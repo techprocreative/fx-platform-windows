@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd supervisor && npx prisma generate && npm run build",
+  "outputDirectory": "supervisor/.next",
+  "installCommand": "npm install --prefix supervisor",
+  "framework": null
+}
