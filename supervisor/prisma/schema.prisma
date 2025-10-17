@@ -1,0 +1,368 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User Management
+model User {
+  id                     String    @id @default(cuid())
+  email                  String    @unique
+  emailVerified          DateTime?
+  passwordHash           String?
+  firstName              String?
+  lastName               String?
+  phoneNumber            String?
+  avatarUrl              String?
+  twoFactorEnabled       Boolean   @default(false)
+  twoFactorSecret        String?
+  locked                 Boolean   @default(false)
+  lockedUntil            DateTime?
+  failedLoginAttempts    Int       @default(0)
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  deletedAt              DateTime?
+
+  // Relations
+  accounts               Account[]
+  sessions               Session[]
+  subscription           Subscription?
+  strategies             Strategy[]
+  executors              Executor[]
+  trades                 Trade[]
+  commands               Command[]
+  backtests              Backtest[]
+  apiKeys                APIKey[]
+  auditLogs              AuditLog[]
+  preferences            UserPreferences?
+
+  @@index([email])
+  @@index([createdAt])
+}
+
+// Authentication
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  ipAddress    String?
+  userAgent    String?
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// User Preferences
+model UserPreferences {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  theme                   String   @default("light")
+  language                String   @default("en")
+  timezone                String   @default("UTC")
+  notifications_email     Boolean  @default(true)
+  notifications_push      Boolean  @default(true)
+  notifications_sms       Boolean  @default(false)
+  quietHoursStart         String?
+  quietHoursEnd           String?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Subscription Management
+model Subscription {
+  id                      String    @id @default(cuid())
+  userId                  String    @unique
+  planId                  String
+  status                  String    @default("active") // active, cancelled, expired, paused
+  paymentMethod           String?   // stripe, midtrans
+  stripeSubscriptionId    String?   @unique
+  midtransOrderId         String?   @unique
+  currentPeriodStart      DateTime
+  currentPeriodEnd        DateTime
+  cancelAtPeriodEnd       Boolean   @default(false)
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invoices Invoice[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Invoice {
+  id              String    @id @default(cuid())
+  subscriptionId  String
+  amount          Float
+  currency        String    @default("USD")
+  status          String    @default("paid") // paid, pending, failed
+  stripeInvoiceId String?   @unique
+  paidAt          DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+}
+
+// API Key Management
+model APIKey {
+  id                String    @id @default(cuid())
+  userId            String
+  name              String
+  keyHash           String
+  secretHash        String    @unique
+  permissions       String[]  @default(["read:strategies", "execute:trades"])
+  ipWhitelist       String[]  @default([])
+  rateLimit         Int       @default(1000)
+  expiresAt         DateTime
+  lastUsed          DateTime?
+  failedAttempts    Int       @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyHash])
+}
+
+// Trading Strategies
+model Strategy {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  description     String?   @db.Text
+  symbol          String
+  timeframe       String    // M1, M5, M15, M30, H1, H4, D1, W1
+  type            String    @default("manual") // manual, ai_generated, imported
+  status          String    @default("draft") // draft, active, paused, archived
+  rules           Json      // Entry, exit, risk management rules
+  version         Int       @default(1)
+  aiPrompt        String?   @db.Text
+  isPublic        Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades Trade[]
+  backtests Backtest[]
+  versions StrategyVersion[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([symbol])
+}
+
+model StrategyVersion {
+  id          String    @id @default(cuid())
+  strategyId  String
+  version     Int
+  rules       Json
+  description String?   @db.Text
+  createdAt   DateTime  @default(now())
+
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@unique([strategyId, version])
+  @@index([strategyId])
+}
+
+// Executor Management
+model Executor {
+  id              String    @id @default(cuid())
+  userId          String
+  name            String
+  apiKey          String    @unique
+  apiSecretHash   String
+  platform        String    // MT5, MT4
+  brokerServer    String?
+  accountNumber   String?
+  status          String    @default("offline") // online, offline, error
+  lastHeartbeat   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades Trade[]
+  commands Command[]
+
+  @@index([userId])
+  @@index([apiKey])
+}
+
+// Trade Execution
+model Trade {
+  id              String    @id @default(cuid())
+  userId          String
+  strategyId      String
+  executorId      String
+  ticket          String
+  symbol          String
+  type            String    // BUY, SELL
+  lots            Float
+  openTime        DateTime
+  openPrice       Float
+  closeTime       DateTime?
+  closePrice      Float?
+  stopLoss        Float?
+  takeProfit      Float?
+  commission      Float?
+  swap            Float?
+  profit          Float?
+  netProfit       Float?
+  pips            Float?
+  magicNumber     Int?
+  comment         String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  executor Executor @relation(fields: [executorId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([strategyId])
+  @@index([executorId])
+  @@index([openTime])
+  @@index([symbol])
+}
+
+// Remote Commands
+model Command {
+  id            String    @id @default(cuid())
+  userId        String
+  executorId    String
+  command       String    // STOP_ALL, PAUSE, RESUME, etc.
+  parameters    Json?
+  priority      String    @default("NORMAL") // LOW, NORMAL, HIGH, URGENT
+  status        String    @default("pending") // pending, executed, failed
+  result        Json?
+  createdAt     DateTime  @default(now())
+  executedAt    DateTime?
+  acknowledgedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  executor Executor @relation(fields: [executorId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([executorId])
+  @@index([status])
+}
+
+// Backtesting
+model Backtest {
+  id            String    @id @default(cuid())
+  userId        String
+  strategyId    String
+  status        String    @default("pending") // pending, running, completed, failed
+  dateFrom      DateTime
+  dateTo        DateTime
+  initialBalance Float
+  settings      Json?     // Spread, commission, slippage
+  results       Json?     // Statistics and trade history
+  createdAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([strategyId])
+  @@index([status])
+}
+
+// Audit Logging
+model AuditLog {
+  id              String    @id @default(cuid())
+  userId          String
+  eventType       String
+  resource        String?
+  action          String?
+  result          String?
+  metadata        Json?
+  ipAddress       String?
+  userAgent       String?
+  hash            String?   // Tamper-proof hash
+  timestamp       DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
+// Market Data (for backtesting)
+model MarketData {
+  id            String    @id @default(cuid())
+  symbol        String
+  timeframe     String
+  timestamp     DateTime
+  open          Float
+  high          Float
+  low           Float
+  close         Float
+  volume        Int
+  createdAt     DateTime  @default(now())
+
+  @@unique([symbol, timeframe, timestamp])
+  @@index([symbol, timeframe, timestamp])
+}
+
+// Activity Logs (for analytics)
+model ActivityLog {
+  id              String    @id @default(cuid())
+  userId          String
+  eventType       String    // login, strategy_create, backtest_run, etc.
+  metadata        Json?
+  timestamp       DateTime  @default(now())
+
+  @@index([userId])
+  @@index([eventType])
+  @@index([timestamp])
+}
