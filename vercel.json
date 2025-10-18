@@ -1,0 +1,50 @@
+{
+  "buildCommand": "prisma generate && pnpm run build",
+  "outputDirectory": ".next",
+  "devCommand": "pnpm dev",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "framework": "nextjs",
+  "nodeVersion": "20.x",
+  "regions": ["sin1"],
+  "env": {
+    "NODE_ENV": "production",
+    "NEXTAUTH_URL": "@NEXTAUTH_URL",
+    "NEXTAUTH_SECRET": "@NEXTAUTH_SECRET",
+    "DATABASE_URL": "@DATABASE_URL"
+  },
+  "build": {
+    "env": {
+      "NODE_ENV": "production"
+    }
+  },
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "X-XSS-Protection",
+          "value": "1; mode=block"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/supervisor(/?|/.+)",
+      "destination": "/",
+      "permanent": false
+    }
+  ]
+}

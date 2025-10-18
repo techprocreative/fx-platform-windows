@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import { promisify } from 'util';
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const bcrypt = require('bcryptjs');
 
 const scrypt = promisify(crypto.scrypt);
