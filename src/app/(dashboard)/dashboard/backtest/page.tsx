@@ -64,7 +64,7 @@ export default function BacktestPage() {
 
   const [formData, setFormData] = useState({
     strategyId: '',
-    symbol: 'EURUSD',
+    symbol: '',
     interval: '1h',
     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     endDate: new Date().toISOString().split('T')[0],
@@ -112,18 +112,43 @@ export default function BacktestPage() {
     }
   };
 
+  const handleStrategyChange = (strategyId: string) => {
+    const selectedStrategy = strategies.find(s => s.id === strategyId);
+    if (selectedStrategy) {
+      setFormData(prev => ({
+        ...prev,
+        strategyId,
+        symbol: selectedStrategy.symbol,
+        interval: selectedStrategy.timeframe.toLowerCase(),
+      }));
+    }
+  };
+
   const handleRunBacktest = async () => {
     if (!formData.strategyId) {
       toast.error('Please select a strategy');
       return;
     }
 
+    if (!formData.symbol) {
+      toast.error('Strategy symbol is not set');
+      return;
+    }
+
     try {
       setLoading(true);
+      
+      // Convert dates to ISO datetime format with time component
+      const requestData = {
+        ...formData,
+        startDate: `${formData.startDate}T00:00:00Z`,
+        endDate: `${formData.endDate}T23:59:59Z`,
+      };
+      
       const response = await fetch('/api/backtest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(requestData),
       });
 
       const data = await response.json();
@@ -203,10 +228,10 @@ export default function BacktestPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
             <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">Strategy</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">Strategy *</label>
               <select
                 value={formData.strategyId}
-                onChange={(e) => setFormData(prev => ({ ...prev, strategyId: e.target.value }))}
+                onChange={(e) => handleStrategyChange(e.target.value)}
                 className="w-full rounded-lg border border-neutral-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               >
                 <option value="">Select a strategy</option>
@@ -218,38 +243,21 @@ export default function BacktestPage() {
                     </option>
                   ))}
               </select>
+              <p className="text-xs text-neutral-500 mt-1">Symbol and timeframe will be auto-filled from selected strategy</p>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Symbol</label>
-              <select
-                value={formData.symbol}
-                onChange={(e) => setFormData(prev => ({ ...prev, symbol: e.target.value }))}
-                className="w-full rounded-lg border border-neutral-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-              >
-                <option value="EURUSD">EUR/USD</option>
-                <option value="GBPUSD">GBP/USD</option>
-                <option value="USDJPY">USD/JPY</option>
-                <option value="XAUUSD">XAU/USD</option>
-                <option value="BTCUSD">BTC/USD</option>
-              </select>
+              <div className="w-full rounded-lg border border-neutral-300 px-4 py-2 bg-neutral-50 text-neutral-700">
+                {formData.symbol ? formData.symbol : <span className="text-neutral-400">Select a strategy first</span>}
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">Timeframe</label>
-              <select
-                value={formData.interval}
-                onChange={(e) => setFormData(prev => ({ ...prev, interval: e.target.value }))}
-                className="w-full rounded-lg border border-neutral-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-              >
-                <option value="1min">1 Minute</option>
-                <option value="5min">5 Minutes</option>
-                <option value="15min">15 Minutes</option>
-                <option value="30min">30 Minutes</option>
-                <option value="1h">1 Hour</option>
-                <option value="4h">4 Hours</option>
-                <option value="1d">Daily</option>
-              </select>
+              <div className="w-full rounded-lg border border-neutral-300 px-4 py-2 bg-neutral-50 text-neutral-700">
+                {formData.interval ? formData.interval.toUpperCase() : <span className="text-neutral-400">Select a strategy first</span>}
+              </div>
             </div>
 
             <div>
