@@ -14,6 +14,9 @@ import {
   LogOut,
   ChevronDown,
   Zap,
+  Server,
+  Activity,
+  History,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -32,6 +35,21 @@ const navItems = [
     label: 'Backtesting',
     href: '/dashboard/backtest',
     icon: BarChart3,
+  },
+  {
+    label: 'Monitor',
+    href: '/dashboard/monitor',
+    icon: Activity,
+  },
+  {
+    label: 'Trades',
+    href: '/dashboard/trades',
+    icon: History,
+  },
+  {
+    label: 'Executors',
+    href: '/dashboard/executors',
+    icon: Server,
   },
   {
     label: 'Analytics',

@@ -10,6 +10,23 @@
       "NODE_ENV": "production"
     }
   },
+  "functions": {
+    "src/app/api/backtest/route.ts": {
+      "maxDuration": 60
+    },
+    "src/app/api/ai/generate-strategy/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/ai/optimize-strategy/route.ts": {
+      "maxDuration": 30
+    },
+    "src/app/api/signals/route.ts": {
+      "maxDuration": 10
+    },
+    "src/app/api/commands/route.ts": {
+      "maxDuration": 10
+    }
+  },
   "headers": [
     {
       "source": "/(.*)",
@@ -20,7 +37,7 @@
         },
         {
           "key": "X-Frame-Options",
-          "value": "SAMEORIGIN"
+          "value": "DENY"
         },
         {
           "key": "X-XSS-Protection",
@@ -29,6 +46,23 @@
         {
           "key": "Referrer-Policy",
           "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "camera=(), microphone=(), geolocation=()"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=63072000; includeSubDomains; preload"
+        }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store, must-revalidate"
         }
       ]
     }
