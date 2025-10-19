@@ -60,22 +60,42 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'asc' },
     });
 
-    // Calculate real metrics from actual trades
-    const totalTrades = trades.length;
-    const winningTrades = trades.filter(t => (t.profit || 0) > 0).length;
-    const losingTrades = trades.filter(t => (t.profit || 0) <= 0).length;
-    const totalProfit = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
+    // Calculate combined metrics from both trades and backtests
+    const totalTrades = trades.length + backtests.length;
+    const winningTrades = (
+      trades.filter(t => (t.profit || 0) > 0).length +
+      backtests.filter(b => (b.returnPercentage || 0) > 0).length
+    );
+    const losingTrades = (
+      trades.filter(t => (t.profit || 0) <= 0).length +
+      backtests.filter(b => (b.returnPercentage || 0) <= 0).length
+    );
+    
+    // Combine profits from both trades and backtests
+    const tradeProfits = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
+    const backtestReturns = backtests.reduce((sum, b) => sum + (b.totalReturn || 0), 0);
+    const totalProfit = tradeProfits + backtestReturns;
     const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
     // Calculate profit factor
-    const totalWinAmount = trades
+    const tradeWins = trades
       .filter(t => (t.profit || 0) > 0)
       .reduce((sum, t) => sum + (t.profit || 0), 0);
-    const totalLossAmount = Math.abs(
+    const backtestWins = backtests
+      .filter(b => (b.returnPercentage || 0) > 0)
+      .reduce((sum, b) => sum + (Math.abs(b.totalReturn || 0)), 0);
+    
+    const tradeLosses = Math.abs(
       trades
         .filter(t => (t.profit || 0) < 0)
         .reduce((sum, t) => sum + (t.profit || 0), 0)
     );
+    const backtestLosses = backtests
+      .filter(b => (b.returnPercentage || 0) < 0)
+      .reduce((sum, b) => sum + (Math.abs(b.totalReturn || 0)), 0);
+    
+    const totalWinAmount = tradeWins + backtestWins;
+    const totalLossAmount = tradeLosses + backtestLosses;
     const profitFactor = totalLossAmount > 0 ? totalWinAmount / totalLossAmount : totalWinAmount > 0 ? Infinity : 0;
 
     // Calculate average win/loss
@@ -112,24 +132,36 @@ export async function GET(request: NextRequest) {
     const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / (returns.length || 1);
     const sharpeRatio = variance > 0 ? (avgReturn / Math.sqrt(variance)) * Math.sqrt(252) : 0;
 
-    // Group actual trades by month
+    // Group actual data by month (trades + backtests)
     const monthlyData: { month: string; profit: number; trades: number }[] = [];
-    const monthlyGroups = new Map<string, number[]>();
+    const monthlyGroups = new Map<string, { profits: number[]; tradeCount: number }>();
 
+    // Add trades to monthly groups
     trades.forEach(trade => {
       const month = trade.createdAt.toISOString().slice(0, 7); // YYYY-MM
       if (!monthlyGroups.has(month)) {
-        monthlyGroups.set(month, []);
+        monthlyGroups.set(month, { profits: [], tradeCount: 0 });
       }
-      monthlyGroups.get(month)!.push(trade.profit || 0);
+      monthlyGroups.get(month)!.profits.push(trade.profit || 0);
+      monthlyGroups.get(month)!.tradeCount += 1;
     });
 
-    monthlyGroups.forEach((profits, month) => {
+    // Add backtests to monthly groups  
+    backtests.forEach(backtest => {
+      const month = backtest.createdAt.toISOString().slice(0, 7); // YYYY-MM
+      if (!monthlyGroups.has(month)) {
+        monthlyGroups.set(month, { profits: [], tradeCount: 0 });
+      }
+      monthlyGroups.get(month)!.profits.push(backtest.totalReturn || 0);
+      monthlyGroups.get(month)!.tradeCount += 1;
+    });
+
+    monthlyGroups.forEach((data, month) => {
       const monthName = new Date(month + '-01').toLocaleString('default', { month: 'short', year: 'numeric' });
       monthlyData.push({
         month: monthName,
-        profit: profits.reduce((sum, p) => sum + p, 0),
-        trades: profits.length,
+        profit: data.profits.reduce((sum, p) => sum + p, 0),
+        trades: data.tradeCount,
       });
     });
 
