@@ -5,7 +5,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
-import { prisma } from '@/lib/prisma';
+import { prisma } from './prisma';
 import crypto from 'crypto';
 
 // Rate limiting storage (in production, use Redis)

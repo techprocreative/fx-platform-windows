@@ -3,7 +3,7 @@
  * Handles real-time communication for Vercel deployment
  */
 
-import type { TradeCommand } from '@/lib/commands/queue';
+import type { TradeCommand } from '../commands/queue';
 
 // Dynamic imports to avoid build errors if not configured
 let Pusher: any;

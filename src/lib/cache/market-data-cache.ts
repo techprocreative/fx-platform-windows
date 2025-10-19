@@ -1,4 +1,4 @@
-import { EnhancedMarketData } from '@/lib/backtest/engine';
+import { EnhancedMarketData } from '../backtest/engine';
 
 export interface CacheConfig {
   ttl: number; // Time to live in seconds

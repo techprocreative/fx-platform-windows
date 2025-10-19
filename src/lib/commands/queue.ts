@@ -6,7 +6,7 @@
 
 import Bull from 'bull';
 import Redis from 'ioredis';
-import { prisma } from '@/lib/prisma';
+import { prisma } from '../prisma';
 
 export interface TradeCommand {
   id: string;

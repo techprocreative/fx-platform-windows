@@ -6,8 +6,8 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
-import { prisma } from '@/lib/prisma';
-import { getCommandQueue } from '@/lib/commands/queue';
+import { prisma } from '../prisma';
+import { getCommandQueue } from '../commands/queue';
 import jwt from 'jsonwebtoken';
 
 interface WSClient {

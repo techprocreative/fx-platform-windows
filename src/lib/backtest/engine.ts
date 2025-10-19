@@ -1,6 +1,6 @@
-import { MarketData, BacktestResult, Strategy } from '@/types';
+import { MarketData, BacktestResult, Strategy } from '../../types';
 import TwelveData from 'twelvedata';
-import { marketDataCache, CacheKey } from '@/lib/cache/market-data-cache';
+import { marketDataCache, CacheKey } from '../cache/market-data-cache';
 
 // Initialize TwelveData client
 const twelveDataClient = new TwelveData({

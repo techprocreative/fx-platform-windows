@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { authOptions } from '../lib/auth';
 import Link from 'next/link';
 import { ArrowRight, Zap, Shield, TrendingUp } from 'lucide-react';
 

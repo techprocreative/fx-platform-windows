@@ -1,4 +1,4 @@
-import { Strategy } from '@/types';
+import { Strategy } from '../../types';
 
 // OpenRouter AI configuration
 const OPENROUTER_API_URL = 'https://openrouter.ai/api/v1/chat/completions';

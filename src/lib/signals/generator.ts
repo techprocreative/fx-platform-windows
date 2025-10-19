@@ -4,7 +4,7 @@
  * DO NOT DELETE - CRITICAL ARCHITECTURE COMPONENT
  */
 
-import { prisma } from '@/lib/prisma';
+import { prisma } from '../prisma';
 
 export interface TradingSignal {
   id: string;

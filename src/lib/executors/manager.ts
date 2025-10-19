@@ -4,9 +4,9 @@
  * DO NOT DELETE - CRITICAL ARCHITECTURE COMPONENT
  */
 
-import { prisma } from '@/lib/prisma';
-import { getWebSocketServer } from '@/lib/websocket/server';
-import { getCommandQueue, TradeCommand } from '@/lib/commands/queue';
+import { prisma } from '../prisma';
+import { getWebSocketServer } from '../websocket/server';
+import { getCommandQueue, TradeCommand } from '../commands/queue';
 import crypto from 'crypto';
 
 export interface Executor {

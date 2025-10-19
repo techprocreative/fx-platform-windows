@@ -1,5 +1,5 @@
 import { BacktestEngine } from './engine';
-import { Strategy } from '@/types';
+import { Strategy } from '../../types';
 
 // Test strategy for MVP
 const testStrategy: Strategy = {
