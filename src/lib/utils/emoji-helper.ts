@@ -61,28 +61,10 @@ export const statusIndicatorsSmall = {
 };
 
 /**
- * Enhanced card component for analytics metrics
+ * Get color class based on format
  */
-export const MetricCard = ({ icon: React.ReactNode, title: string, value: string, suffix?: string, format?: 'currency' | 'percent', format?: 'number' }) => (
-  <div className="rounded-lg border border border-neutral-200 bg-white p-6 hover:shadow-sm transition-colors">
-    <div className="flex items-start justify-between mb-4">
-      <div className="flex items-center gap-3">
-        <div
-          className={`p-2 text-${getStatusColor(status.color)} rounded-full p-3 ${getStatusColor(status.color)} text-center`}>
-            <icon className={`w-4 h-4 ${getStatusColor(status.color)}`} />
-            <span>{status}</span>
-          </div>
-        </div>
-        <div className="text-left">
-          <p className="text-sm font-medium text-neutral-900">{title}</p>
-          <p className={`text-sm text-neutral-600`}>{suffix}</p>
-        </div>
-      </div>
-      <div className={`text-right ${format === 'currency' ? 'text-green-600' : 
-      format === 'percent' ? 'text-blue-600' : 'text-red-600'}`}>
-        {displayValue}
-      </div>
-    </div>
-    {/* End of Metric Cards */}
-  </div>
-);
+export function getFormatColor(format?: 'currency' | 'percent' | 'number'): string {
+  if (format === 'currency') return 'text-green-600';
+  if (format === 'percent') return 'text-blue-600';
+  return 'text-neutral-900';
+}

@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
+
 import { authOptions } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
-import { z } from 'zod';
+import { AppError, handleApiError } from '@/lib/errors';
+import {
+  STRATEGY_LIST_INCLUDE,
+  revalidateStrategiesCache,
+} from '@/lib/cache/query-cache';
+
+import type { Prisma } from '@prisma/client';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,36 +29,33 @@ export async function GET(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      throw new AppError(401, 'Unauthorized');
     }
 
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
     const symbol = url.searchParams.get('symbol');
-    const page = parseInt(url.searchParams.get('page') || '1');
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 100);
+    const page = Math.max(parseInt(url.searchParams.get('page') || '1', 10), 1);
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 100);
     const skip = (page - 1) * limit;
 
-    const where: any = {
+    const where: Prisma.StrategyWhereInput = {
       userId: session.user.id,
       deletedAt: null,
+      ...(status && status !== 'all' ? { status } : {}),
+      ...(symbol ? { symbol: symbol.toUpperCase() } : {}),
     };
 
-    if (status && status !== 'all') {
-      where.status = status;
-    }
-
-    if (symbol) {
-      where.symbol = symbol.toUpperCase();
-    }
+    const strategiesPromise = prisma.strategy.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { createdAt: 'desc' },
+      include: STRATEGY_LIST_INCLUDE,
+    });
 
     const [strategies, total] = await Promise.all([
-      prisma.strategy.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
+      strategiesPromise,
       prisma.strategy.count({ where }),
     ]);
 
@@ -64,11 +69,7 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('Strategy GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch strategies' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 
@@ -77,42 +78,36 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      throw new AppError(401, 'Unauthorized');
     }
 
     const body = await req.json();
 
-    // Validate input
     const validation = strategyCreateSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json(
-        {
-          error: 'Validation error',
-          details: validation.error.flatten().fieldErrors,
-        },
-        { status: 400 }
+      throw new AppError(
+        400,
+        'Validation error',
+        'VALIDATION_ERROR',
+        validation.error.flatten().fieldErrors
       );
     }
 
-    const { name, description, symbol, timeframe, type, rules, isPublic } =
-      validation.data;
+    const { name, description, symbol, timeframe, type, rules, isPublic } = validation.data;
 
-    // Check user subscription limits (MVP: no limits)
-    const existingCount = await prisma.strategy.count({
-      where: {
-        userId: session.user.id,
-        deletedAt: null,
-      },
-    });
+    const [existingCount] = await Promise.all([
+      prisma.strategy.count({
+        where: {
+          userId: session.user.id,
+          deletedAt: null,
+        },
+      }),
+    ]);
 
     if (existingCount >= 100) {
-      return NextResponse.json(
-        { error: 'Strategy limit reached. Upgrade your plan.' },
-        { status: 409 }
-      );
+      throw new AppError(409, 'Strategy limit reached. Upgrade your plan.', 'STRATEGY_LIMIT');
     }
 
-    // Create strategy
     const strategy = await prisma.strategy.create({
       data: {
         userId: session.user.id,
@@ -127,7 +122,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Log activity
     await prisma.activityLog.create({
       data: {
         userId: session.user.id,
@@ -139,12 +133,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    await revalidateStrategiesCache();
+
     return NextResponse.json(strategy, { status: 201 });
   } catch (error) {
-    console.error('Strategy POST error:', error);
-    return NextResponse.json(
-      { error: 'Failed to create strategy' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }

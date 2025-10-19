@@ -19,6 +19,7 @@ import {
   History,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const navItems = [
   {
@@ -211,7 +212,7 @@ export default function DashboardLayout({
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-6">
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
 

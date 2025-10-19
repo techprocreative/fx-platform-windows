@@ -1,11 +1,13 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { ChevronLeft, Edit2, Play, BarChart3 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { ChevronLeft, Edit2, Play, BarChart3 } from "lucide-react";
+import { useEffect } from "react";
+import toast from "react-hot-toast";
+
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { useApiRequest } from "@/hooks/useApiRequest";
 
 interface Strategy {
   id: string;
@@ -24,50 +26,43 @@ interface Strategy {
 }
 
 export default function StrategyDetailPage({ params }: { params: { id: string } }) {
-  const { status } = useSession();
-  const [strategy, setStrategy] = useState<Strategy | null>(null);
-  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const { data: strategy, loading, error, execute } = useApiRequest<Strategy>();
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      redirect('/login');
-    }
-
-    if (status === 'authenticated') {
-      fetchStrategy();
-    }
-  }, [status]);
-
-  const fetchStrategy = async () => {
-    try {
+    execute(async () => {
       const response = await fetch(`/api/strategy/${params.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setStrategy(data);
-      } else {
-        toast.error('Strategy not found');
+
+      if (response.status === 401) {
+        router.replace("/login");
+        throw new Error("Unauthorized");
       }
-    } catch (error) {
-      toast.error('Failed to load strategy');
-    } finally {
-      setLoading(false);
-    }
-  };
+
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(body?.error || "Strategy not found");
+      }
+
+      return response.json();
+    }).catch((err) => {
+      if (err.message !== "Unauthorized") {
+        toast.error(err.message);
+      }
+    });
+  }, [execute, params.id, router]);
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin">
-          <div className="h-12 w-12 rounded-full border-4 border-primary-600 border-t-transparent" />
-        </div>
+      <div className="flex h-96 items-center justify-center">
+        <LoadingSpinner size="lg" />
       </div>
     );
   }
 
-  if (!strategy) {
+  if (error || !strategy) {
     return (
       <div className="rounded-lg border border-neutral-200 bg-white p-8 text-center">
-        <p className="text-neutral-600">Strategy not found</p>
+        <p className="text-neutral-600">{error?.message || "Strategy not found"}</p>
       </div>
     );
   }

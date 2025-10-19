@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
+import { z } from 'zod';
+
+import { AppError, handleApiError } from '@/lib/errors';
+import { revalidateStrategiesCache } from '@/lib/cache/query-cache';
 import { authOptions } from '../../../../lib/auth';
 import { prisma } from '../../../../lib/prisma';
-import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,17 +18,17 @@ const strategyUpdateSchema = z.object({
 });
 
 export async function GET(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      throw new AppError(401, 'Unauthorized');
     }
 
-    const strategy = await prisma.strategy.findFirst({
+    const strategyPromise = prisma.strategy.findFirst({
       where: {
         id: params.id,
         userId: session.user.id,
@@ -34,6 +37,14 @@ export async function GET(
       include: {
         trades: {
           take: 10,
+          orderBy: { createdAt: 'desc' },
+        },
+        backtests: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        },
+        versions: {
+          take: 5,
           orderBy: { createdAt: 'desc' },
         },
         _count: {
@@ -46,20 +57,15 @@ export async function GET(
       },
     });
 
+    const strategy = await strategyPromise;
+
     if (!strategy) {
-      return NextResponse.json(
-        { error: 'Strategy not found' },
-        { status: 404 }
-      );
+      throw new AppError(404, 'Strategy not found', 'STRATEGY_NOT_FOUND');
     }
 
     return NextResponse.json(strategy);
   } catch (error) {
-    console.error('Strategy GET error:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch strategy' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 
@@ -71,24 +77,21 @@ export async function PATCH(
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      throw new AppError(401, 'Unauthorized');
     }
 
     const body = await req.json();
-
-    // Validate input
     const validation = strategyUpdateSchema.safeParse(body);
+
     if (!validation.success) {
-      return NextResponse.json(
-        {
-          error: 'Validation error',
-          details: validation.error.flatten().fieldErrors,
-        },
-        { status: 400 }
+      throw new AppError(
+        400,
+        'Validation error',
+        'VALIDATION_ERROR',
+        validation.error.flatten().fieldErrors
       );
     }
 
-    // Check ownership
     const strategy = await prisma.strategy.findFirst({
       where: {
         id: params.id,
@@ -98,13 +101,9 @@ export async function PATCH(
     });
 
     if (!strategy) {
-      return NextResponse.json(
-        { error: 'Strategy not found' },
-        { status: 404 }
-      );
+      throw new AppError(404, 'Strategy not found', 'STRATEGY_NOT_FOUND');
     }
 
-    // Create version if rules are being updated
     if (validation.data.rules) {
       await prisma.strategyVersion.create({
         data: {
@@ -116,16 +115,35 @@ export async function PATCH(
       });
     }
 
-    // Update strategy
     const updated = await prisma.strategy.update({
       where: { id: params.id },
       data: {
         ...validation.data,
         version: validation.data.rules ? strategy.version + 1 : strategy.version,
       },
+      include: {
+        trades: {
+          take: 10,
+          orderBy: { createdAt: 'desc' },
+        },
+        backtests: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        },
+        versions: {
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+        },
+        _count: {
+          select: {
+            trades: true,
+            backtests: true,
+            versions: true,
+          },
+        },
+      },
     });
 
-    // Log activity
     await prisma.activityLog.create({
       data: {
         userId: session.user.id,
@@ -137,28 +155,25 @@ export async function PATCH(
       },
     });
 
+    await revalidateStrategiesCache();
+
     return NextResponse.json(updated);
   } catch (error) {
-    console.error('Strategy PATCH error:', error);
-    return NextResponse.json(
-      { error: 'Failed to update strategy' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 
 export async function DELETE(
-  req: NextRequest,
+  _req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      throw new AppError(401, 'Unauthorized');
     }
 
-    // Check ownership
     const strategy = await prisma.strategy.findFirst({
       where: {
         id: params.id,
@@ -168,19 +183,14 @@ export async function DELETE(
     });
 
     if (!strategy) {
-      return NextResponse.json(
-        { error: 'Strategy not found' },
-        { status: 404 }
-      );
+      throw new AppError(404, 'Strategy not found', 'STRATEGY_NOT_FOUND');
     }
 
-    // Soft delete
     await prisma.strategy.update({
       where: { id: params.id },
       data: { deletedAt: new Date() },
     });
 
-    // Log activity
     await prisma.activityLog.create({
       data: {
         userId: session.user.id,
@@ -192,12 +202,10 @@ export async function DELETE(
       },
     });
 
+    await revalidateStrategiesCache();
+
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Strategy DELETE error:', error);
-    return NextResponse.json(
-      { error: 'Failed to delete strategy' },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }

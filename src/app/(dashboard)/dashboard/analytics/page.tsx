@@ -13,6 +13,12 @@ import {
   Calendar,
   Filter,
   Download,
+  PieChart,
+  LineChart,
+  Target,
+  Zap,
+  Award,
+  AlertCircle
 } from 'lucide-react';
 
 interface PerformanceData {
@@ -45,6 +51,9 @@ export default function AnalyticsPage() {
   const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('6M');
+  const [selectedMetric, setSelectedMetric] = useState<'overview' | 'profitability' | 'risk' | 'consistency'>('overview');
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportFormat, setExportFormat] = useState<'pdf' | 'csv' | 'excel'>('pdf');
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -147,11 +156,37 @@ export default function AnalyticsPage() {
             <option value="ALL">All Time</option>
           </select>
 
-          <button className="flex items-center gap-2 px-4 py-2 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors">
+          <button
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+            onClick={() => setShowExportDialog(true)}
+          >
             <Download className="h-4 w-4" />
             Export
           </button>
         </div>
+      </div>
+
+      {/* Metric Selector */}
+      <div className="flex gap-2 mb-6">
+        {[
+          { id: 'overview', label: 'Overview', icon: BarChart3 },
+          { id: 'profitability', label: 'Profitability', icon: DollarSign },
+          { id: 'risk', label: 'Risk Analysis', icon: Target },
+          { id: 'consistency', label: 'Consistency', icon: Zap }
+        ].map((metric) => (
+          <button
+            key={metric.id}
+            onClick={() => setSelectedMetric(metric.id as any)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
+              selectedMetric === metric.id
+                ? 'bg-primary-600 text-white'
+                : 'bg-white border border-neutral-300 text-neutral-700 hover:bg-neutral-50'
+            }`}
+          >
+            <metric.icon className="h-4 w-4" />
+            {metric.label}
+          </button>
+        ))}
       </div>
 
       {/* Performance Overview */}
@@ -196,6 +231,98 @@ export default function AnalyticsPage() {
           </div>
           <p className="text-2xl font-bold text-orange-600">-{data.maxDrawdown.toFixed(1)}%</p>
         </div>
+      </div>
+
+      {/* Interactive Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Equity Curve */}
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+            <LineChart className="h-5 w-5" />
+            Equity Curve
+          </h2>
+          <div className="h-64 bg-neutral-50 rounded-lg flex items-center justify-center">
+            <div className="text-center">
+              <LineChart className="h-12 w-12 text-neutral-400 mx-auto mb-2" />
+              <p className="text-neutral-500">Interactive equity chart</p>
+              <p className="text-sm text-neutral-400">Shows account balance over time</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Profit Distribution */}
+        <div className="bg-white rounded-lg border border-neutral-200 p-6">
+          <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+            <PieChart className="h-5 w-5" />
+            Profit Distribution
+          </h2>
+          <div className="h-64 bg-neutral-50 rounded-lg flex items-center justify-center">
+            <div className="text-center">
+              <PieChart className="h-12 w-12 text-neutral-400 mx-auto mb-2" />
+              <p className="text-neutral-500">Profit by symbol</p>
+              <p className="text-sm text-neutral-400">Breakdown of profitability</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Strategy Comparison */}
+      <div className="bg-white rounded-lg border border-neutral-200 p-6">
+        <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+          <Award className="h-5 w-5" />
+          Strategy Performance Comparison
+        </h2>
+        {data.strategyPerformance.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-neutral-200">
+                  <th className="text-left py-2 px-4 text-sm font-medium text-neutral-700">Strategy</th>
+                  <th className="text-right py-2 px-4 text-sm font-medium text-neutral-700">Profit</th>
+                  <th className="text-right py-2 px-4 text-sm font-medium text-neutral-700">Win Rate</th>
+                  <th className="text-right py-2 px-4 text-sm font-medium text-neutral-700">Trades</th>
+                  <th className="text-right py-2 px-4 text-sm font-medium text-neutral-700">Profit Factor</th>
+                  <th className="text-center py-2 px-4 text-sm font-medium text-neutral-700">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.strategyPerformance.map((strategy) => (
+                  <tr key={strategy.strategyId} className="border-b border-neutral-100">
+                    <td className="py-3 px-4">
+                      <div>
+                        <p className="font-medium text-neutral-900">{strategy.name}</p>
+                        <p className="text-xs text-neutral-500">ID: {strategy.strategyId}</p>
+                      </div>
+                    </td>
+                    <td className={`py-3 px-4 text-right font-medium ${
+                      strategy.profit >= 0 ? 'text-green-600' : 'text-red-600'
+                    }`}>
+                      ${strategy.profit.toFixed(2)}
+                    </td>
+                    <td className="py-3 px-4 text-right">
+                      <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
+                        strategy.winRate >= 50 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {strategy.winRate.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 text-right text-neutral-900">{strategy.trades}</td>
+                    <td className="py-3 px-4 text-right text-neutral-900">
+                      {(strategy.profit / (strategy.trades * 0.01)).toFixed(2)}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="text-neutral-500 text-center py-4">No strategy data available</p>
+        )}
       </div>
 
       {/* Charts Section */}
@@ -312,6 +439,64 @@ export default function AnalyticsPage() {
           )}
         </ul>
       </div>
+
+      {/* Export Dialog */}
+      {showExportDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Export Report</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">
+                  Export Format
+                </label>
+                <div className="space-y-2">
+                  {[
+                    { value: 'pdf', label: 'PDF Report', description: 'Comprehensive report with charts' },
+                    { value: 'csv', label: 'CSV Data', description: 'Raw data for analysis' },
+                    { value: 'excel', label: 'Excel Workbook', description: 'Detailed spreadsheet with all metrics' }
+                  ].map((format) => (
+                    <label key={format.value} className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="radio"
+                        value={format.value}
+                        checked={exportFormat === format.value}
+                        onChange={(e) => setExportFormat(e.target.value as any)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="font-medium text-neutral-900">{format.label}</p>
+                        <p className="text-sm text-neutral-500">{format.description}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <Button
+                variant="secondary"
+                onClick={() => setShowExportDialog(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  // Handle export logic here
+                  console.log(`Exporting as ${exportFormat}`);
+                  setShowExportDialog(false);
+                }}
+                className="flex-1"
+              >
+                Export Report
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

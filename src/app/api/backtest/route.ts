@@ -1,128 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
+import { z } from 'zod';
+
+import { AppError, handleApiError } from '@/lib/errors';
+import { transformStrategyRules } from '@/lib/backtest/strategy-rules';
 import { authOptions } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
-import { z } from 'zod';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// Helper function to transform strategy rules
-function transformStrategyRules(rules: any) {
-  try {
-    if (!rules || typeof rules !== 'object') {
-      return getDefaultStrategyRules();
-    }
-
-    // Handle strategy rules from the strategy creation form
-    if (rules.entry && rules.exit && rules.riskManagement) {
-      return [
-        {
-          name: 'Entry Rule',
-          conditions: rules.entry.conditions.map((condition: any) => ({
-            indicator: condition.indicator.toUpperCase(),
-            operator: convertOperator(condition.condition),
-            value: condition.value,
-            timeframes: [convertTimeframe(rules.timeframe || 'H1')],
-          })),
-          action: {
-            type: 'buy',
-            parameters: {
-              size: rules.riskManagement.lotSize || 0.01,
-            },
-          },
-        },
-        {
-          name: 'Exit Rule',
-          conditions: [
-            {
-              indicator: 'PRICE',
-              operator: 'GTE',
-              value: 999999, // Always true rule for exit
-              timeframes: [convertTimeframe(rules.timeframe || 'H1')],
-            },
-          ],
-          action: {
-            type: 'close',
-            parameters: {
-              takeProfit: rules.exit.takeProfit,
-              stopLoss: rules.exit.stopLoss,
-            },
-          },
-        },
-      ];
-    }
-
-    return getDefaultStrategyRules();
-  } catch (error) {
-    console.error('Error transforming strategy rules:', error);
-    return getDefaultStrategyRules();
-  }
-}
-
-function getDefaultStrategyRules() {
-  return [
-    {
-      name: 'Default Entry',
-      conditions: [
-        {
-          indicator: 'RSI',
-          operator: 'LT',
-          value: 30,
-          timeframes: ['1H'],
-        },
-      ],
-      action: {
-        type: 'buy',
-        parameters: {
-          size: 0.01,
-        },
-      },
-    },
-    {
-      name: 'Default Exit',
-      conditions: [
-        {
-          indicator: 'RSI',
-          operator: 'GT',
-          value: 70,
-          timeframes: ['1H'],
-        },
-      ],
-      action: {
-        type: 'close',
-        parameters: {},
-      },
-    },
-  ];
-}
-
-function convertOperator(condition: string) {
-  const operatorMap: Record<string, string> = {
-    'greater_than': 'GT',
-    'less_than': 'LT',
-    'equals': 'EQ',
-    'crosses_above': 'GTE',
-    'crosses_below': 'LTE',
-    'gte': 'GTE',
-    'lte': 'LTE',
-  };
-  return operatorMap[condition] || 'EQ';
-}
-
-function convertTimeframe(timeframe: string) {
-  const timeframeMap: Record<string, string> = {
-    'M1': '1min',
-    'M5': '5min',
-    'M15': '15min',
-    'M30': '30min',
-    'H1': '1h',
-    'H4': '4h',
-    'D1': '1d',
-    'W1': '1w',
-  };
-  return timeframeMap[timeframe] || '1h';
-}
 
 // Request validation schema
 const BacktestRequestSchema = z.object({
@@ -140,33 +27,23 @@ export async function POST(request: NextRequest) {
     // Check authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      throw new AppError(401, 'Authentication required');
     }
 
     const body = await request.json();
     const validatedData = BacktestRequestSchema.parse(body);
 
     // Fetch strategy from database
-    const strategy = await prisma.strategy.findUnique({
-      where: { id: validatedData.strategyId },
+    const strategy = await prisma.strategy.findFirst({
+      where: {
+        id: validatedData.strategyId,
+        userId: session.user.id,
+        deletedAt: null,
+      },
     });
 
     if (!strategy) {
-      return NextResponse.json(
-        { error: 'Strategy not found' },
-        { status: 404 }
-      );
-    }
-
-    // Check if user owns this strategy
-    if (strategy.userId !== session.user.id) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
+      throw new AppError(404, 'Strategy not found', 'STRATEGY_NOT_FOUND');
     }
 
     // Parse dates
@@ -175,20 +52,14 @@ export async function POST(request: NextRequest) {
 
     // Validate date range
     if (startDate >= endDate) {
-      return NextResponse.json(
-        { error: 'Start date must be before end date' },
-        { status: 400 }
-      );
+      throw new AppError(400, 'Start date must be before end date', 'INVALID_DATE_RANGE');
     }
 
     // Limit backtest period to prevent excessive API calls
     const maxDays = 365;
     const daysDiff = (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
     if (daysDiff > maxDays) {
-      return NextResponse.json(
-        { error: `Backtest period cannot exceed ${maxDays} days` },
-        { status: 400 }
-      );
+      throw new AppError(400, `Backtest period cannot exceed ${maxDays} days`, 'INVALID_DATE_RANGE');
     }
 
     // Create backtest record
@@ -294,35 +165,15 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      return NextResponse.json(
-        { 
-          error: 'Backtest execution failed',
-          details: backtestError instanceof Error ? backtestError.message : 'Unknown error',
-        },
-        { status: 500 }
-      );
+      throw backtestError instanceof Error ? backtestError : new Error('Backtest execution failed');
     }
 
   } catch (error) {
-    console.error('Backtest API error:', error);
-    
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { 
-          error: 'Invalid request data',
-          details: error.errors,
-        },
-        { status: 400 }
-      );
+      return handleApiError(new AppError(400, 'Invalid request data', 'VALIDATION_ERROR', error.flatten().fieldErrors));
     }
 
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
 
@@ -331,10 +182,7 @@ export async function GET(request: NextRequest) {
     // Check authentication
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      );
+      throw new AppError(401, 'Authentication required');
     }
 
     const { searchParams } = new URL(request.url);
@@ -381,13 +229,6 @@ export async function GET(request: NextRequest) {
     });
 
   } catch (error) {
-    console.error('Backtest GET error:', error);
-    return NextResponse.json(
-      { 
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }
