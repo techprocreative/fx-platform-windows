@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { createOpenRouterAI } from '@/lib/ai/openrouter';
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '../../../../lib/auth';
+import { createOpenRouterAI } from '../../../../lib/ai/openrouter';
+import { prisma } from '../../../../lib/prisma';
 import { z } from 'zod';
 
 // Request validation schema

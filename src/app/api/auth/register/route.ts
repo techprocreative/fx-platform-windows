@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
-import { hashPassword, generateRandomToken } from '@/lib/crypto';
+import { prisma } from '../../../../lib/prisma';
+import { hashPassword, generateRandomToken } from '../../../../lib/crypto';
 import { z } from 'zod';
 
 export const dynamic = 'force-dynamic';

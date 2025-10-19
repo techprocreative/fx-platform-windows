@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { Zap, AlertCircle, CheckCircle } from 'lucide-react';
-import { validatePasswordStrength } from '@/lib/crypto';
+import { validatePasswordStrength } from '../../../lib/crypto';
 
 export default function RegisterPage() {
   const router = useRouter();
