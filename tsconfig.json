@@ -18,25 +18,25 @@
     "noImplicitReturns": true,
     "moduleResolution": "node",
     "resolveJsonModule": true,
-    "baseUrl": ".",
+    "baseUrl": "./",
     "paths": {
       "@/*": [
-        "./src/*"
+        "src/*"
       ],
       "@/components/*": [
-        "./src/components/*"
+        "src/components/*"
       ],
       "@/lib/*": [
-        "./src/lib/*"
+        "src/lib/*"
       ],
       "@/types/*": [
-        "./src/types/*"
+        "src/types/*"
       ],
       "@/hooks/*": [
-        "./src/hooks/*"
+        "src/hooks/*"
       ],
       "@/utils/*": [
-        "./src/lib/utils/*"
+        "src/lib/utils/*"
       ]
     },
     "forceConsistentCasingInFileNames": true,
