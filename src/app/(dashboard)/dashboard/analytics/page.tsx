@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import {
   BarChart3,
   TrendingUp,
@@ -59,6 +60,12 @@ export default function AnalyticsPage() {
       const response = await fetch(`/api/analytics?timeframe=${timeframe}`);
       if (response.ok) {
         const analyticsData = await response.json();
+        
+        // Check if data is empty and provide guidance
+        if (!analyticsData || analyticsData.totalTrades === 0) {
+          return;
+        }
+        
         setData(analyticsData);
       }
     } catch (error) {
@@ -78,10 +85,42 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (!data) {
+  if (!data || data.totalTrades === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-neutral-600">No analytics data available</p>
+      <div className="text-center py-12 bg-blue-50 border border border-blue-200 rounded-lg p-6 text-center">
+        <div className="mx-auto mb-4">
+          <Activity className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <p className="text-lg font-semibold text-blue-900 mb-2">No Activity Yet</p>
+        </div>
+        <p className="text-sm text-blue-700 mb-4">
+          Start trading or run backtests to see analytics data
+        </p>
+        <div className="mt-4 grid grid-cols-1 gap-4">
+          <div className="text-center">
+            <p className="text-sm text-neutral-600 mb-1">Strategy Creation</p>
+            <p className="text-xs text-neutral-500">• Create strategy → Run backtest → See analytics</p>
+            <Link
+              href="/dashboard/strategies/new"
+              className="inline-flex items-center gap-2 text-primary-600 font-semibold hover:text-primary-700"
+            >
+              Create Strategy
+            </Link>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-neutral-600 mb-1">Backtest Testing</p>
+            <p className="text-xs text-neutral-500">• Test strategy → View analytics</p>
+            <Link
+              href="/dashboard/backtest"
+              className="inline-flex items-center gap-2 text-primary-600 font-semibold hover:text-primary-700"
+            >
+              View Backtests
+            </Link>
+          </div>
+          <div className="text-center">
+            <p className="text-sm text-neutral-600 mb-1">Trade Execution</p>
+            <p className="text-xs text-neutral-500">• Connect executor → Execute trades</p>
+          </div>
+        </div>
       </div>
     );
   }
