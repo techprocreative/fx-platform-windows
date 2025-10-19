@@ -1,5 +1,7 @@
 {
+  "rootDirectory": "./",
   "buildCommand": "prisma generate && npm run build",
+  "installCommand": "npm install",
   "framework": "nextjs",
   "regions": ["sin1"],
   "build": {
