@@ -31,8 +31,8 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    const totalProfit = trades.reduce((sum, trade) => sum + (trade.profit || 0), 0);
-    const winningTrades = trades.filter((t) => t.profit && t.profit > 0).length;
+    const totalProfit = trades.reduce((sum: number, trade: any) => sum + (trade.profit || 0), 0);
+    const winningTrades = trades.filter((t: any) => t.profit && t.profit > 0).length;
     const winRate = trades.length > 0 ? (winningTrades / trades.length) * 100 : 0;
 
     return NextResponse.json({
