@@ -5,7 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { ChevronLeft, Plus, Trash2, AlertCircle } from 'lucide-react';
+import { 
+  ChevronLeft, Plus, Trash2, AlertCircle, 
+  Sparkles, BookOpen, Target, TrendingUp, 
+  Shield, Info, HelpCircle, Zap 
+} from 'lucide-react';
 import Link from 'next/link';
 
 interface Condition {
@@ -16,15 +20,141 @@ interface Condition {
   period?: number;
 }
 
+interface StrategyTemplate {
+  id: string;
+  name: string;
+  description: string;
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  icon: React.ReactNode;
+  config: {
+    name: string;
+    description: string;
+    symbol: string;
+    timeframe: string;
+    entryConditions: Omit<Condition, 'id'>[];
+    exitRules: any;
+    riskManagement: any;
+    entryLogic: 'AND' | 'OR';
+  };
+}
+
 const INDICATORS = ['RSI', 'MACD', 'EMA', 'SMA', 'ADX', 'Bollinger Bands', 'Stochastic'];
 const CONDITIONS = ['greater_than', 'less_than', 'equals', 'crosses_above', 'crosses_below'];
 const SYMBOLS = ['EURUSD', 'GBPUSD', 'USDJPY', 'XAUUSD', 'BTCUSD', 'ETHUSD', 'SP500'];
 const TIMEFRAMES = ['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1'];
 
+const STRATEGY_TEMPLATES: StrategyTemplate[] = [
+  {
+    id: 'rsi-oversold',
+    name: 'RSI Oversold Bounce',
+    description: 'Buy when RSI indicates oversold conditions. Great for beginners!',
+    difficulty: 'beginner',
+    icon: <TrendingUp className="h-5 w-5" />,
+    config: {
+      name: 'RSI Bounce Strategy',
+      description: 'Buys when RSI shows oversold (below 30) and sells at profit target',
+      symbol: 'EURUSD',
+      timeframe: 'H1',
+      entryConditions: [
+        {
+          indicator: 'RSI',
+          condition: 'less_than',
+          value: 30,
+          period: 14,
+        },
+      ],
+      exitRules: {
+        takeProfit: { type: 'pips', value: 30 },
+        stopLoss: { type: 'pips', value: 15 },
+        trailing: { enabled: false, distance: 10 },
+      },
+      riskManagement: {
+        lotSize: 0.01,
+        maxPositions: 2,
+        maxDailyLoss: 100,
+      },
+      entryLogic: 'AND',
+    },
+  },
+  {
+    id: 'ma-crossover',
+    name: 'Moving Average Crossover',
+    description: 'Classic trend-following strategy using MA crossovers',
+    difficulty: 'beginner',
+    icon: <Target className="h-5 w-5" />,
+    config: {
+      name: 'MA Crossover Strategy',
+      description: 'Trades when fast MA crosses slow MA',
+      symbol: 'EURUSD',
+      timeframe: 'H4',
+      entryConditions: [
+        {
+          indicator: 'EMA',
+          condition: 'crosses_above',
+          value: 50,
+          period: 20,
+        },
+      ],
+      exitRules: {
+        takeProfit: { type: 'pips', value: 50 },
+        stopLoss: { type: 'pips', value: 25 },
+        trailing: { enabled: true, distance: 15 },
+      },
+      riskManagement: {
+        lotSize: 0.01,
+        maxPositions: 3,
+        maxDailyLoss: 150,
+      },
+      entryLogic: 'AND',
+    },
+  },
+  {
+    id: 'breakout',
+    name: 'Support/Resistance Breakout',
+    description: 'Trade breakouts from key levels with momentum',
+    difficulty: 'intermediate',
+    icon: <Zap className="h-5 w-5" />,
+    config: {
+      name: 'Breakout Strategy',
+      description: 'Trades breakouts with ADX confirmation',
+      symbol: 'EURUSD',
+      timeframe: 'H1',
+      entryConditions: [
+        {
+          indicator: 'ADX',
+          condition: 'greater_than',
+          value: 25,
+          period: 14,
+        },
+        {
+          indicator: 'RSI',
+          condition: 'greater_than',
+          value: 50,
+          period: 14,
+        },
+      ],
+      exitRules: {
+        takeProfit: { type: 'pips', value: 60 },
+        stopLoss: { type: 'pips', value: 20 },
+        trailing: { enabled: true, distance: 20 },
+      },
+      riskManagement: {
+        lotSize: 0.02,
+        maxPositions: 3,
+        maxDailyLoss: 200,
+      },
+      entryLogic: 'AND',
+    },
+  },
+];
+
 export default function NewStrategyPage() {
   const { status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState<'simple' | 'advanced'>('simple');
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null);
+  const [showTemplates, setShowTemplates] = useState(true);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -34,15 +164,7 @@ export default function NewStrategyPage() {
     type: 'manual',
   });
 
-  const [entryConditions, setEntryConditions] = useState<Condition[]>([
-    {
-      id: '1',
-      indicator: 'RSI',
-      condition: 'greater_than',
-      value: 70,
-      period: 14,
-    },
-  ]);
+  const [entryConditions, setEntryConditions] = useState<Condition[]>([]);
 
   const [exitRules, setExitRules] = useState({
     takeProfit: { type: 'pips', value: 50 },
@@ -57,6 +179,28 @@ export default function NewStrategyPage() {
   });
 
   const [entryLogic, setEntryLogic] = useState<'AND' | 'OR'>('AND');
+
+  const selectTemplate = (template: StrategyTemplate) => {
+    setSelectedTemplate(template.id);
+    setFormData({
+      name: template.config.name,
+      description: template.config.description,
+      symbol: template.config.symbol,
+      timeframe: template.config.timeframe,
+      type: 'manual',
+    });
+    
+    const conditions = template.config.entryConditions.map((c, idx) => ({
+      ...c,
+      id: Date.now().toString() + idx,
+    }));
+    setEntryConditions(conditions);
+    
+    setExitRules(template.config.exitRules);
+    setRiskManagement(template.config.riskManagement);
+    setEntryLogic(template.config.entryLogic);
+    setShowTemplates(false);
+  };
 
   if (status === 'unauthenticated') {
     redirect('/login');
@@ -162,19 +306,142 @@ export default function NewStrategyPage() {
         </Link>
         <div>
           <h1 className="text-3xl font-bold text-neutral-900">Create Strategy</h1>
-          <p className="text-neutral-600 mt-1">Design a new trading strategy</p>
+          <p className="text-neutral-600 mt-1">
+            {mode === 'simple' 
+              ? 'Choose a template to get started quickly' 
+              : 'Design a custom trading strategy'}
+          </p>
         </div>
       </div>
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Mode Selector */}
+      <div className="bg-white rounded-lg border border-neutral-200 p-4">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Sparkles className="h-5 w-5 text-primary-600" />
+            <span className="font-semibold text-neutral-900">Creation Mode</span>
+          </div>
+          <div className="flex gap-2 bg-neutral-100 p-1 rounded-lg">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('simple');
+                setShowTemplates(true);
+                setEntryConditions([]);
+              }}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                mode === 'simple'
+                  ? 'bg-white text-primary-600 shadow-sm'
+                  : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <BookOpen className="h-4 w-4" />
+                Simple
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode('advanced')}
+              className={`px-4 py-2 rounded-md font-medium transition-colors ${
+                mode === 'advanced'
+                  ? 'bg-white text-primary-600 shadow-sm'
+                  : 'text-neutral-600 hover:text-neutral-900'
+              }`}
+            >
+              <span className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Advanced
+              </span>
+            </button>
+          </div>
+        </div>
+        
+        {mode === 'simple' && (
+          <div className="text-sm text-neutral-600 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-start gap-2">
+              <Info className="h-4 w-4 text-blue-600 mt-0.5" />
+              <div>
+                <strong className="text-blue-900">Beginner Mode</strong>
+                <p className="mt-1">Start with a proven template and customize it to your needs. Perfect for beginners!</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Template Selection (Simple Mode) */}
+      {mode === 'simple' && showTemplates && (
+        <div className="space-y-4">
+          <h2 className="text-lg font-bold text-neutral-900">Choose a Template</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {STRATEGY_TEMPLATES.map((template) => (
+              <button
+                key={template.id}
+                type="button"
+                onClick={() => selectTemplate(template)}
+                className="bg-white border-2 border-neutral-200 rounded-lg p-4 hover:border-primary-500 hover:shadow-md transition-all text-left"
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`p-2 rounded-lg ${
+                    template.difficulty === 'beginner' ? 'bg-green-100 text-green-600' :
+                    template.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-600' :
+                    'bg-red-100 text-red-600'
+                  }`}>
+                    {template.icon}
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-neutral-900">{template.name}</h3>
+                    <p className="text-sm text-neutral-600 mt-1">{template.description}</p>
+                    <div className="mt-2">
+                      <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
+                        template.difficulty === 'beginner' ? 'bg-green-100 text-green-700' :
+                        template.difficulty === 'intermediate' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {template.difficulty}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+          
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => setMode('advanced')}
+              className="text-primary-600 hover:text-primary-700 font-medium"
+            >
+              Or create from scratch →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Form (shown when template is selected or in advanced mode) */}
+      {(mode === 'advanced' || (mode === 'simple' && !showTemplates)) && (
+        <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Information */}
         <div className="rounded-lg border border-neutral-200 bg-white p-6 space-y-4">
-          <h2 className="text-lg font-bold text-neutral-900">Basic Information</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-neutral-900">Basic Information</h2>
+            {mode === 'simple' && (
+              <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                Pre-filled from template
+              </span>
+            )}
+          </div>
 
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-neutral-700 mb-2">
               Strategy Name
+              {mode === 'simple' && (
+                <span className="ml-2 text-xs text-neutral-500 font-normal">
+                  (You can customize this)
+                </span>
+              )}
             </label>
             <input
               id="name"
@@ -423,12 +690,34 @@ export default function NewStrategyPage() {
 
         {/* Risk Management */}
         <div className="rounded-lg border border-neutral-200 bg-white p-6 space-y-4">
-          <h2 className="text-lg font-bold text-neutral-900">Risk Management</h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-neutral-900">Risk Management</h2>
+            {mode === 'simple' && (
+              <div className="flex items-center gap-1 text-xs text-amber-700">
+                <HelpCircle className="h-3 w-3" />
+                <span>Conservative settings applied</span>
+              </div>
+            )}
+          </div>
+
+          {mode === 'simple' && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm">
+              <p className="text-amber-900 font-medium mb-1">Beginner-Safe Settings</p>
+              <p className="text-amber-800">
+                We've set conservative risk limits: small lot sizes (0.01), 
+                limited positions, and strict daily loss limits. As you gain experience, 
+                you can gradually increase these values.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Lot Size
+                <span className="ml-1 text-xs text-neutral-500 font-normal">
+                  (0.01 = micro lot)
+                </span>
               </label>
               <input
                 type="number"
@@ -497,19 +786,35 @@ export default function NewStrategyPage() {
             Cancel
           </Link>
         </div>
-      </form>
+        </form>
+      )}
 
       {/* Info Box */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 flex gap-3">
-        <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-        <div className="text-sm text-blue-800">
-          <p className="font-semibold mb-1">💡 Tip:</p>
-          <p>
-            Start with simple strategies and test them thoroughly with backtesting before deploying
-            to live trading. Diversify across multiple strategies for better risk management.
-          </p>
+      {mode === 'simple' && !showTemplates && (
+        <div className="rounded-lg border border-green-200 bg-green-50 p-4 flex gap-3">
+          <Sparkles className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-green-800">
+            <p className="font-semibold mb-1">✅ Template Applied!</p>
+            <p>
+              We've pre-filled the form with a proven strategy configuration. You can customize 
+              any values to match your trading style. Click "Create Strategy" when you're ready!
+            </p>
+          </div>
         </div>
-      </div>
+      )}
+      
+      {mode === 'advanced' && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 flex gap-3">
+          <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-800">
+            <p className="font-semibold mb-1">💡 Pro Tip:</p>
+            <p>
+              Start with simple strategies and test them thoroughly with backtesting before deploying
+              to live trading. Diversify across multiple strategies for better risk management.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
