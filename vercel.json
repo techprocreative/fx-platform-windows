@@ -1,8 +1,8 @@
 {
-  "buildCommand": "prisma generate && pnpm run build",
+  "buildCommand": "prisma generate && npm run build",
   "outputDirectory": ".next",
-  "devCommand": "pnpm dev",
-  "installCommand": "pnpm install --frozen-lockfile",
+  "devCommand": "npm run dev",
+  "installCommand": "npm ci",
   "framework": "nextjs",
   "regions": ["sin1"],
   "build": {
