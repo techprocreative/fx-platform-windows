@@ -6,25 +6,32 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Starting database seed...');
 
-  // Create demo user
-  const demoUser = await prisma.user.create({
-    data: {
-      email: 'demo@nexustrade.com',
-      passwordHash: await hashPassword('Demo123!'),
-      firstName: 'Demo',
-      lastName: 'User',
-      emailVerified: new Date(),
-      preferences: {
-        create: {
-          theme: 'light',
-          language: 'en',
-          timezone: 'UTC',
-        },
-      },
-    },
+  // Check if demo user exists
+  let demoUser = await prisma.user.findUnique({
+    where: { email: 'demo@nexustrade.com' },
   });
 
-  console.log('✅ Created demo user:', demoUser.email);
+  if (!demoUser) {
+    demoUser = await prisma.user.create({
+      data: {
+        email: 'demo@nexustrade.com',
+        passwordHash: await hashPassword('Demo123!'),
+        firstName: 'Demo',
+        lastName: 'User',
+        emailVerified: new Date(),
+        preferences: {
+          create: {
+            theme: 'light',
+            language: 'en',
+            timezone: 'UTC',
+          },
+        },
+      },
+    });
+    console.log('✅ Created demo user:', demoUser.email);
+  } else {
+    console.log('✅ Demo user already exists:', demoUser.email);
+  }
 
   // Create sample strategy
   const strategy = await prisma.strategy.create({

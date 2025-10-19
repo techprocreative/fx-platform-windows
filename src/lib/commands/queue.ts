@@ -392,9 +392,34 @@ export class CommandQueueService {
    * Update strategy metrics based on execution results
    */
   private async updateStrategyMetrics(result: CommandResult): Promise<void> {
-    // Implementation depends on your metrics tracking
-    // This is a placeholder
-    console.log('Updating strategy metrics:', result);
+    try {
+      if (result.strategyId && result.success) {
+        // Update strategy performance metrics
+        await prisma.strategy.update({
+          where: { id: result.strategyId },
+          data: {
+            lastTradeAt: new Date(),
+            updatedAt: new Date(),
+          },
+        });
+
+        // Log activity
+        await prisma.activityLog.create({
+          data: {
+            userId: result.userId || 'system',
+            eventType: 'TRADE_EXECUTED',
+            metadata: {
+              commandId: result.commandId,
+              strategyId: result.strategyId,
+              success: result.success,
+              executionTime: result.timestamp,
+            },
+          },
+        });
+      }
+    } catch (error) {
+      console.error('Failed to update strategy metrics:', error);
+    }
   }
 
   /**

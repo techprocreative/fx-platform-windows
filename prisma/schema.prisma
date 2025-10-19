@@ -40,6 +40,7 @@ model User {
   backtests              Backtest[]
   apiKeys                APIKey[]
   auditLogs              AuditLog[]
+  activityLogs           ActivityLog[]
   preferences            UserPreferences?
 
   @@index([email])
@@ -361,6 +362,8 @@ model ActivityLog {
   eventType       String    // login, strategy_create, backtest_run, etc.
   metadata        Json?
   timestamp       DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([eventType])

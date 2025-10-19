@@ -61,7 +61,12 @@ function applyCorsHeaders(request: NextRequest, response: NextResponse) {
 export const config = {
   matcher: [
     // Protected paths
-    ...protectedPaths,
+    '/dashboard/:path*',
+    '/api/dashboard/:path*',
+    '/api/strategy/:path*',
+    '/api/signals/:path*',
+    '/api/commands/:path*',
+    '/api/ws/:path*',
     // API routes for CORS
     '/api/:path*',
     // All paths for security headers

@@ -7,6 +7,123 @@ import { z } from 'zod';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Helper function to transform strategy rules
+function transformStrategyRules(rules: any) {
+  try {
+    if (!rules || typeof rules !== 'object') {
+      return getDefaultStrategyRules();
+    }
+
+    // Handle strategy rules from the strategy creation form
+    if (rules.entry && rules.exit && rules.riskManagement) {
+      return [
+        {
+          name: 'Entry Rule',
+          conditions: rules.entry.conditions.map((condition: any) => ({
+            indicator: condition.indicator.toUpperCase(),
+            operator: convertOperator(condition.condition),
+            value: condition.value,
+            timeframes: [convertTimeframe(rules.timeframe || 'H1')],
+          })),
+          action: {
+            type: 'buy',
+            parameters: {
+              size: rules.riskManagement.lotSize || 0.01,
+            },
+          },
+        },
+        {
+          name: 'Exit Rule',
+          conditions: [
+            {
+              indicator: 'PRICE',
+              operator: 'GTE',
+              value: 999999, // Always true rule for exit
+              timeframes: [convertTimeframe(rules.timeframe || 'H1')],
+            },
+          ],
+          action: {
+            type: 'close',
+            parameters: {
+              takeProfit: rules.exit.takeProfit,
+              stopLoss: rules.exit.stopLoss,
+            },
+          },
+        },
+      ];
+    }
+
+    return getDefaultStrategyRules();
+  } catch (error) {
+    console.error('Error transforming strategy rules:', error);
+    return getDefaultStrategyRules();
+  }
+}
+
+function getDefaultStrategyRules() {
+  return [
+    {
+      name: 'Default Entry',
+      conditions: [
+        {
+          indicator: 'RSI',
+          operator: 'LT',
+          value: 30,
+          timeframes: ['1H'],
+        },
+      ],
+      action: {
+        type: 'buy',
+        parameters: {
+          size: 0.01,
+        },
+      },
+    },
+    {
+      name: 'Default Exit',
+      conditions: [
+        {
+          indicator: 'RSI',
+          operator: 'GT',
+          value: 70,
+          timeframes: ['1H'],
+        },
+      ],
+      action: {
+        type: 'close',
+        parameters: {},
+      },
+    },
+  ];
+}
+
+function convertOperator(condition: string) {
+  const operatorMap: Record<string, string> = {
+    'greater_than': 'GT',
+    'less_than': 'LT',
+    'equals': 'EQ',
+    'crosses_above': 'GTE',
+    'crosses_below': 'LTE',
+    'gte': 'GTE',
+    'lte': 'LTE',
+  };
+  return operatorMap[condition] || 'EQ';
+}
+
+function convertTimeframe(timeframe: string) {
+  const timeframeMap: Record<string, string> = {
+    'M1': '1min',
+    'M5': '5min',
+    'M15': '15min',
+    'M30': '30min',
+    'H1': '1h',
+    'H4': '4h',
+    'D1': '1d',
+    'W1': '1w',
+  };
+  return timeframeMap[timeframe] || '1h';
+}
+
 // Request validation schema
 const BacktestRequestSchema = z.object({
   strategyId: z.string(),
@@ -92,6 +209,19 @@ export async function POST(request: NextRequest) {
     });
 
     try {
+      // Transform strategy data to format expected by backtest engine
+      const transformedStrategy = {
+        id: strategy.id,
+        name: strategy.name,
+        rules: transformStrategyRules(strategy.rules),
+        parameters: {
+          riskPerTrade: 0.02,
+          maxPositions: 1,
+          stopLoss: 0.002,
+          takeProfit: 0.004,
+        },
+      };
+
       // Run backtest
       const { runBacktest } = await import('../../../lib/backtest/engine');
       const result = await runBacktest(validatedData.strategyId, {
@@ -100,7 +230,7 @@ export async function POST(request: NextRequest) {
         initialBalance: validatedData.initialBalance,
         symbol: validatedData.symbol,
         interval: validatedData.interval,
-        strategy: strategy,
+        strategy: transformedStrategy,
         preferredDataSource: validatedData.preferredDataSource,
       });
 
