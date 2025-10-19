@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { marketDataCache } from '@/lib/cache/market-data-cache';
+import { authOptions } from '../../../lib/auth';
+import { marketDataCache } from '../../../lib/cache/market-data-cache';
 
 // GET /api/cache - Get cache statistics
 export async function GET(request: NextRequest) {

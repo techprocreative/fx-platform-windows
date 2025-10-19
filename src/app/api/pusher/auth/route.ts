@@ -6,8 +6,8 @@
 
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { authenticatePusherChannel, isRealtimeConfigured } from '@/lib/realtime/pusher-service';
+import { authOptions } from '../../../../lib/auth';
+import { authenticatePusherChannel, isRealtimeConfigured } from '../../../../lib/realtime/pusher-service';
 import { 
   createErrorResponse, 
   createSecureResponse,
@@ -15,7 +15,7 @@ import {
   validateAPIKey,
   rateLimit,
   getClientIP
-} from '@/lib/api-security';
+} from '../../../../lib/api-security';
 
 export async function POST(request: NextRequest) {
   try {

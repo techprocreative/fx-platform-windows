@@ -5,20 +5,20 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
-import { prisma } from '@/lib/prisma';
+import { authOptions } from '../../../../lib/auth';
+import { prisma } from '../../../../lib/prisma';
 import { 
   uploadBacktestResults,
   uploadCSV,
   isBlobStorageConfigured,
   getStorageStatus 
-} from '@/lib/storage/vercel-blob';
+} from '../../../../lib/storage/vercel-blob';
 import { 
   createSecureResponse, 
   createErrorResponse,
   rateLimit,
   getClientIP
-} from '@/lib/api-security';
+} from '../../../../lib/api-security';
 
 export async function POST(request: NextRequest) {
   try {

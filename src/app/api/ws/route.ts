@@ -5,10 +5,10 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getWebSocketServer } from '@/lib/websocket/server';
-import { getExecutorManager } from '@/lib/executors/manager';
+import { getWebSocketServer } from '../../../lib/websocket/server';
+import { getExecutorManager } from '../../../lib/executors/manager';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '@/lib/auth';
+import { authOptions } from '../../../lib/auth';
 
 // Initialize WebSocket server on first request
 let initialized = false;
