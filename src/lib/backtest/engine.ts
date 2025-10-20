@@ -212,10 +212,20 @@ export class BacktestEngine {
   private positions: any[] = [];
   private trades: any[] = [];
   private equityCurve: { timestamp: Date; equity: number }[] = [];
+  private strategyParameters: { stopLoss: number; takeProfit: number; maxPositions: number; maxDailyLoss: number } = {
+    stopLoss: 0.002,
+    takeProfit: 0.004,
+    maxPositions: 1,
+    maxDailyLoss: 100,
+  };
 
   constructor(initialBalance: number = 10000) {
     this.balance = initialBalance;
     this.equity = initialBalance;
+  }
+  
+  setStrategyParameters(params: { stopLoss: number; takeProfit: number; maxPositions: number; maxDailyLoss: number }) {
+    this.strategyParameters = params;
   }
 
   async loadData(
@@ -374,7 +384,16 @@ export class BacktestEngine {
   }
 
   private openPosition(type: 'buy' | 'sell', size: number, price: number, timestamp: Date): void {
-    if (this.positions.length >= 1) return; // Limit to 1 open position for simplicity
+    if (this.positions.length >= this.strategyParameters.maxPositions) return;
+    
+    // Calculate SL and TP based on strategy parameters
+    const stopLossPrice = type === 'buy' 
+      ? price - (price * this.strategyParameters.stopLoss)
+      : price + (price * this.strategyParameters.stopLoss);
+      
+    const takeProfitPrice = type === 'buy'
+      ? price + (price * this.strategyParameters.takeProfit)
+      : price - (price * this.strategyParameters.takeProfit);
     
     this.positions.push({
       type,
@@ -382,6 +401,8 @@ export class BacktestEngine {
       openPrice: price,
       openTime: timestamp,
       currentPrice: price,
+      stopLoss: stopLossPrice,
+      takeProfit: takeProfitPrice,
     });
   }
 
@@ -434,6 +455,78 @@ export class BacktestEngine {
     this.equityCurve.push({ timestamp, equity: this.equity });
   }
 
+  private checkStopLossAndTakeProfit(currentPrice: number, timestamp: Date): void {
+    const positionsToClose: any[] = [];
+    
+    this.positions.forEach((position, index) => {
+      let shouldClose = false;
+      let closeReason = '';
+      
+      if (position.type === 'buy') {
+        // Check stop loss
+        if (currentPrice <= position.stopLoss) {
+          shouldClose = true;
+          closeReason = 'Stop Loss';
+        }
+        // Check take profit
+        else if (currentPrice >= position.takeProfit) {
+          shouldClose = true;
+          closeReason = 'Take Profit';
+        }
+      } else if (position.type === 'sell') {
+        // Check stop loss
+        if (currentPrice >= position.stopLoss) {
+          shouldClose = true;
+          closeReason = 'Stop Loss';
+        }
+        // Check take profit
+        else if (currentPrice <= position.takeProfit) {
+          shouldClose = true;
+          closeReason = 'Take Profit';
+        }
+      }
+      
+      if (shouldClose) {
+        positionsToClose.push({ position, index, reason: closeReason });
+      }
+    });
+    
+    // Close positions that hit SL/TP
+    positionsToClose.reverse().forEach(({ position, reason }) => {
+      this.closePositionWithReason(currentPrice, timestamp, reason);
+    });
+  }
+  
+  private closePositionWithReason(price: number, timestamp: Date, reason: string = 'Manual'): void {
+    if (this.positions.length === 0) return;
+    
+    const position = this.positions.pop();
+    if (!position) return;
+    
+    const pipValue = 0.0001;
+    let profit = 0;
+    
+    if (position.type === 'buy') {
+      profit = (price - position.openPrice) / pipValue * position.size * 10;
+    } else {
+      profit = (position.openPrice - price) / pipValue * position.size * 10;
+    }
+    
+    this.balance += profit;
+    
+    this.trades.push({
+      type: position.type,
+      size: position.size,
+      openPrice: position.openPrice,
+      closePrice: price,
+      openTime: position.openTime,
+      closeTime: timestamp,
+      profit,
+      duration: timestamp.getTime() - position.openTime.getTime(),
+      closeReason: reason,
+    });
+  }
+
   async runBacktest(strategy: Strategy): Promise<BacktestResult> {
     if (this.data.length === 0) {
       throw new Error('No data loaded for backtesting');
@@ -444,6 +537,9 @@ export class BacktestEngine {
     // Run strategy through all data points
     for (let i = 0; i < this.data.length; i++) {
       const candle = this.data[i];
+      
+      // Check SL/TP for open positions FIRST
+      this.checkStopLossAndTakeProfit(candle.close, candle.timestamp);
       
       // Apply strategy rules
       this.applyStrategy(strategy, candle, i);
@@ -556,6 +652,16 @@ export async function runBacktest(strategyId: string, params: {
   preferredDataSource?: 'twelvedata' | 'yahoo';
 }): Promise<BacktestResult> {
   const engine = new BacktestEngine(params.initialBalance);
+  
+  // Set strategy parameters from strategy object
+  if (params.strategy.parameters) {
+    engine.setStrategyParameters({
+      stopLoss: params.strategy.parameters.stopLoss || 0.002,
+      takeProfit: params.strategy.parameters.takeProfit || 0.004,
+      maxPositions: params.strategy.parameters.maxPositions || 1,
+      maxDailyLoss: params.strategy.parameters.maxDailyLoss || 100,
+    });
+  }
   
   await engine.loadData(
     params.symbol,

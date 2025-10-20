@@ -80,16 +80,31 @@ export async function POST(request: NextRequest) {
     });
 
     try {
+      // Extract parameters from strategy rules
+      const strategyRules = strategy.rules as any;
+      const riskManagement = strategyRules?.riskManagement || {};
+      const exitRules = strategyRules?.exit || {};
+      
+      // Convert pips to decimal for backtest engine
+      const stopLossPips = exitRules?.stopLoss?.value || 25;
+      const takeProfitPips = exitRules?.takeProfit?.value || 50;
+      
+      // Approximate conversion: 1 pip = 0.0001 for most forex pairs
+      // For JPY pairs it's 0.01, but we'll use general conversion
+      const stopLossDecimal = stopLossPips * 0.0001;
+      const takeProfitDecimal = takeProfitPips * 0.0001;
+
       // Transform strategy data to format expected by backtest engine
       const transformedStrategy = {
         id: strategy.id,
         name: strategy.name,
         rules: transformStrategyRules(strategy.rules),
         parameters: {
-          riskPerTrade: 0.02,
-          maxPositions: 1,
-          stopLoss: 0.002,
-          takeProfit: 0.004,
+          riskPerTrade: riskManagement.lotSize || 0.01,
+          maxPositions: riskManagement.maxPositions || 1,
+          stopLoss: stopLossDecimal,
+          takeProfit: takeProfitDecimal,
+          maxDailyLoss: riskManagement.maxDailyLoss || 100,
         },
       };
 
