@@ -8,7 +8,6 @@ export const STRATEGY_LIST_INCLUDE = {
     select: {
       id: true,
       profit: true,
-      status: true,
       createdAt: true,
     },
     orderBy: { createdAt: 'desc' as const },

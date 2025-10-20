@@ -361,6 +361,12 @@ export function createOpenRouterAI(apiKey?: string, model?: string): OpenRouterA
   return new OpenRouterAI(apiKey, model);
 }
 
-// Export default instance for convenience
-const defaultAI = new OpenRouterAI();
-export default defaultAI;
+// Lazy-loaded default instance
+let defaultAI: OpenRouterAI | null = null;
+
+export function getDefaultAI(): OpenRouterAI {
+  if (!defaultAI) {
+    defaultAI = new OpenRouterAI();
+  }
+  return defaultAI;
+}

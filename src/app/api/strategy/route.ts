@@ -19,7 +19,7 @@ const strategyCreateSchema = z.object({
   description: z.string().optional(),
   symbol: z.string().min(3).max(20),
   timeframe: z.enum(['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1']),
-  type: z.enum(['manual', 'ai_generated', 'imported']).default('manual'),
+  type: z.enum(['manual', 'automated', 'ai_generated', 'imported']).default('manual'),
   rules: z.object({}).passthrough(), // JSON object
   isPublic: z.boolean().default(false),
 });
