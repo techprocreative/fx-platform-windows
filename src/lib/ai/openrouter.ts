@@ -177,6 +177,8 @@ CRITICAL REQUIREMENTS:
         symbol: strategyData.symbol,
         timeframe: strategyData.timeframe,
         rulesCount: Array.isArray(strategyData.rules) ? strategyData.rules.length : 0,
+        exitParams: strategyData.parameters?.exit,
+        riskParams: strategyData.parameters?.riskManagement,
       });
       
       // Validate and enhance the strategy
