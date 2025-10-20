@@ -289,6 +289,24 @@ CRITICAL REQUIREMENTS:
         extractedTimeframe: finalTimeframe,
       });
 
+      // Convert AI response to proper pip values
+      // AI may return large numbers (100 meaning 100 pips) or decimals (0.01)
+      // We need to normalize to decimal format (pips / 10000 for most pairs)
+      const rawStopLoss = strategyData.parameters?.stopLoss || 0.002;
+      const rawTakeProfit = strategyData.parameters?.takeProfit || 0.004;
+      
+      // If AI returns values >= 1, assume they are in pips and convert to decimal
+      // e.g., 30 pips = 0.0030, 50 pips = 0.0050
+      const stopLoss = rawStopLoss >= 1 ? rawStopLoss / 10000 : rawStopLoss;
+      const takeProfit = rawTakeProfit >= 1 ? rawTakeProfit / 10000 : rawTakeProfit;
+      
+      console.log('💰 TP/SL Conversion:', {
+        rawStopLoss,
+        rawTakeProfit,
+        convertedStopLoss: stopLoss,
+        convertedTakeProfit: takeProfit,
+      });
+      
       return {
         id: `ai_${Date.now()}`,
         name: strategyData.name || 'AI Generated Strategy',
@@ -299,8 +317,8 @@ CRITICAL REQUIREMENTS:
         parameters: {
           riskPerTrade: strategyData.parameters?.riskPerTrade || 0.01,
           maxPositions: strategyData.parameters?.maxPositions || 1,
-          stopLoss: strategyData.parameters?.stopLoss || 0.002,
-          takeProfit: strategyData.parameters?.takeProfit || 0.004,
+          stopLoss,
+          takeProfit,
           maxDailyLoss: strategyData.parameters?.maxDailyLoss || 100,
         },
         tags: this.generateTags(strategyData),
