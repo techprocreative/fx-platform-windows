@@ -30,6 +30,7 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
 import { AIStrategyGenerator } from "@/components/forms/AIStrategyGenerator";
+import { AIPreviewCard } from "@/components/forms/AIPreviewCard";
 
 type StrategyMode = "simple" | "advanced" | "ai";
 
@@ -310,6 +311,9 @@ export function StrategyForm({
     initialData?.rules?.entry.logic ?? "AND"
   );
   const [errors, setErrors] = useState<string[]>([]);
+  const [aiGeneratedData, setAIGeneratedData] = useState<any>(null);
+  const [showAIPreview, setShowAIPreview] = useState(false);
+  const [highlightFields, setHighlightFields] = useState(false);
 
   useEffect(() => {
     if (initialData?.rules) {
@@ -465,12 +469,7 @@ export function StrategyForm({
     }
   };
 
-  const handleAIGenerate = (data: {
-    name: string;
-    description: string;
-    rules: any;
-    parameters: any;
-  }) => {
+  const populateFieldsFromAI = (data: any) => {
     // Set form data from AI generation
     setFormData((prev) => ({
       ...prev,
@@ -508,10 +507,95 @@ export function StrategyForm({
         trailing: { enabled: false, distance: 10 },
       });
     }
+  };
 
-    // Switch to advanced mode to show the generated strategy
+  const handleAIGenerate = (data: {
+    name: string;
+    description: string;
+    rules: any;
+    parameters: any;
+  }) => {
+    // Store generated data and show preview
+    setAIGeneratedData(data);
+    setShowAIPreview(true);
+    toast.success("Strategy generated! Review the preview below.");
+  };
+
+  const handleReviewStrategy = () => {
+    if (!aiGeneratedData) return;
+
+    // Populate fields with AI data
+    populateFieldsFromAI(aiGeneratedData);
+
+    // Switch to advanced mode
     setMode("advanced");
-    toast.success("AI-generated strategy loaded! Review and customize it below.");
+
+    // Hide preview
+    setShowAIPreview(false);
+
+    // Enable field highlighting
+    setHighlightFields(true);
+    setTimeout(() => setHighlightFields(false), 3000);
+
+    // Smooth scroll to basic information section
+    setTimeout(() => {
+      const basicInfoSection = document.getElementById('basic-information-section');
+      if (basicInfoSection) {
+        basicInfoSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 100);
+
+    toast.success("Review and customize your strategy below!");
+  };
+
+  const handleUseAsIs = async () => {
+    if (!aiGeneratedData) return;
+
+    // Populate fields with AI data
+    populateFieldsFromAI(aiGeneratedData);
+
+    // Hide preview and switch mode
+    setShowAIPreview(false);
+    setMode("advanced");
+
+    // Wait a bit for state to update then validate and submit
+    setTimeout(async () => {
+      if (!validate()) {
+        toast.error("Please review the strategy - some fields need attention");
+        // Scroll to errors
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      // Submit directly
+      const payload = {
+        formData: {
+          ...formData,
+          name: aiGeneratedData.name,
+          description: aiGeneratedData.description,
+          type: "ai_generated",
+        },
+        rules: {
+          entry: {
+            conditions: entryConditions.map(({ id, ...condition }) => condition),
+            logic: entryLogic,
+          },
+          exit: exitRules,
+          riskManagement,
+        },
+      };
+
+      try {
+        await onSubmit(payload);
+        toast.success("Strategy created successfully!");
+      } catch (error) {
+        if (error instanceof Error) {
+          toast.error(error.message);
+        } else {
+          toast.error("Failed to create strategy");
+        }
+      }
+    }, 100);
   };
 
   return (
@@ -683,11 +767,19 @@ export function StrategyForm({
         </Card>
       )}
 
-      {mode === "ai" && (
+      {mode === "ai" && !showAIPreview && (
         <AIStrategyGenerator onGenerate={handleAIGenerate} />
       )}
 
-      <Card>
+      {mode === "ai" && showAIPreview && aiGeneratedData && (
+        <AIPreviewCard
+          strategy={aiGeneratedData}
+          onReview={handleReviewStrategy}
+          onUseAsIs={handleUseAsIs}
+        />
+      )}
+
+      <Card id="basic-information-section" className={highlightFields ? "ai-highlighted-section" : ""}>
         <CardHeader className="border-none pb-0">
           <CardTitle>Basic Information</CardTitle>
           <CardDescription>

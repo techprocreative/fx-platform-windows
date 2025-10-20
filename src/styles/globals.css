@@ -2,6 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer utilities {
+  /* AI Generated Field Highlight Animation */
+  .ai-highlighted-section {
+    animation: pulse-purple-border 2s ease-in-out;
+    border-width: 2px;
+  }
+
+  @keyframes pulse-purple-border {
+    0%, 100% {
+      border-color: rgb(147 51 234);
+      box-shadow: 0 0 0 3px rgba(147, 51, 234, 0.1);
+    }
+    50% {
+      border-color: rgb(192 132 252);
+      box-shadow: 0 0 0 6px rgba(147, 51, 234, 0.2);
+    }
+  }
+}
+
 * {
   @apply border-neutral-200;
 }
