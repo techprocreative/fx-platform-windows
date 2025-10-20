@@ -6,6 +6,7 @@ const config: Config = {
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
+  darkMode: ['class', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
@@ -87,7 +88,54 @@ const config: Config = {
       },
     },
   },
-  plugins: [],
+  plugins: [
+    // Plugin for custom CSS variables
+    function({ addUtilities }: { addUtilities: any }) {
+      const newUtilities = {
+        '.bg-primary': {
+          'background-color': 'rgb(var(--bg-primary))',
+        },
+        '.bg-secondary': {
+          'background-color': 'rgb(var(--bg-secondary))',
+        },
+        '.bg-tertiary': {
+          'background-color': 'rgb(var(--bg-tertiary))',
+        },
+        '.bg-inverse': {
+          'background-color': 'rgb(var(--bg-inverse))',
+        },
+        '.text-primary': {
+          'color': 'rgb(var(--text-primary))',
+        },
+        '.text-secondary': {
+          'color': 'rgb(var(--text-secondary))',
+        },
+        '.text-tertiary': {
+          'color': 'rgb(var(--text-tertiary))',
+        },
+        '.border-primary': {
+          'border-color': 'rgb(var(--border-primary))',
+        },
+        '.border-secondary': {
+          'border-color': 'rgb(var(--border-secondary))',
+        },
+        '.border-focus': {
+          'border-color': 'rgb(var(--border-focus))',
+        },
+        '.bg-accent-primary': {
+          'background-color': 'rgb(var(--accent-primary))',
+        },
+        '.text-accent-primary': {
+          'color': 'rgb(var(--accent-primary))',
+        },
+        '.theme-transition': {
+          'transition': 'var(--theme-transition)',
+        },
+      };
+      
+      addUtilities(newUtilities);
+    },
+  ],
 };
 
 export default config;

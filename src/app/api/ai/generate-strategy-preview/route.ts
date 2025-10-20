@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
         symbol: strategyData.symbol,
         timeframe: strategyData.timeframe,
         rules: strategyData.rules || [],
-        parameters: strategyData.parameters,
         prompt,
         model: 'x-ai/grok-4-fast',
       },

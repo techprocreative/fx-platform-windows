@@ -2,6 +2,79 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Screen Reader Only Content */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Focus visible for keyboard navigation */
+.focus-visible:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .focus-visible:focus {
+    outline: 3px solid #000000;
+    outline-offset: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Skip link styles */
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 6px;
+  background: #000;
+  color: #fff;
+  padding: 8px;
+  text-decoration: none;
+  border-radius: 4px;
+  z-index: 1000;
+  transition: top 0.3s;
+}
+
+.skip-link:focus {
+  top: 6px;
+}
+
+/* Focus indicators for interactive elements */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+a:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+/* Keyboard navigation indicators */
+.keyboard-nav *:focus {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
 @layer utilities {
   /* AI Generated Field Highlight Animation */
   .ai-highlighted-section {
@@ -21,8 +94,70 @@
   }
 }
 
+/* CSS Variables for Theme Switching */
+:root {
+  /* Background colors */
+  --bg-primary: 255 255 255;
+  --bg-secondary: 249 250 251;
+  --bg-tertiary: 243 244 246;
+  --bg-inverse: 17 24 39;
+  
+  /* Text colors */
+  --text-primary: 17 24 39;
+  --text-secondary: 75 85 99;
+  --text-tertiary: 107 114 128;
+  --text-inverse: 255 255 255;
+  
+  /* Border colors */
+  --border-primary: 229 231 235;
+  --border-secondary: 209 213 219;
+  --border-focus: 59 130 246;
+  
+  /* Accent colors */
+  --accent-primary: 59 130 246;
+  --accent-hover: 37 99 235;
+  
+  /* Shadow colors */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  
+  /* Transition */
+  --theme-transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+[data-theme="dark"] {
+  /* Background colors */
+  --bg-primary: 17 24 39;
+  --bg-secondary: 31 41 55;
+  --bg-tertiary: 55 65 81;
+  --bg-inverse: 255 255 255;
+  
+  /* Text colors */
+  --text-primary: 255 255 255;
+  --text-secondary: 209 213 219;
+  --text-tertiary: 156 163 175;
+  --text-inverse: 17 24 39;
+  
+  /* Border colors */
+  --border-primary: 55 65 81;
+  --border-secondary: 75 85 99;
+  --border-focus: 96 165 250;
+  
+  /* Accent colors */
+  --accent-primary: 96 165 250;
+  --accent-hover: 59 130 246;
+  
+  /* Shadow colors */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.25);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.4);
+}
+
+/* Apply CSS Variables */
 * {
   @apply border-neutral-200;
+  transition: var(--theme-transition);
 }
 
 [data-theme="dark"] * {
@@ -30,22 +165,93 @@
 }
 
 body {
-  @apply bg-white text-gray-900;
+  background-color: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
   font-feature-settings: "rlig" 1, "calt" 1;
+  transition: var(--theme-transition);
 }
 
-[data-theme="dark"] body {
-  @apply bg-gray-950 text-white;
+/* Background utilities */
+.bg-primary {
+  background-color: rgb(var(--bg-primary));
+}
+
+.bg-secondary {
+  background-color: rgb(var(--bg-secondary));
+}
+
+.bg-tertiary {
+  background-color: rgb(var(--bg-tertiary));
+}
+
+.bg-inverse {
+  background-color: rgb(var(--bg-inverse));
+}
+
+/* Text utilities */
+.text-primary {
+  color: rgb(var(--text-primary));
+}
+
+.text-secondary {
+  color: rgb(var(--text-secondary));
+}
+
+.text-tertiary {
+  color: rgb(var(--text-tertiary));
+}
+
+.text-inverse {
+  color: rgb(var(--text-inverse));
+}
+
+/* Border utilities */
+.border-primary {
+  border-color: rgb(var(--border-primary));
+}
+
+.border-secondary {
+  border-color: rgb(var(--border-secondary));
+}
+
+/* Component styles with theme support */
+.card {
+  background-color: rgb(var(--bg-primary));
+  border-color: rgb(var(--border-primary));
+  box-shadow: var(--shadow-sm);
+  transition: var(--theme-transition);
+}
+
+.card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.input {
+  background-color: rgb(var(--bg-primary));
+  border-color: rgb(var(--border-primary));
+  color: rgb(var(--text-primary));
+  transition: var(--theme-transition);
+}
+
+.input:focus {
+  border-color: rgb(var(--border-focus));
+  box-shadow: 0 0 0 3px rgb(var(--border-focus) / 0.1);
 }
 
 a {
-  @apply text-blue-600 hover:text-blue-700 transition-colors;
+  color: rgb(var(--accent-primary));
+  transition: var(--theme-transition);
+}
+
+a:hover {
+  color: rgb(var(--accent-hover));
 }
 
 input,
 textarea,
 select {
   @apply border border-gray-300 bg-white;
+  transition: var(--theme-transition);
 }
 
 [data-theme="dark"] input,

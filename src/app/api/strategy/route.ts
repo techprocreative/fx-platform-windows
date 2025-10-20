@@ -35,29 +35,75 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
     const symbol = url.searchParams.get('symbol');
+    const search = url.searchParams.get('search');
+    const sortBy = url.searchParams.get('sortBy') || 'createdAt';
+    const sortOrder = url.searchParams.get('sortOrder') || 'desc';
     const page = Math.max(parseInt(url.searchParams.get('page') || '1', 10), 1);
     const limit = Math.min(parseInt(url.searchParams.get('limit') || '20', 10), 100);
     const skip = (page - 1) * limit;
 
+    // Build where clause with optimized queries
     const where: Prisma.StrategyWhereInput = {
       userId: session.user.id,
       deletedAt: null,
       ...(status && status !== 'all' ? { status } : {}),
       ...(symbol ? { symbol: symbol.toUpperCase() } : {}),
+      ...(search ? {
+        OR: [
+          { name: { contains: search, mode: 'insensitive' } },
+          { description: { contains: search, mode: 'insensitive' } },
+          { symbol: { contains: search.toUpperCase(), mode: 'insensitive' } },
+        ],
+      } : {}),
     };
 
+    // Build order by clause
+    const orderBy: Prisma.StrategyOrderByWithRelationInput = {};
+    if (sortBy === 'name') {
+      orderBy.name = sortOrder as 'asc' | 'desc';
+    } else if (sortBy === 'symbol') {
+      orderBy.symbol = sortOrder as 'asc' | 'desc';
+    } else if (sortBy === 'status') {
+      orderBy.status = sortOrder as 'asc' | 'desc';
+    } else {
+      orderBy.createdAt = sortOrder as 'asc' | 'desc';
+    }
+
+    // Optimized query with proper indexing
     const strategiesPromise = prisma.strategy.findMany({
       where,
       skip,
       take: limit,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       include: STRATEGY_LIST_INCLUDE,
     });
 
-    const [strategies, total] = await Promise.all([
+    // Count query with optimized where clause
+    const totalPromise = prisma.strategy.count({ where });
+
+    // Additional stats queries (optimized with specific selects)
+    const statsPromise = prisma.strategy.groupBy({
+      by: ['status'],
+      where: {
+        userId: session.user.id,
+        deletedAt: null,
+      },
+      _count: {
+        status: true,
+      },
+    });
+
+    const [strategies, total, stats] = await Promise.all([
       strategiesPromise,
-      prisma.strategy.count({ where }),
+      totalPromise,
+      statsPromise,
     ]);
+
+    // Process stats into a more usable format
+    const statusCounts = stats.reduce((acc, stat) => {
+      acc[stat.status] = stat._count.status;
+      return acc;
+    }, {} as Record<string, number>);
 
     return NextResponse.json({
       strategies,
@@ -66,6 +112,12 @@ export async function GET(req: NextRequest) {
         page,
         pages: Math.ceil(total / limit),
         limit,
+        hasNext: page * limit < total,
+        hasPrev: page > 1,
+      },
+      stats: {
+        byStatus: statusCounts,
+        total,
       },
     });
   } catch (error) {

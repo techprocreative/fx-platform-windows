@@ -55,13 +55,15 @@ export async function POST(request: NextRequest) {
     // Create strategy in database
     const strategy = await prisma.strategy.create({
       data: {
-        ...strategyData,
-        id: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: strategyData.name || 'AI Generated Strategy',
+        description: strategyData.description || null,
+        symbol: strategyData.symbol || 'EURUSD',
+        timeframe: strategyData.timeframe || 'H1',
+        rules: (strategyData.rules || {}) as any,
         userId: session.user.id,
-        source: 'ai',
-        sourceModel: model || 'anthropic/claude-3-haiku:beta',
-        sourcePrompt: prompt,
-        isActive: false,
+        type: 'ai_generated',
+        aiPrompt: prompt,
+        status: 'draft',
       },
     });
 
@@ -108,7 +110,7 @@ export async function GET(request: NextRequest) {
     const userStrategies = await prisma.strategy.count({
       where: {
         userId: session.user.id,
-        source: 'ai',
+        type: 'ai_generated',
         createdAt: {
           gte: new Date(new Date().setDate(new Date().getDate() - 1)), // Last 24 hours
         },

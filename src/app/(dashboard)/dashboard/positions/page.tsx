@@ -33,6 +33,7 @@ export default function PositionsPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       redirect('/login');
+      return;
     }
     if (status === 'authenticated') {
       fetchPositions();
@@ -40,6 +41,7 @@ export default function PositionsPage() {
       const interval = setInterval(fetchPositions, 5000); // Update every 5 seconds
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [status]);
 
   const fetchPositions = async () => {

@@ -64,16 +64,25 @@ export async function GET(request: NextRequest) {
     const totalTrades = trades.length + backtests.length;
     const winningTrades = (
       trades.filter(t => (t.profit || 0) > 0).length +
-      backtests.filter(b => (b.returnPercentage || 0) > 0).length
+      backtests.filter(b => {
+        const results = b.results as any;
+        return (results?.returnPercentage || 0) > 0;
+      }).length
     );
     const losingTrades = (
       trades.filter(t => (t.profit || 0) <= 0).length +
-      backtests.filter(b => (b.returnPercentage || 0) <= 0).length
+      backtests.filter(b => {
+        const results = b.results as any;
+        return (results?.returnPercentage || 0) <= 0;
+      }).length
     );
     
     // Combine profits from both trades and backtests
     const tradeProfits = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
-    const backtestReturns = backtests.reduce((sum, b) => sum + (b.totalReturn || 0), 0);
+    const backtestReturns = backtests.reduce((sum, b) => {
+      const results = b.results as any;
+      return sum + (results?.totalReturn || 0);
+    }, 0);
     const totalProfit = tradeProfits + backtestReturns;
     const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
 
@@ -82,8 +91,14 @@ export async function GET(request: NextRequest) {
       .filter(t => (t.profit || 0) > 0)
       .reduce((sum, t) => sum + (t.profit || 0), 0);
     const backtestWins = backtests
-      .filter(b => (b.returnPercentage || 0) > 0)
-      .reduce((sum, b) => sum + (Math.abs(b.totalReturn || 0)), 0);
+      .filter(b => {
+        const results = b.results as any;
+        return (results?.returnPercentage || 0) > 0;
+      })
+      .reduce((sum, b) => {
+        const results = b.results as any;
+        return sum + (Math.abs(results?.totalReturn || 0));
+      }, 0);
     
     const tradeLosses = Math.abs(
       trades
@@ -91,8 +106,14 @@ export async function GET(request: NextRequest) {
         .reduce((sum, t) => sum + (t.profit || 0), 0)
     );
     const backtestLosses = backtests
-      .filter(b => (b.returnPercentage || 0) < 0)
-      .reduce((sum, b) => sum + (Math.abs(b.totalReturn || 0)), 0);
+      .filter(b => {
+        const results = b.results as any;
+        return (results?.returnPercentage || 0) < 0;
+      })
+      .reduce((sum, b) => {
+        const results = b.results as any;
+        return sum + (Math.abs(results?.totalReturn || 0));
+      }, 0);
     
     const totalWinAmount = tradeWins + backtestWins;
     const totalLossAmount = tradeLosses + backtestLosses;
@@ -176,8 +197,6 @@ export async function GET(request: NextRequest) {
         },
       },
       _count: { id: true },
-      _avg: { returnPercentage: true },
-      _sum: { totalReturn: true },
     });
 
     const strategyPerformance = await Promise.all(
@@ -187,14 +206,24 @@ export async function GET(request: NextRequest) {
           select: { id: true, name: true },
         });
 
-        const winningBacktests = await prisma.backtest.count({
+        const allBacktests = await prisma.backtest.findMany({
           where: {
             userId: session.user.id,
             strategyId: sp.strategyId,
             createdAt: { gte: startDate },
-            returnPercentage: { gt: 0 },
           },
+          select: { results: true },
         });
+
+        const winningBacktests = allBacktests.filter(b => {
+          const results = b.results as any;
+          return (results?.returnPercentage || 0) > 0;
+        }).length;
+
+        const totalReturn = allBacktests.reduce((sum, b) => {
+          const results = b.results as any;
+          return sum + (results?.totalReturn || 0);
+        }, 0);
 
         const totalStratBacktests = sp._count.id;
         const stratWinRate = totalStratBacktests > 0 ? (winningBacktests / totalStratBacktests) * 100 : 0;
@@ -202,7 +231,7 @@ export async function GET(request: NextRequest) {
         return {
           strategyId: sp.strategyId,
           name: strategy?.name || 'Unknown Strategy',
-          profit: sp._sum.totalReturn || 0,
+          profit: totalReturn,
           winRate: stratWinRate,
           trades: totalStratBacktests,
         };

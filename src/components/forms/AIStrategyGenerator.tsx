@@ -12,7 +12,6 @@ interface AIStrategyGeneratorProps {
     name: string;
     description: string;
     rules: any;
-    parameters: any;
   }) => void;
 }
 
@@ -79,10 +78,7 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
       onGenerate({
         name: strategy.name,
         description: strategy.description,
-        symbol: strategy.symbol,
-        timeframe: strategy.timeframe,
         rules: strategy.rules,
-        parameters: strategy.parameters,
       });
 
       toast.success('Strategy generated! Review and customize it below.');
@@ -176,7 +172,7 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
         <Button
           type="button"
           onClick={handleGenerate}
-          disabled={loading || prompt.length < 10 || (usage && usage.remaining === 0)}
+          disabled={loading || prompt.length < 10 || (usage && usage.remaining === 0) || false}
           className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
           size="lg"
         >

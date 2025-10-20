@@ -14,7 +14,7 @@ const TOTP_OPTIONS = {
  * @param userId - User ID
  * @returns TOTP secret and QR code data URL
  */
-export function generateTOTPSecret(userId: string): { secret: string; qrCodeUrl: string } {
+export async function generateTOTPSecret(userId: string): Promise<{ secret: string; qrCodeUrl: string }> {
   try {
     // Generate a secure random secret
     const secret = authenticator.generateSecret();

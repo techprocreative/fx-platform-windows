@@ -548,7 +548,6 @@ export function StrategyForm({
     name: string;
     description: string;
     rules: any;
-    parameters: any;
   }) => {
     // Store generated data and show preview
     setAIGeneratedData(data);
@@ -598,24 +597,28 @@ export function StrategyForm({
         period: 14,
       })) || [];
 
+      // Extract parameters from rules structure if available
+      const rulesData = aiGeneratedData.rules as any;
+      const params = rulesData?.parameters || {};
+      
       // Prepare exit rules
       const exitRulesFromAI = {
         takeProfit: { 
           type: "pips" as const, 
-          value: Math.round((aiGeneratedData.parameters?.takeProfit || 0.004) * 10000) 
+          value: Math.round((params?.takeProfit || 0.004) * 10000) 
         },
         stopLoss: { 
           type: "pips" as const, 
-          value: Math.round((aiGeneratedData.parameters?.stopLoss || 0.002) * 10000) 
+          value: Math.round((params?.stopLoss || 0.002) * 10000) 
         },
         trailing: { enabled: false, distance: 10 },
       };
 
       // Prepare risk management
       const riskMgmt = {
-        lotSize: aiGeneratedData.parameters?.riskPerTrade || 0.01,
-        maxPositions: aiGeneratedData.parameters?.maxPositions || 1,
-        maxDailyLoss: aiGeneratedData.parameters?.maxDailyLoss || 100,
+        lotSize: params?.riskPerTrade || 0.01,
+        maxPositions: params?.maxPositions || 1,
+        maxDailyLoss: params?.maxDailyLoss || 100,
       };
 
       // Submit directly without switching mode

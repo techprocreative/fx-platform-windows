@@ -84,7 +84,7 @@ export async function validateAPIKey(apiKey: string): Promise<any> {
  */
 export function generateJWT(payload: any, expiresIn: string = '15m'): string {
   const secret = process.env.JWT_SECRET || 'default-secret-change-in-production';
-  return jwt.sign(payload, secret, { expiresIn });
+  return jwt.sign(payload, secret, { expiresIn } as jwt.SignOptions);
 }
 
 /**

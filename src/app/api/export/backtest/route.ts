@@ -195,7 +195,7 @@ async function exportAsCSV(backtest: any): Promise<NextResponse> {
     });
   } else {
     // Fallback for development - return CSV as text
-    const csvContent = [headers.join(','), ...data.map(row => row.join(','))].join('\n');
+    const csvContent = [headers.join(','), ...data.map((row: string[]) => row.join(','))].join('\n');
     
     return new NextResponse(csvContent, {
       status: 200,

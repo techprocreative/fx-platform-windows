@@ -30,7 +30,11 @@ export class TradingWebSocketServer {
   private wss: WebSocketServer;
   private clients: Map<string, WSClient> = new Map();
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private cleanupInterval: NodeJS.Timeout | null = null;
   private commandQueue = getCommandQueue();
+  private maxConnections: number = 1000; // Connection pool limit
+  private connectionTimeout: number = 300000; // 5 minutes timeout
+  private maxInactiveTime: number = 120000; // 2 minutes max inactive time
 
   constructor(port: number = 8080) {
     this.wss = new WebSocketServer({
@@ -54,6 +58,7 @@ export class TradingWebSocketServer {
 
     this.setupWebSocketServer();
     this.startHeartbeat();
+    this.startCleanupInterval();
   }
 
   /**
@@ -61,6 +66,17 @@ export class TradingWebSocketServer {
    */
   private setupWebSocketServer(): void {
     this.wss.on('connection', async (ws: WebSocket, req: IncomingMessage) => {
+      // Check connection pool limit
+      if (this.clients.size >= this.maxConnections) {
+        console.warn(`Connection limit reached (${this.maxConnections}). Rejecting new connection.`);
+        ws.send(JSON.stringify({
+          type: 'ERROR',
+          payload: { message: 'Server connection limit reached' },
+        }));
+        ws.close(1008, 'Connection limit reached');
+        return;
+      }
+
       const apiKey = this.extractApiKey(req);
       const ipAddress = this.getClientIP(req);
 
@@ -84,6 +100,16 @@ export class TradingWebSocketServer {
         return;
       }
 
+      // Check if executor already has an active connection
+      const existingClient = Array.from(this.clients.values()).find(
+        c => c.executorId === executor.id
+      );
+      
+      if (existingClient) {
+        console.warn(`Executor ${executor.id} already connected. Terminating previous connection.`);
+        this.forceDisconnectClient(existingClient, 'New connection from same executor');
+      }
+
       // Create client object
       const client: WSClient = {
         id: `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
@@ -98,6 +124,9 @@ export class TradingWebSocketServer {
       // Add to clients map
       this.clients.set(client.id, client);
 
+      // Set connection timeout
+      this.setConnectionTimeout(client);
+
       // Log connection
       await this.logConnection(client, true);
 
@@ -108,13 +137,14 @@ export class TradingWebSocketServer {
           executorId: executor.id,
           clientId: client.id,
           timestamp: new Date().toISOString(),
+          connectionPoolSize: this.clients.size,
         },
       });
 
       // Setup client event handlers
       this.setupClientHandlers(client);
 
-      console.log(`Executor connected: ${executor.id} from ${ipAddress}`);
+      console.log(`Executor connected: ${executor.id} from ${ipAddress}. Total connections: ${this.clients.size}`);
     });
 
     this.wss.on('error', (error) => {
@@ -146,13 +176,15 @@ export class TradingWebSocketServer {
     });
 
     // Handle client disconnect
-    ws.on('close', async () => {
-      await this.handleDisconnect(client);
+    ws.on('close', async (code, reason) => {
+      await this.handleDisconnect(client, code, reason.toString());
     });
 
     // Handle errors
     ws.on('error', (error) => {
       console.error(`Client ${client.id} error:`, error);
+      // Force disconnect on error to prevent hanging connections
+      this.forceDisconnectClient(client, 'WebSocket error');
     });
   }
 
@@ -309,19 +341,54 @@ export class TradingWebSocketServer {
   /**
    * Handle client disconnect
    */
-  private async handleDisconnect(client: WSClient): Promise<void> {
+  private async handleDisconnect(client: WSClient, code: number = 1000, reason: string = 'Normal closure'): Promise<void> {
     this.clients.delete(client.id);
     await this.logConnection(client, false);
     
     // Update executor status
-    await prisma.executor.update({
-      where: { id: client.executorId },
-      data: {
-        status: 'offline',
-      },
-    });
+    try {
+      await prisma.executor.update({
+        where: { id: client.executorId },
+        data: {
+          status: 'offline',
+        },
+      });
+    } catch (error) {
+      console.error(`Failed to update executor status for ${client.executorId}:`, error);
+    }
 
-    console.log(`Executor disconnected: ${client.executorId}`);
+    console.log(`Executor disconnected: ${client.executorId} (code: ${code}, reason: ${reason}). Remaining connections: ${this.clients.size}`);
+  }
+
+  /**
+   * Force disconnect a client
+   */
+  private forceDisconnectClient(client: WSClient, reason: string): void {
+    try {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.close(1000, reason);
+      } else {
+        client.ws.terminate();
+      }
+      this.clients.delete(client.id);
+      console.log(`Force disconnected client ${client.id}: ${reason}`);
+    } catch (error) {
+      console.error(`Error force disconnecting client ${client.id}:`, error);
+      this.clients.delete(client.id);
+    }
+  }
+
+  /**
+   * Set connection timeout for client
+   */
+  private setConnectionTimeout(client: WSClient): void {
+    setTimeout(() => {
+      const currentClient = this.clients.get(client.id);
+      if (currentClient && currentClient.ws.readyState !== WebSocket.OPEN) {
+        console.log(`Connection timeout for client ${client.id}`);
+        this.forceDisconnectClient(currentClient, 'Connection timeout');
+      }
+    }, this.connectionTimeout);
   }
 
   /**
@@ -397,19 +464,105 @@ export class TradingWebSocketServer {
    */
   private startHeartbeat(): void {
     this.heartbeatInterval = setInterval(() => {
+      const now = new Date();
+      const clientsToRemove: string[] = [];
+
       this.clients.forEach((client) => {
-        if (!client.isAlive) {
-          // Client didn't respond to last ping
-          console.log(`Terminating inactive client: ${client.id}`);
-          client.ws.terminate();
-          this.clients.delete(client.id);
+        const inactiveTime = now.getTime() - client.lastHeartbeat.getTime();
+        
+        // Check if client is inactive for too long
+        if (inactiveTime > this.maxInactiveTime) {
+          console.log(`Client ${client.id} inactive for ${inactiveTime}ms. Terminating.`);
+          clientsToRemove.push(client.id);
           return;
         }
 
-        client.isAlive = false;
-        client.ws.ping();
+        if (!client.isAlive) {
+          // Client didn't respond to last ping
+          console.log(`Terminating unresponsive client: ${client.id}`);
+          clientsToRemove.push(client.id);
+          return;
+        }
+
+        // Check if WebSocket is still open before sending ping
+        if (client.ws.readyState === WebSocket.OPEN) {
+          client.isAlive = false;
+          try {
+            client.ws.ping();
+          } catch (error) {
+            console.error(`Failed to ping client ${client.id}:`, error);
+            clientsToRemove.push(client.id);
+          }
+        } else {
+          // WebSocket is not open, mark for removal
+          clientsToRemove.push(client.id);
+        }
       });
+
+      // Remove inactive/unresponsive clients
+      clientsToRemove.forEach(clientId => {
+        const client = this.clients.get(clientId);
+        if (client) {
+          this.forceDisconnectClient(client, 'Heartbeat failure');
+        }
+      });
+
+      // Log connection pool status
+      if (this.clients.size > 0) {
+        console.log(`Heartbeat check completed. Active connections: ${this.clients.size}`);
+      }
     }, 30000); // 30 seconds
+  }
+
+  /**
+   * Start cleanup interval for memory management
+   */
+  private startCleanupInterval(): void {
+    this.cleanupInterval = setInterval(() => {
+      // Force garbage collection if available
+      if (global.gc) {
+        global.gc();
+      }
+      
+      // Clean up any dangling connections
+      this.cleanupDanglingConnections();
+      
+      // Log memory usage for monitoring
+      this.logMemoryUsage();
+    }, 300000); // 5 minutes
+  }
+
+  /**
+   * Clean up dangling connections
+   */
+  private cleanupDanglingConnections(): void {
+    const clientsToRemove: string[] = [];
+    
+    this.clients.forEach((client, id) => {
+      // Remove clients with closed or closing WebSocket connections
+      if (client.ws.readyState === WebSocket.CLOSED ||
+          client.ws.readyState === WebSocket.CLOSING) {
+        clientsToRemove.push(id);
+      }
+    });
+
+    clientsToRemove.forEach(id => {
+      this.clients.delete(id);
+      console.log(`Cleaned up dangling connection: ${id}`);
+    });
+  }
+
+  /**
+   * Log memory usage for monitoring
+   */
+  private logMemoryUsage(): void {
+    if (typeof process !== 'undefined' && process.memoryUsage) {
+      const memUsage = process.memoryUsage();
+      console.log(`Memory Usage - RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB, ` +
+                  `Heap Used: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB, ` +
+                  `Heap Total: ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB, ` +
+                  `Active Connections: ${this.clients.size}`);
+    }
   }
 
   /**
@@ -499,15 +652,54 @@ export class TradingWebSocketServer {
       clearInterval(this.heartbeatInterval);
     }
 
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+
     // Close all client connections
     this.clients.forEach((client) => {
-      client.ws.close(1000, 'Server shutting down');
+      try {
+        if (client.ws.readyState === WebSocket.OPEN) {
+          client.ws.close(1000, 'Server shutting down');
+        } else {
+          client.ws.terminate();
+        }
+      } catch (error) {
+        console.error(`Error closing client ${client.id}:`, error);
+      }
     });
+
+    // Clear clients map
+    this.clients.clear();
 
     // Close WebSocket server
     this.wss.close();
     
     console.log('WebSocket server shut down');
+  }
+
+  /**
+   * Get server statistics
+   */
+  public getServerStats(): any {
+    const now = new Date();
+    const clientStats = Array.from(this.clients.values()).map(client => ({
+      id: client.id,
+      executorId: client.executorId,
+      isAlive: client.isAlive,
+      lastHeartbeat: client.lastHeartbeat,
+      inactiveTime: now.getTime() - client.lastHeartbeat.getTime(),
+      ipAddress: client.ipAddress,
+    }));
+
+    return {
+      totalConnections: this.clients.size,
+      maxConnections: this.maxConnections,
+      activeConnections: clientStats.filter(c => c.isAlive).length,
+      inactiveConnections: clientStats.filter(c => !c.isAlive).length,
+      clients: clientStats,
+      uptime: process.uptime ? process.uptime() : 0,
+    };
   }
 }
 

@@ -71,7 +71,10 @@ export async function POST(request: NextRequest) {
     const userOptimizations = await prisma.strategy.count({
       where: {
         userId: session.user.id,
-        source: 'ai_optimization',
+        type: 'ai_generated',
+        aiPrompt: {
+          contains: 'Optimized based on strategy',
+        },
         createdAt: {
           gte: new Date(new Date().setDate(new Date().getDate() - 1)), // Last 24 hours
         },
@@ -92,14 +95,15 @@ export async function POST(request: NextRequest) {
       model
     );
 
-    // Prepare performance data for AI
+    // Extract performance metrics from results Json
+    const results = recentBacktest.results as any || {};
     const performanceData = {
       currentMetrics: {
-        winRate: recentBacktest.winRate,
-        profitFactor: recentBacktest.profitFactor,
-        maxDrawdown: recentBacktest.maxDrawdown,
-        returnPercentage: recentBacktest.returnPercentage,
-        sharpeRatio: recentBacktest.sharpeRatio,
+        winRate: results.winRate || 0,
+        profitFactor: results.profitFactor || 0,
+        maxDrawdown: results.maxDrawdown || 0,
+        returnPercentage: results.returnPercentage || 0,
+        sharpeRatio: results.sharpeRatio || 0,
       },
       targetGoals: performanceGoals || {
         targetWinRate: 60,
@@ -109,20 +113,25 @@ export async function POST(request: NextRequest) {
     };
 
     // Optimize strategy
-    const optimizedStrategyData = await ai.optimizeStrategy(strategy, performanceData);
+    const optimizedStrategyData = await ai.optimizeStrategy({
+      ...strategy,
+      description: strategy.description || undefined,
+      type: strategy.type as 'ai_generated' | 'manual' | 'imported',
+      status: strategy.status as 'draft' | 'active' | 'paused' | 'archived',
+    }, performanceData);
 
     // Create optimized strategy in database
     const optimizedStrategy = await prisma.strategy.create({
       data: {
-        ...optimizedStrategyData,
-        id: `ai_opt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: optimizedStrategyData.name || strategy.name || 'Optimized Strategy',
+        description: optimizedStrategyData.description || strategy.description || null,
+        symbol: optimizedStrategyData.symbol || strategy.symbol || 'EURUSD',
+        timeframe: optimizedStrategyData.timeframe || strategy.timeframe || 'H1',
+        rules: (optimizedStrategyData.rules || {}) as any,
         userId: session.user.id,
-        source: 'ai_optimization',
-        sourceModel: model || 'anthropic/claude-3-haiku:beta',
-        sourcePrompt: `Optimized based on strategy ${strategyId}`,
-        originalStrategyId: strategyId,
-        isActive: false,
-        tags: [...(optimizedStrategyData.tags || []), 'optimized'],
+        type: 'ai_generated',
+        aiPrompt: `Optimized based on strategy ${strategyId}`,
+        status: 'draft',
       },
     });
 

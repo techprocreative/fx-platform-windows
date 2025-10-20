@@ -20,6 +20,10 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { Breadcrumb, MobileBreadcrumb } from '@/components/ui/Breadcrumb';
+import { HelpButton } from '@/components/help/HelpButton';
+import { InteractiveTutorial } from '@/components/help/InteractiveTutorial';
 
 const navItems = [
   {
@@ -88,18 +92,18 @@ export default function DashboardLayout({
   const isActive = (href: string) => pathname === href || pathname.startsWith(href + '/');
 
   return (
-    <div className="flex h-screen bg-neutral-50">
+    <div className="flex h-screen bg-secondary">
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-white shadow-lg transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-primary shadow-lg transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center gap-2 border-b border-neutral-200 p-6">
+          <div className="flex items-center gap-2 border-b border-primary p-6">
             <Zap className="h-6 w-6 text-primary-600" />
-            <span className="text-xl font-bold text-neutral-900">NexusTrade</span>
+            <span className="text-xl font-bold text-primary">NexusTrade</span>
             <button
               onClick={() => setSidebarOpen(false)}
               className="ml-auto lg:hidden"
@@ -121,8 +125,8 @@ export default function DashboardLayout({
                   onClick={() => setSidebarOpen(false)}
                   className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
                     active
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'text-neutral-600 hover:bg-neutral-100'
+                      ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                      : 'text-secondary hover:bg-secondary'
                   }`}
                 >
                   <Icon className="h-5 w-5" />
@@ -133,10 +137,10 @@ export default function DashboardLayout({
           </nav>
 
           {/* Footer */}
-          <div className="border-t border-neutral-200 p-4">
+          <div className="border-t border-primary p-4">
             <button
               onClick={handleLogout}
-              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-neutral-600 hover:bg-neutral-100 transition-colors"
+              className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-secondary hover:bg-secondary transition-colors"
             >
               <LogOut className="h-5 w-5" />
               <span className="font-medium">Logout</span>
@@ -148,7 +152,7 @@ export default function DashboardLayout({
       {/* Main Content */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <header className="border-b border-neutral-200 bg-white shadow-sm">
+        <header className="border-b border-primary bg-primary shadow-sm">
           <div className="flex items-center justify-between p-6">
             <button
               onClick={() => setSidebarOpen(true)}
@@ -159,29 +163,34 @@ export default function DashboardLayout({
 
             <div className="flex-1" />
 
+            {/* Theme Toggle */}
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+            </div>
+
             {/* User Menu */}
             <div className="relative">
               <button
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-neutral-100 transition-colors"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-secondary transition-colors"
               >
-                <div className="h-8 w-8 rounded-full bg-primary-600 flex items-center justify-center text-white font-semibold">
+                <div className="h-8 w-8 rounded-full bg-accent-primary flex items-center justify-center text-inverse font-semibold">
                   {session?.user?.name?.charAt(0).toUpperCase() || '?'}
                 </div>
-                <span className="hidden sm:inline text-sm font-medium text-neutral-700">
+                <span className="hidden sm:inline text-sm font-medium text-secondary">
                   {session?.user?.name || 'User'}
                 </span>
-                <ChevronDown className="h-4 w-4 text-neutral-600" />
+                <ChevronDown className="h-4 w-4 text-secondary" />
               </button>
 
               {/* Dropdown Menu */}
               {userMenuOpen && (
-                <div className="absolute right-0 mt-2 w-48 rounded-lg bg-white shadow-lg border border-neutral-200 z-10">
-                  <div className="px-4 py-3 border-b border-neutral-200">
-                    <p className="text-sm font-medium text-neutral-900">
+                <div className="absolute right-0 mt-2 w-48 rounded-lg bg-primary shadow-lg border border-primary z-10">
+                  <div className="px-4 py-3 border-b border-primary">
+                    <p className="text-sm font-medium text-primary">
                       {session?.user?.name}
                     </p>
-                    <p className="text-xs text-neutral-600">
+                    <p className="text-xs text-tertiary">
                       {session?.user?.email}
                     </p>
                   </div>
@@ -189,7 +198,7 @@ export default function DashboardLayout({
                   <div className="p-2">
                     <Link
                       href="/dashboard/settings"
-                      className="block px-4 py-2 text-sm text-neutral-700 hover:bg-neutral-100 rounded-md transition-colors"
+                      className="block px-4 py-2 text-sm text-primary hover:bg-secondary rounded-md transition-colors"
                       onClick={() => setUserMenuOpen(false)}
                     >
                       Account Settings
@@ -199,7 +208,7 @@ export default function DashboardLayout({
                         setUserMenuOpen(false);
                         handleLogout();
                       }}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                     >
                       Logout
                     </button>
@@ -212,6 +221,16 @@ export default function DashboardLayout({
 
         {/* Page Content */}
         <main className="flex-1 overflow-auto p-6">
+          {/* Breadcrumb Navigation */}
+          <div className="mb-6">
+            <div className="hidden lg:block">
+              <Breadcrumb />
+            </div>
+            <div className="lg:hidden">
+              <MobileBreadcrumb />
+            </div>
+          </div>
+          
           <ErrorBoundary>{children}</ErrorBoundary>
         </main>
       </div>
@@ -223,6 +242,10 @@ export default function DashboardLayout({
           onClick={() => setSidebarOpen(false)}
         />
       )}
+      
+      {/* Help Components */}
+      <HelpButton />
+      <InteractiveTutorial />
     </div>
   );
 }

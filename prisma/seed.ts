@@ -221,7 +221,6 @@ async function main() {
         returnPercentage: 2.505,
         maxDrawdown: 3.2,
         winRate: 66.7,
-        totalTrades: 3,
         winningTrades: 2,
         losingTrades: 1,
         averageWin: 62.5,

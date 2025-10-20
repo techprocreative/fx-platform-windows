@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '../../../../lib/prisma';
 import { hashPassword, generateRandomToken } from '../../../../lib/crypto';
 import { z } from 'zod';
+import { applyRateLimit } from '@/lib/middleware/rate-limit-middleware';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,6 +20,12 @@ const registerSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
+    // Apply rate limiting for registration
+    const rateLimitResponse = await applyRateLimit(req, 'login' as any);
+    if (rateLimitResponse) {
+      return rateLimitResponse;
+    }
+
     const body = await req.json();
 
     // Validate input

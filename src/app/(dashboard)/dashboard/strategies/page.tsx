@@ -15,6 +15,12 @@ import {
   TrendingUp,
 } from 'lucide-react';
 
+import { LoadingState, TableLoadingState } from '@/components/ui/LoadingState';
+import { InlineError } from '@/components/ui/ErrorMessage';
+import { useConfirmDialog, confirmDelete } from '@/components/ui/ConfirmDialog';
+import { StrategyStatus } from '@/components/ui/StatusIndicator';
+import { Button } from '@/components/ui/Button';
+
 interface Strategy {
   id: string;
   name: string;
@@ -30,7 +36,11 @@ export default function StrategiesPage() {
   const { data: session, status } = useSession();
   const [strategies, setStrategies] = useState<Strategy[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'draft'>('all');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -44,12 +54,16 @@ export default function StrategiesPage() {
 
   const fetchStrategies = async () => {
     try {
+      setError(null);
       const response = await fetch('/api/strategy');
-      if (response.ok) {
-        const data = await response.json();
-        setStrategies(data.strategies || []);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch strategies: ${response.statusText}`);
       }
+      const data = await response.json();
+      setStrategies(data.strategies || []);
     } catch (error) {
+      const err = error instanceof Error ? error : new Error('Failed to load strategies');
+      setError(err);
       toast.error('Failed to load strategies');
     } finally {
       setLoading(false);
@@ -57,21 +71,29 @@ export default function StrategiesPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this strategy?')) return;
+    const strategy = strategies.find(s => s.id === id);
+    if (!strategy) return;
+
+    const confirmed = await confirm(confirmDelete(strategy.name));
+    if (!confirmed) return;
 
     try {
+      setDeletingId(id);
       const response = await fetch(`/api/strategy/${id}`, {
         method: 'DELETE',
       });
 
-      if (response.ok) {
-        setStrategies(strategies.filter((s) => s.id !== id));
-        toast.success('Strategy deleted');
-      } else {
-        toast.error('Failed to delete strategy');
+      if (!response.ok) {
+        throw new Error(`Failed to delete strategy: ${response.statusText}`);
       }
+
+      setStrategies(strategies.filter((s) => s.id !== id));
+      toast.success('Strategy deleted successfully');
     } catch (error) {
-      toast.error('An error occurred');
+      const err = error instanceof Error ? error : new Error('Failed to delete strategy');
+      toast.error(err.message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -85,16 +107,19 @@ export default function StrategiesPage() {
         body: JSON.stringify({ status: newStatus }),
       });
 
-      if (response.ok) {
-        setStrategies(
-          strategies.map((s) =>
-            s.id === id ? { ...s, status: newStatus as any } : s
-          )
-        );
-        toast.success(`Strategy ${newStatus}`);
+      if (!response.ok) {
+        throw new Error(`Failed to update strategy: ${response.statusText}`);
       }
+
+      setStrategies(
+        strategies.map((s) =>
+          s.id === id ? { ...s, status: newStatus as any } : s
+        )
+      );
+      toast.success(`Strategy ${newStatus} successfully`);
     } catch (error) {
-      toast.error('Failed to update strategy');
+      const err = error instanceof Error ? error : new Error('Failed to update strategy');
+      toast.error(err.message);
     }
   };
 
@@ -104,11 +129,24 @@ export default function StrategiesPage() {
   });
 
   if (status === 'loading' || loading) {
+    return <PageLoadingState />;
+  }
+
+  if (error) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin">
-          <div className="h-12 w-12 rounded-full border-4 border-primary-600 border-t-transparent" />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-neutral-900">Strategies</h1>
+            <p className="text-neutral-600 mt-1">
+              Manage your trading strategies
+            </p>
+          </div>
         </div>
+        <InlineError
+          error={error}
+          retry={fetchStrategies}
+        />
       </div>
     );
   }
@@ -217,17 +255,7 @@ export default function StrategiesPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <span
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium capitalize ${
-                        strategy.status === 'active'
-                          ? 'bg-green-100 text-green-700'
-                          : strategy.status === 'draft'
-                          ? 'bg-yellow-100 text-yellow-700'
-                          : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {strategy.status}
-                    </span>
+                    <StrategyStatus status={strategy.status} />
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -259,10 +287,15 @@ export default function StrategiesPage() {
 
                       <button
                         onClick={() => handleDelete(strategy.id)}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                        disabled={deletingId === strategy.id}
+                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         title="Delete strategy"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        {deletingId === strategy.id ? (
+                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </td>
@@ -272,6 +305,28 @@ export default function StrategiesPage() {
           </table>
         </div>
       )}
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog />
+    </div>
+  );
+}
+
+// Helper component for page loading state
+function PageLoadingState() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-neutral-900">Strategies</h1>
+          <p className="text-neutral-600 mt-1">
+            Loading your strategies...
+          </p>
+        </div>
+      </div>
+      <div className="rounded-lg border border-neutral-200 bg-white">
+        <TableLoadingState />
+      </div>
     </div>
   );
 }

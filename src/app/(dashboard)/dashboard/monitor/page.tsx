@@ -43,6 +43,7 @@ export default function MonitorPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       redirect('/login');
+      return;
     }
     if (status === 'authenticated') {
       fetchStatus();
@@ -51,6 +52,7 @@ export default function MonitorPage() {
       const interval = setInterval(fetchStatus, 30000);
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [status]);
 
   const fetchStatus = async () => {

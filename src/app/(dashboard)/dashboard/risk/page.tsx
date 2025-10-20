@@ -32,6 +32,7 @@ export default function RiskPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       redirect('/login');
+      return;
     }
     if (status === 'authenticated') {
       fetchRiskData();
@@ -39,6 +40,7 @@ export default function RiskPage() {
       const interval = setInterval(fetchRiskData, 10000); // Update every 10 seconds
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [status]);
 
   const fetchRiskData = async () => {

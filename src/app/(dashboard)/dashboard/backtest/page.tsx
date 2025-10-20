@@ -18,6 +18,12 @@ import {
   Activity,
 } from 'lucide-react';
 
+import { LoadingState, TableLoadingState } from '@/components/ui/LoadingState';
+import { InlineError, CardError } from '@/components/ui/ErrorMessage';
+import { useConfirmDialog, confirmDiscard } from '@/components/ui/ConfirmDialog';
+import { BacktestStatus, ProgressIndicator } from '@/components/ui/StatusIndicator';
+import { useBacktestStatus } from '@/hooks/useWebSocket';
+
 interface Strategy {
   id: string;
   name: string;
@@ -38,17 +44,23 @@ interface Backtest {
     timeframe: string;
   };
   status: 'running' | 'completed' | 'failed';
-  startDate: string;
-  endDate: string;
-  symbol: string;
-  interval: string;
+  dateFrom: string;
+  dateTo: string;
+  settings?: {
+    symbol: string;
+    interval: string;
+    preferredDataSource?: string;
+  };
   initialBalance: number;
-  finalBalance?: number;
-  totalReturn?: number;
-  returnPercentage?: number;
-  maxDrawdown?: number;
-  winRate?: number;
-  totalTrades?: number;
+  results?: {
+    finalBalance?: number;
+    totalReturn?: number;
+    returnPercentage?: number;
+    maxDrawdown?: number;
+    winRate?: number;
+    totalTrades?: number;
+    progress?: number;
+  };
   createdAt: string;
   completedAt?: string;
 }
@@ -61,6 +73,10 @@ export default function BacktestPage() {
   const [loading, setLoading] = useState(true);
   const [showNewBacktest, setShowNewBacktest] = useState(false);
   const [runningBacktests, setRunningBacktests] = useState<Set<string>>(new Set());
+  const [error, setError] = useState<Error | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  
+  const { confirm, ConfirmDialog } = useConfirmDialog();
 
   const [formData, setFormData] = useState({
     strategyId: '',
@@ -74,6 +90,7 @@ export default function BacktestPage() {
   useEffect(() => {
     if (status === 'unauthenticated') {
       redirect('/login');
+      return;
     }
     if (status === 'authenticated') {
       fetchData();
@@ -87,26 +104,43 @@ export default function BacktestPage() {
 
       return () => clearInterval(interval);
     }
+    return undefined;
   }, [status, runningBacktests.size]);
 
   const fetchData = async () => {
     try {
+      setError(null);
       const [backtestsRes, strategiesRes] = await Promise.all([
         fetch('/api/backtest'),
         fetch('/api/strategy'),
       ]);
 
-      if (backtestsRes.ok) {
-        const backtestsData = await backtestsRes.json();
-        setBacktests(backtestsData.backtests || []);
+      if (!backtestsRes.ok) {
+        throw new Error(`Failed to fetch backtests: ${backtestsRes.statusText}`);
       }
 
-      if (strategiesRes.ok) {
-        const strategiesData = await strategiesRes.json();
-        setStrategies(strategiesData.strategies || []);
+      if (!strategiesRes.ok) {
+        throw new Error(`Failed to fetch strategies: ${strategiesRes.statusText}`);
       }
+
+      const backtestsData = await backtestsRes.json();
+      const strategiesData = await strategiesRes.json();
+      
+      setBacktests(backtestsData.backtests || []);
+      setStrategies(strategiesData.strategies || []);
+      
+      // Update running backtests set
+      const runningIds = new Set<string>(
+        backtestsData.backtests
+          .filter((bt: Backtest) => bt.status === 'running')
+          .map((bt: Backtest) => bt.id)
+      );
+      setRunningBacktests(runningIds);
+
     } catch (error) {
-      toast.error('Failed to fetch data');
+      const err = error instanceof Error ? error : new Error('Failed to fetch data');
+      setError(err);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -151,7 +185,7 @@ export default function BacktestPage() {
     }
 
     try {
-      setLoading(true);
+      setSubmitting(true);
       
       // Convert dates to ISO datetime format with time component
       const requestData = {
@@ -169,9 +203,7 @@ export default function BacktestPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        toast.error(data.error || 'Failed to start backtest');
-        setLoading(false);
-        return;
+        throw new Error(data.error || 'Failed to start backtest');
       }
 
       toast.success('Backtest started successfully!');
@@ -179,8 +211,28 @@ export default function BacktestPage() {
       setShowNewBacktest(false);
       fetchData();
     } catch (error) {
-      toast.error('An error occurred');
-      setLoading(false);
+      const err = error instanceof Error ? error : new Error('Failed to start backtest');
+      toast.error(err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleCancelForm = async () => {
+    if (showNewBacktest) {
+      const confirmed = await confirm(confirmDiscard());
+      if (confirmed) {
+        setShowNewBacktest(false);
+        // Reset form
+        setFormData({
+          strategyId: '',
+          symbol: '',
+          interval: '1h',
+          startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+          endDate: new Date().toISOString().split('T')[0],
+          initialBalance: 10000,
+        });
+      }
     }
   };
 
@@ -210,10 +262,37 @@ export default function BacktestPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin">
-          <div className="h-12 w-12 rounded-full border-4 border-primary-600 border-t-transparent" />
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-neutral-900">Backtesting</h1>
+            <p className="text-neutral-600 mt-1">
+              Loading your backtests...
+            </p>
+          </div>
         </div>
+        <div className="rounded-lg border border-neutral-200 bg-white">
+          <TableLoadingState />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-neutral-900">Backtesting</h1>
+            <p className="text-neutral-600 mt-1">
+              Test your strategies on historical data
+            </p>
+          </div>
+        </div>
+        <InlineError
+          error={error}
+          retry={fetchData}
+        />
       </div>
     );
   }
@@ -311,14 +390,15 @@ export default function BacktestPage() {
           <div className="flex gap-3">
             <button
               onClick={handleRunBacktest}
-              disabled={!formData.strategyId || loading}
+              disabled={!formData.strategyId || submitting}
               className="px-6 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-primary-600/50 disabled:cursor-not-allowed transition-colors font-medium"
             >
-              {loading ? 'Starting...' : 'Run Backtest'}
+              {submitting ? 'Starting...' : 'Run Backtest'}
             </button>
             <button
-              onClick={() => setShowNewBacktest(false)}
-              className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-medium"
+              onClick={handleCancelForm}
+              disabled={submitting}
+              className="px-6 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
             >
               Cancel
             </button>
@@ -371,19 +451,17 @@ export default function BacktestPage() {
                     <h3 className="text-lg font-semibold text-neutral-900">
                       {backtest.strategy?.name || 'Unknown Strategy'}
                     </h3>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(backtest.status)}`}>
-                      {backtest.status}
-                    </span>
+                    <BacktestStatus
+                      status={backtest.status}
+                      progress={(backtest.results as any)?.progress}
+                    />
                     {runningBacktests.has(backtest.id) && (
-                      <div className="flex items-center gap-1 text-yellow-600">
-                        <div className="w-2 h-2 bg-yellow-600 rounded-full animate-pulse" />
-                        <span className="text-xs">Running...</span>
-                      </div>
+                      <RealtimeBacktestStatus backtestId={backtest.id} />
                     )}
                   </div>
                   
                   <div className="flex items-center gap-4 text-sm text-neutral-600 mb-3">
-                    <span>{(backtest.settings as any)?.symbol} • {(backtest.settings as any)?.interval}</span>
+                    <span>{backtest.settings?.symbol} • {backtest.settings?.interval}</span>
                     <span>•</span>
                     <span>{formatDuration(backtest.dateFrom, backtest.dateTo)}</span>
                     <span>•</span>
@@ -457,6 +535,38 @@ export default function BacktestPage() {
               )}
             </div>
           ))}
+        </div>
+      )}
+      
+      {/* Confirmation Dialog */}
+      <ConfirmDialog />
+    </div>
+  );
+}
+
+// Component for real-time backtest status updates
+function RealtimeBacktestStatus({ backtestId }: { backtestId: string }) {
+  const backtestStatus = useBacktestStatus(backtestId);
+  
+  if (!backtestStatus) {
+    return (
+      <div className="flex items-center gap-1 text-yellow-600">
+        <div className="w-2 h-2 bg-yellow-600 rounded-full animate-pulse" />
+        <span className="text-xs">Running...</span>
+      </div>
+    );
+  }
+  
+  return (
+    <div className="flex items-center gap-2">
+      {backtestStatus.progress !== undefined && (
+        <div className="text-xs text-neutral-600">
+          {Math.round(backtestStatus.progress)}%
+        </div>
+      )}
+      {backtestStatus.currentStep && (
+        <div className="text-xs text-neutral-600 max-w-32 truncate">
+          {backtestStatus.currentStep}
         </div>
       )}
     </div>

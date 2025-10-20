@@ -175,7 +175,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Get pending commands from queue
-    const pendingCommands = await commandQueue.getPendingCommands(executorId);
+    const pendingCommands = await commandQueue.getPendingCommands(executorId || undefined);
 
     return NextResponse.json({
       commands,
