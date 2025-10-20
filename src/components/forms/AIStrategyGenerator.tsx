@@ -79,6 +79,8 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
       onGenerate({
         name: strategy.name,
         description: strategy.description,
+        symbol: strategy.symbol,
+        timeframe: strategy.timeframe,
         rules: strategy.rules,
         parameters: strategy.parameters,
       });
