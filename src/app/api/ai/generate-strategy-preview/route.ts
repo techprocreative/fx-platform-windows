@@ -23,6 +23,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if OpenRouter API key is configured
+    if (!process.env.OPENROUTER_API_KEY) {
+      console.error('OPENROUTER_API_KEY not configured');
+      return NextResponse.json(
+        { 
+          error: 'AI service is not configured. Please contact administrator.',
+          code: 'SERVICE_UNAVAILABLE'
+        },
+        { status: 503 }
+      );
+    }
+
     const body = await request.json();
     const { prompt, model: requestModel } = GenerateStrategyPreviewSchema.parse(body);
     
@@ -91,10 +103,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Check if it's an API key error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    if (errorMessage.includes('401') || errorMessage.includes('API key')) {
+      return NextResponse.json(
+        { 
+          error: 'AI service authentication failed. Please contact administrator.',
+          code: 'AUTH_ERROR',
+          details: 'The OpenRouter API key may be invalid or not configured.',
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       { 
         error: 'Failed to generate strategy',
-        details: error instanceof Error ? error.message : 'Unknown error',
+        details: errorMessage,
       },
       { status: 500 }
     );

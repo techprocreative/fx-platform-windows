@@ -62,6 +62,8 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
       if (!response.ok) {
         if (data.code === 'LIMIT_REACHED') {
           toast.error(data.error || 'Daily limit reached');
+        } else if (data.code === 'SERVICE_UNAVAILABLE' || data.code === 'AUTH_ERROR') {
+          toast.error('AI service is temporarily unavailable. Please try again later or contact support.');
         } else {
           toast.error(data.error || 'Failed to generate strategy');
         }
