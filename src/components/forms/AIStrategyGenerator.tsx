@@ -7,12 +7,6 @@ import toast from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
 
-interface AIModel {
-  id: string;
-  name: string;
-  recommended?: boolean;
-}
-
 interface AIStrategyGeneratorProps {
   onGenerate: (data: {
     name: string;
