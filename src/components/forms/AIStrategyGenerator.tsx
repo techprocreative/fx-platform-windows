@@ -24,20 +24,20 @@ interface AIStrategyGeneratorProps {
 
 export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
   const [prompt, setPrompt] = useState('');
-  const [selectedModel, setSelectedModel] = useState('anthropic/claude-3-haiku:beta');
   const [loading, setLoading] = useState(false);
-  const [models, setModels] = useState<AIModel[]>([]);
   const [usage, setUsage] = useState<{ used: number; remaining: number; dailyLimit: number } | null>(null);
+  
+  // Fixed model - Grok (from OpenRouter)
+  const AI_MODEL = 'x-ai/grok-4-fast';
 
-  // Load models and usage info on mount
+  // Load usage info on mount
   useState(() => {
     fetch('/api/ai/generate-strategy-preview')
       .then(res => res.json())
       .then(data => {
-        if (data.models) setModels(data.models);
         if (data.usage) setUsage(data.usage);
       })
-      .catch(err => console.error('Failed to load AI models:', err));
+      .catch(err => console.error('Failed to load usage info:', err));
   });
 
   const handleGenerate = async () => {
@@ -59,7 +59,7 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: prompt.trim(),
-          model: selectedModel,
+          model: AI_MODEL,
         }),
       });
 
@@ -116,42 +116,22 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Usage Info */}
-        {usage && (
-          <div className="rounded-lg bg-white border border-purple-200 p-3">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-neutral-600">AI Generations Today:</span>
-              <span className="font-semibold text-purple-600">
+        {/* Usage Info & AI Model */}
+        <div className="rounded-lg bg-white border border-purple-200 p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-purple-600" />
+              <span className="text-sm font-medium text-neutral-700">Powered by Grok</span>
+            </div>
+            {usage && (
+              <span className="text-sm font-semibold text-purple-600">
                 {usage.remaining} / {usage.dailyLimit} remaining
               </span>
-            </div>
-          </div>
-        )}
-
-        {/* Model Selection */}
-        <div className="space-y-2">
-          <label className="text-sm font-medium text-neutral-700">AI Model</label>
-          <select
-            value={selectedModel}
-            onChange={(e) => setSelectedModel(e.target.value)}
-            className="w-full rounded-lg border border-neutral-300 px-4 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-            disabled={loading}
-          >
-            {models.length > 0 ? (
-              models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.name} {model.recommended ? '(Recommended)' : ''}
-                </option>
-              ))
-            ) : (
-              <>
-                <option value="anthropic/claude-3-haiku:beta">Claude 3 Haiku (Recommended)</option>
-                <option value="anthropic/claude-3-sonnet:beta">Claude 3 Sonnet</option>
-                <option value="openai/gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                <option value="openai/gpt-4">GPT-4</option>
-              </>
             )}
-          </select>
+          </div>
+          <p className="text-xs text-neutral-500">
+            Using xAI's Grok 4 Fast model for fast and accurate strategy generation
+          </p>
         </div>
 
         {/* Prompt Input */}

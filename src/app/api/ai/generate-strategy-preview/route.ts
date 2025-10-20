@@ -24,7 +24,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { prompt, model } = GenerateStrategyPreviewSchema.parse(body);
+    const { prompt, model: requestModel } = GenerateStrategyPreviewSchema.parse(body);
+    
+    // Force use of Grok 4 Fast model from OpenRouter
+    const model = 'x-ai/grok-4-fast';
 
     // Check user's AI generation limit (same as full generation)
     const recentGenerations = await prisma.strategy.count({
@@ -48,7 +51,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Initialize OpenRouter AI
+    // Initialize OpenRouter AI with Grok
     const ai = createOpenRouterAI(
       process.env.OPENROUTER_API_KEY,
       model
@@ -66,7 +69,7 @@ export async function POST(request: NextRequest) {
         rules: strategyData.rules || [],
         parameters: strategyData.parameters,
         prompt,
-        model: model || 'anthropic/claude-3-haiku:beta',
+        model: 'x-ai/grok-4-fast',
       },
       usage: {
         used: recentGenerations,
@@ -124,12 +127,11 @@ export async function GET(request: NextRequest) {
     const remainingLimit = Math.max(0, dailyLimit - recentGenerations);
 
     return NextResponse.json({
-      models: [
-        { id: 'anthropic/claude-3-haiku:beta', name: 'Claude 3 Haiku (Fast)', recommended: true },
-        { id: 'anthropic/claude-3-sonnet:beta', name: 'Claude 3 Sonnet (Balanced)' },
-        { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo (Fast)' },
-        { id: 'openai/gpt-4', name: 'GPT-4 (Advanced)' },
-      ],
+      model: {
+        id: 'x-ai/grok-4-fast',
+        name: 'Grok 4 Fast',
+        provider: 'xAI',
+      },
       usage: {
         dailyLimit,
         used: recentGenerations,
