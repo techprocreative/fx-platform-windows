@@ -252,23 +252,24 @@ CRITICAL REQUIREMENTS:
         }
       
       // Extract timeframe from prompt (prioritize user input over AI)
+      // IMPORTANT: Check longer strings FIRST to avoid false matches (m15 contains m1!)
       let finalTimeframe = null;
-      if (promptLower.includes('m1') || promptLower.includes('1 minute') || promptLower.includes('1-minute')) {
-        finalTimeframe = 'M1';
-      } else if (promptLower.includes('m5') || promptLower.includes('5 minute') || promptLower.includes('5-minute')) {
-        finalTimeframe = 'M5';
+      if (promptLower.includes('m30') || promptLower.includes('30 minute') || promptLower.includes('30-minute')) {
+        finalTimeframe = 'M30';
       } else if (promptLower.includes('m15') || promptLower.includes('15 minute') || promptLower.includes('15-minute')) {
         finalTimeframe = 'M15';
-      } else if (promptLower.includes('m30') || promptLower.includes('30 minute') || promptLower.includes('30-minute')) {
-        finalTimeframe = 'M30';
-      } else if (promptLower.includes('h1') || promptLower.includes('1 hour') || promptLower.includes('1-hour') || promptLower.includes('hourly')) {
-        finalTimeframe = 'H1';
+      } else if (promptLower.includes('m5') || promptLower.includes('5 minute') || promptLower.includes('5-minute')) {
+        finalTimeframe = 'M5';
+      } else if (promptLower.includes('m1') || promptLower.includes('1 minute') || promptLower.includes('1-minute')) {
+        finalTimeframe = 'M1';
       } else if (promptLower.includes('h4') || promptLower.includes('4 hour') || promptLower.includes('4-hour')) {
         finalTimeframe = 'H4';
-      } else if (promptLower.includes('d1') || promptLower.includes('daily') || promptLower.includes('1 day')) {
-        finalTimeframe = 'D1';
+      } else if (promptLower.includes('h1') || promptLower.includes('1 hour') || promptLower.includes('1-hour') || promptLower.includes('hourly')) {
+        finalTimeframe = 'H1';
       } else if (promptLower.includes('w1') || promptLower.includes('weekly') || promptLower.includes('1 week')) {
         finalTimeframe = 'W1';
+      } else if (promptLower.includes('d1') || promptLower.includes('daily') || promptLower.includes('1 day')) {
+        finalTimeframe = 'D1';
       }
       
       // Use AI response if no timeframe found in prompt
