@@ -107,18 +107,43 @@ Your response must be a valid JSON object with the following structure:
 }
 
 CRITICAL INSTRUCTIONS:
-1. SYMBOL: Extract the trading symbol from user request (e.g., XAUUSD, EURUSD, GBPUSD, USDJPY, etc.)
-   - If user mentions "gold" → use XAUUSD
-   - If user mentions "euro" or "EUR" → use EURUSD
-   - If user mentions "pound" or "GBP" → use GBPUSD
-   - If user doesn't specify → use EURUSD as default
+1. SYMBOL: Extract the trading symbol from user request
+   
+   MAJOR FOREX PAIRS:
+   - Euro: EURUSD (keywords: "euro", "eur", "eurusd")
+   - Pound: GBPUSD (keywords: "pound", "gbp", "cable", "sterling")
+   - Yen: USDJPY (keywords: "yen", "jpy", "usdjpy")
+   - Swiss: USDCHF (keywords: "swiss", "chf", "swissy")
+   - Aussie: AUDUSD (keywords: "aussie", "aud", "audusd")
+   - Loonie: USDCAD (keywords: "cad", "loonie", "usdcad")
+   - Kiwi: NZDUSD (keywords: "kiwi", "nzd", "nzdusd")
+   
+   CROSS PAIRS:
+   - EURJPY, GBPJPY, EURGBP, AUDJPY, EURAUD, EURCHF, AUDNZD, etc.
+   
+   COMMODITIES:
+   - Gold: XAUUSD (keywords: "gold", "xau", "xauusd")
+   - Silver: XAGUSD (keywords: "silver", "xag", "xagusd")
+   - Oil: USOIL/UKOIL (keywords: "oil", "crude", "wti", "brent")
+   
+   INDICES:
+   - US30 (Dow Jones), NAS100 (NASDAQ), SPX500 (S&P 500)
+   - UK100 (FTSE), GER40 (DAX), JPN225 (Nikkei)
+   
+   CRYPTO:
+   - BTCUSD (keywords: "bitcoin", "btc"), ETHUSD (keywords: "ethereum", "eth")
+   
+   If user doesn't specify → use EURUSD as default
    
 2. TIMEFRAME: Extract timeframe from user request or use H1 as default
    - Valid values: M1, M5, M15, M30, H1, H4, D1, W1
    
 3. Use realistic indicators and values appropriate for the symbol:
-   - For XAUUSD (gold): larger pip values, higher volatility
-   - For forex pairs: typical RSI 30-70, SMAs
+   - For XAUUSD (gold): larger pip values (100-200), higher volatility
+   - For XAGUSD (silver): medium pip values (50-100), high volatility
+   - For major forex pairs: typical RSI 30-70, SMAs, 20-50 pips TP/SL
+   - For indices: larger point values
+   - For oil: medium pip values
    
 4. Keep strategies simple and executable
 5. Risk management is important (position sizes 0.01-0.1)
@@ -148,16 +173,72 @@ IMPORTANT: Extract the symbol from my request. If I mention a specific pair or c
       if (!finalSymbol) {
         // Try to extract from prompt
         const promptLower = prompt.toLowerCase();
-        if (promptLower.includes('xauusd') || promptLower.includes('gold')) {
+        
+        // Commodities
+        if (promptLower.includes('xauusd') || promptLower.includes('gold') || promptLower.includes('xau')) {
           finalSymbol = 'XAUUSD';
-        } else if (promptLower.includes('gbpusd') || promptLower.includes('pound')) {
+        } else if (promptLower.includes('xagusd') || promptLower.includes('silver') || promptLower.includes('xag')) {
+          finalSymbol = 'XAGUSD';
+        } else if (promptLower.includes('usoil') || promptLower.includes('wti') || promptLower.includes('crude oil')) {
+          finalSymbol = 'USOIL';
+        } else if (promptLower.includes('ukoil') || promptLower.includes('brent')) {
+          finalSymbol = 'UKOIL';
+        }
+        // Major Forex Pairs
+        else if (promptLower.includes('eurusd') || promptLower.includes('euro')) {
+          finalSymbol = 'EURUSD';
+        } else if (promptLower.includes('gbpusd') || promptLower.includes('pound') || promptLower.includes('cable') || promptLower.includes('sterling')) {
           finalSymbol = 'GBPUSD';
         } else if (promptLower.includes('usdjpy') || promptLower.includes('yen')) {
           finalSymbol = 'USDJPY';
-        } else if (promptLower.includes('eurusd') || promptLower.includes('euro')) {
+        } else if (promptLower.includes('usdchf') || promptLower.includes('swiss') || promptLower.includes('swissy')) {
+          finalSymbol = 'USDCHF';
+        } else if (promptLower.includes('audusd') || promptLower.includes('aussie')) {
+          finalSymbol = 'AUDUSD';
+        } else if (promptLower.includes('usdcad') || promptLower.includes('loonie')) {
+          finalSymbol = 'USDCAD';
+        } else if (promptLower.includes('nzdusd') || promptLower.includes('kiwi')) {
+          finalSymbol = 'NZDUSD';
+        }
+        // Cross Pairs
+        else if (promptLower.includes('eurjpy')) {
+          finalSymbol = 'EURJPY';
+        } else if (promptLower.includes('gbpjpy')) {
+          finalSymbol = 'GBPJPY';
+        } else if (promptLower.includes('eurgbp')) {
+          finalSymbol = 'EURGBP';
+        } else if (promptLower.includes('audjpy')) {
+          finalSymbol = 'AUDJPY';
+        } else if (promptLower.includes('euraud')) {
+          finalSymbol = 'EURAUD';
+        } else if (promptLower.includes('eurchf')) {
+          finalSymbol = 'EURCHF';
+        } else if (promptLower.includes('audnzd')) {
+          finalSymbol = 'AUDNZD';
+        }
+        // Indices
+        else if (promptLower.includes('us30') || promptLower.includes('dow jones') || promptLower.includes('dow')) {
+          finalSymbol = 'US30';
+        } else if (promptLower.includes('nas100') || promptLower.includes('nasdaq')) {
+          finalSymbol = 'NAS100';
+        } else if (promptLower.includes('spx500') || promptLower.includes('sp500') || promptLower.includes('s&p')) {
+          finalSymbol = 'SPX500';
+        } else if (promptLower.includes('uk100') || promptLower.includes('ftse')) {
+          finalSymbol = 'UK100';
+        } else if (promptLower.includes('ger40') || promptLower.includes('dax')) {
+          finalSymbol = 'GER40';
+        } else if (promptLower.includes('jpn225') || promptLower.includes('nikkei')) {
+          finalSymbol = 'JPN225';
+        }
+        // Crypto
+        else if (promptLower.includes('btcusd') || promptLower.includes('bitcoin') || promptLower.includes('btc')) {
+          finalSymbol = 'BTCUSD';
+        } else if (promptLower.includes('ethusd') || promptLower.includes('ethereum') || promptLower.includes('eth')) {
+          finalSymbol = 'ETHUSD';
+        }
+        // Default fallback
+        else {
           finalSymbol = 'EURUSD';
-        } else {
-          finalSymbol = 'EURUSD'; // Default fallback
         }
       }
 

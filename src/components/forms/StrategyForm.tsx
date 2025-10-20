@@ -160,13 +160,46 @@ const CONDITIONS: ConditionOperator[] = [
 ];
 
 const SYMBOLS = [
+  // Major Forex Pairs
   "EURUSD",
   "GBPUSD",
   "USDJPY",
-  "XAUUSD",
+  "USDCHF",
+  "AUDUSD",
+  "USDCAD",
+  "NZDUSD",
+  
+  // Cross Currency Pairs
+  "EURJPY",
+  "GBPJPY",
+  "EURGBP",
+  "AUDJPY",
+  "EURAUD",
+  "EURCHF",
+  "AUDNZD",
+  "NZDJPY",
+  "GBPAUD",
+  "GBPCAD",
+  "GBPNZD",
+  "AUDCAD",
+  
+  // Commodities
+  "XAUUSD", // Gold
+  "XAGUSD", // Silver
+  "USOIL",  // WTI Crude Oil
+  "UKOIL",  // Brent Crude Oil
+  
+  // Indices
+  "US30",   // Dow Jones
+  "NAS100", // NASDAQ
+  "SPX500", // S&P 500
+  "UK100",  // FTSE 100
+  "GER40",  // DAX
+  "JPN225", // Nikkei
+  
+  // Crypto (if supported)
   "BTCUSD",
   "ETHUSD",
-  "SP500",
 ];
 
 const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"];
