@@ -8,6 +8,8 @@ interface AIPreviewCardProps {
   strategy: {
     name: string;
     description: string;
+    symbol?: string;
+    timeframe?: string;
     rules: any[];
     parameters: {
       takeProfit?: number;
@@ -56,9 +58,21 @@ export function AIPreviewCard({ strategy, onReview, onUseAsIs }: AIPreviewCardPr
           
           <div className="flex items-center gap-4 pt-2 border-t border-neutral-100">
             <div className="flex items-center gap-1.5 text-sm">
+              <CheckCircle className="h-4 w-4 text-purple-600" />
+              <span className="text-neutral-700">
+                <span className="font-medium">{strategy.symbol || 'EURUSD'}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-sm">
+              <CheckCircle className="h-4 w-4 text-purple-600" />
+              <span className="text-neutral-700">
+                <span className="font-medium">{strategy.timeframe || 'H1'}</span>
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-sm">
               <CheckCircle className="h-4 w-4 text-green-600" />
               <span className="text-neutral-700">
-                <span className="font-medium">{entryConditionsCount}</span> Entry Condition{entryConditionsCount !== 1 ? 's' : ''}
+                <span className="font-medium">{entryConditionsCount}</span> Condition{entryConditionsCount !== 1 ? 's' : ''}
               </span>
             </div>
             {firstCondition && (
@@ -109,7 +123,7 @@ export function AIPreviewCard({ strategy, onReview, onUseAsIs }: AIPreviewCardPr
         {/* Info Box */}
         <div className="rounded-lg bg-purple-50 border border-purple-200 p-4">
           <p className="text-sm text-purple-900">
-            <span className="font-medium">💡 Next steps:</span> Review and customize the strategy to match your trading style, or use it as-is if it meets your requirements.
+            <span className="font-medium">💡 Ready to use:</span> This strategy is complete with all required fields. Click "Use As-Is" to create and backtest immediately, or "Review & Customize" to fine-tune the parameters.
           </p>
         </div>
 

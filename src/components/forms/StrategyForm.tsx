@@ -475,6 +475,8 @@ export function StrategyForm({
       ...prev,
       name: data.name,
       description: data.description,
+      symbol: data.symbol || formData.symbol,
+      timeframe: data.timeframe || formData.timeframe,
       type: "ai_generated",
     }));
 
@@ -551,51 +553,72 @@ export function StrategyForm({
   const handleUseAsIs = async () => {
     if (!aiGeneratedData) return;
 
-    // Populate fields with AI data
-    populateFieldsFromAI(aiGeneratedData);
+    try {
+      // Show loading toast
+      toast.loading("Creating strategy...");
 
-    // Hide preview and switch mode
-    setShowAIPreview(false);
-    setMode("advanced");
+      // Prepare conditions from AI data
+      const conditions = aiGeneratedData.rules?.[0]?.conditions?.map((cond: any, index: number) => ({
+        indicator: cond.indicator || "RSI",
+        condition: cond.operator || "greater_than",
+        value: cond.value || null,
+        period: 14,
+      })) || [];
 
-    // Wait a bit for state to update then validate and submit
-    setTimeout(async () => {
-      if (!validate()) {
-        toast.error("Please review the strategy - some fields need attention");
-        // Scroll to errors
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-        return;
-      }
+      // Prepare exit rules
+      const exitRulesFromAI = {
+        takeProfit: { 
+          type: "pips" as const, 
+          value: Math.round((aiGeneratedData.parameters?.takeProfit || 0.004) * 10000) 
+        },
+        stopLoss: { 
+          type: "pips" as const, 
+          value: Math.round((aiGeneratedData.parameters?.stopLoss || 0.002) * 10000) 
+        },
+        trailing: { enabled: false, distance: 10 },
+      };
 
-      // Submit directly
+      // Prepare risk management
+      const riskMgmt = {
+        lotSize: aiGeneratedData.parameters?.riskPerTrade || 0.01,
+        maxPositions: aiGeneratedData.parameters?.maxPositions || 1,
+        maxDailyLoss: aiGeneratedData.parameters?.maxDailyLoss || 100,
+      };
+
+      // Submit directly without switching mode
       const payload = {
         formData: {
-          ...formData,
           name: aiGeneratedData.name,
           description: aiGeneratedData.description,
-          type: "ai_generated",
+          symbol: aiGeneratedData.symbol || formData.symbol,
+          timeframe: aiGeneratedData.timeframe || formData.timeframe,
+          type: "ai_generated" as const,
         },
         rules: {
           entry: {
-            conditions: entryConditions.map(({ id, ...condition }) => condition),
+            conditions,
             logic: entryLogic,
           },
-          exit: exitRules,
-          riskManagement,
+          exit: exitRulesFromAI,
+          riskManagement: riskMgmt,
         },
       };
 
-      try {
-        await onSubmit(payload);
-        toast.success("Strategy created successfully!");
-      } catch (error) {
-        if (error instanceof Error) {
-          toast.error(error.message);
-        } else {
-          toast.error("Failed to create strategy");
-        }
+      await onSubmit(payload);
+      
+      // Hide preview on success
+      setShowAIPreview(false);
+      toast.dismiss();
+      toast.success("Strategy created successfully! Ready for backtest.");
+      
+    } catch (error) {
+      toast.dismiss();
+      if (error instanceof Error) {
+        toast.error(error.message);
+      } else {
+        toast.error("Failed to create strategy");
       }
-    }, 100);
+    }
   };
 
   return (
