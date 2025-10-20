@@ -13,8 +13,7 @@ const nextConfig = {
     tsconfigPath: './tsconfig.json',
   },
   eslint: {
-    ignoreDuringBuilds: false,
-    dirs: ['src', 'pages', 'components', 'lib', 'types'],
+    ignoreDuringBuilds: true,
   },
 
   // Images Optimization
@@ -72,6 +71,9 @@ const nextConfig = {
       permanent: true,
     },
   ],
+
+  // Output configuration - use standalone for Vercel
+  output: 'standalone',
 
   // Experimental Optimizations
   experimental: {

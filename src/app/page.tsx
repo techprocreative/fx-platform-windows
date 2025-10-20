@@ -4,6 +4,8 @@ import { authOptions } from '../lib/auth';
 import Link from 'next/link';
 import { ArrowRight, Zap, Shield, TrendingUp } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 export default async function Home() {
   const session = await getServerSession(authOptions);
 

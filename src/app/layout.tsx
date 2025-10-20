@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import dynamic from 'next/dynamic';
 import '../styles/globals.css';
-import { ClientProvider } from '../components/providers/ClientProvider';
 import { DefaultSkipLinks } from '../components/accessibility/SkipLink';
 import { setupInteractionTracking } from '@/lib/accessibility/keyboard-navigation';
+
+const ClientProvider = dynamic(
+  () => import('../components/providers/ClientProvider').then((mod) => mod.ClientProvider),
+  { ssr: false }
+);
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -18,8 +23,13 @@ export const metadata: Metadata = {
     'AI',
     'machine learning',
   ],
-  viewport: 'width=device-width, initial-scale=1',
   icons: '/favicon.ico',
+};
+
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  themeColor: '#000000',
 };
 
 export default function RootLayout({
@@ -34,11 +44,6 @@ export default function RootLayout({
 
   return (
     <html lang="en" suppressHydrationWarning>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="theme-color" content="#000000" />
-        <meta name="description" content="Empower your trading with institutional-grade technology" />
-      </head>
       <body className={inter.className}>
         <DefaultSkipLinks />
         <ClientProvider>
