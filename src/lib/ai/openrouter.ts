@@ -171,6 +171,14 @@ CRITICAL REQUIREMENTS:
     try {
       const strategyData = JSON.parse(response);
       
+      // Debug: Log raw AI response
+      console.log('🤖 Raw AI Response:', {
+        name: strategyData.name,
+        symbol: strategyData.symbol,
+        timeframe: strategyData.timeframe,
+        rulesCount: Array.isArray(strategyData.rules) ? strategyData.rules.length : 0,
+      });
+      
       // Validate and enhance the strategy
       // ALWAYS extract symbol from user prompt to override AI if needed
       const promptLower = prompt.toLowerCase();
@@ -267,6 +275,15 @@ CRITICAL REQUIREMENTS:
       if (!finalTimeframe) {
         finalTimeframe = strategyData.timeframe || 'H1';
       }
+      
+      // Debug: Log extraction results
+      console.log('🔍 Extraction Results:', {
+        prompt: prompt.substring(0, 50) + '...',
+        aiSymbol: strategyData.symbol,
+        aiTimeframe: strategyData.timeframe,
+        extractedSymbol: finalSymbol,
+        extractedTimeframe: finalTimeframe,
+      });
 
       return {
         id: `ai_${Date.now()}`,

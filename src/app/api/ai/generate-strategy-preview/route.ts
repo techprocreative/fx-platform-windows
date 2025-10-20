@@ -71,6 +71,13 @@ export async function POST(request: NextRequest) {
 
     // Generate strategy (but don't save to database yet)
     const strategyData = await ai.generateStrategy(prompt);
+    
+    // Debug logging
+    console.log('📤 API Response - Sending to client:', {
+      symbol: strategyData.symbol,
+      timeframe: strategyData.timeframe,
+      name: strategyData.name,
+    });
 
     // Return the generated data for preview/editing
     return NextResponse.json({
@@ -78,6 +85,8 @@ export async function POST(request: NextRequest) {
       strategy: {
         name: strategyData.name || 'AI Generated Strategy',
         description: strategyData.description || '',
+        symbol: strategyData.symbol,
+        timeframe: strategyData.timeframe,
         rules: strategyData.rules || [],
         parameters: strategyData.parameters,
         prompt,
