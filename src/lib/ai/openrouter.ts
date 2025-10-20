@@ -172,7 +172,8 @@ CRITICAL REQUIREMENTS:
       const strategyData = JSON.parse(response);
       
       // Debug: Log raw AI response
-      console.log('🤖 Raw AI Response:', {
+      console.log('🤖 Raw AI Response (Full):', JSON.stringify(strategyData, null, 2));
+      console.log('🤖 Raw AI Response (Summary):', {
         name: strategyData.name,
         symbol: strategyData.symbol,
         timeframe: strategyData.timeframe,
