@@ -29,8 +29,9 @@ import {
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { cn } from "@/lib/utils";
+import { AIStrategyGenerator } from "@/components/forms/AIStrategyGenerator";
 
-type StrategyMode = "simple" | "advanced";
+type StrategyMode = "simple" | "advanced" | "ai";
 
 type ConditionOperator =
   | "greater_than"
@@ -464,6 +465,55 @@ export function StrategyForm({
     }
   };
 
+  const handleAIGenerate = (data: {
+    name: string;
+    description: string;
+    rules: any;
+    parameters: any;
+  }) => {
+    // Set form data from AI generation
+    setFormData((prev) => ({
+      ...prev,
+      name: data.name,
+      description: data.description,
+      type: "ai_generated",
+    }));
+
+    // Convert AI rules to form format
+    if (data.rules && Array.isArray(data.rules) && data.rules.length > 0) {
+      const rule = data.rules[0];
+      if (rule.conditions && Array.isArray(rule.conditions)) {
+        const conditions = rule.conditions.map((cond: any, index: number) => ({
+          id: `ai-${Date.now()}-${index}`,
+          indicator: cond.indicator || "RSI",
+          condition: cond.operator || "greater_than",
+          value: cond.value || null,
+          period: 14,
+        }));
+        setEntryConditions(conditions);
+      }
+    }
+
+    // Set risk management from AI parameters
+    if (data.parameters) {
+      setRiskManagement({
+        lotSize: data.parameters.riskPerTrade || 0.01,
+        maxPositions: data.parameters.maxPositions || 1,
+        maxDailyLoss: data.parameters.maxDailyLoss || 100,
+      });
+
+      setExitRules({
+        takeProfit: { type: "pips", value: (data.parameters.takeProfit || 0.004) * 10000 },
+        stopLoss: { type: "pips", value: (data.parameters.stopLoss || 0.002) * 10000 },
+        trailing: { enabled: false, distance: 10 },
+      });
+    }
+
+    // Switch to advanced mode to show the generated strategy
+    setMode("advanced");
+    toast.success("AI-generated strategy loaded! Review and customize it below.");
+  };
+
   return (
     <form onSubmit={handleSubmit} className="space-y-8" noValidate>
       <div className="flex items-start justify-between gap-4">
@@ -516,6 +566,18 @@ export function StrategyForm({
                 <div className="flex items-center gap-2">
                   <Shield className="h-4 w-4" />
                   Advanced
+                </div>
+              </Button>
+              <Button
+                type="button"
+                variant={mode === "ai" ? "primary" : "secondary"}
+                size="sm"
+                className="shadow-none"
+                onClick={() => setMode("ai")}
+              >
+                <div className="flex items-center gap-2">
+                  <Zap className="h-4 w-4" />
+                  AI
                 </div>
               </Button>
             </div>
@@ -619,6 +681,10 @@ export function StrategyForm({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {mode === "ai" && (
+        <AIStrategyGenerator onGenerate={handleAIGenerate} />
       )}
 
       <Card>

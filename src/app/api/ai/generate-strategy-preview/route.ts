@@ -1,0 +1,150 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth/next';
+import { z } from 'zod';
+
+import { authOptions } from '../../../../lib/auth';
+import { createOpenRouterAI } from '../../../../lib/ai/openrouter';
+import { prisma } from '../../../../lib/prisma';
+
+// Request validation schema
+const GenerateStrategyPreviewSchema = z.object({
+  prompt: z.string().min(10).max(1000),
+  model: z.string().optional(),
+});
+
+export async function POST(request: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    const body = await request.json();
+    const { prompt, model } = GenerateStrategyPreviewSchema.parse(body);
+
+    // Check user's AI generation limit (same as full generation)
+    const recentGenerations = await prisma.strategy.count({
+      where: {
+        userId: session.user.id,
+        type: 'ai_generated',
+        createdAt: {
+          gte: new Date(new Date().setDate(new Date().getDate() - 1)), // Last 24 hours
+        },
+      },
+    });
+
+    const dailyLimit = 10; // 10 generations per day
+    if (recentGenerations >= dailyLimit) {
+      return NextResponse.json(
+        { 
+          error: `Daily AI generation limit reached (${dailyLimit} generations per day)`,
+          code: 'LIMIT_REACHED'
+        },
+        { status: 429 }
+      );
+    }
+
+    // Initialize OpenRouter AI
+    const ai = createOpenRouterAI(
+      process.env.OPENROUTER_API_KEY,
+      model
+    );
+
+    // Generate strategy (but don't save to database yet)
+    const strategyData = await ai.generateStrategy(prompt);
+
+    // Return the generated data for preview/editing
+    return NextResponse.json({
+      success: true,
+      strategy: {
+        name: strategyData.name || 'AI Generated Strategy',
+        description: strategyData.description || '',
+        rules: strategyData.rules || [],
+        parameters: strategyData.parameters,
+        prompt,
+        model: model || 'anthropic/claude-3-haiku:beta',
+      },
+      usage: {
+        used: recentGenerations,
+        remaining: dailyLimit - recentGenerations - 1,
+        dailyLimit,
+      },
+    });
+
+  } catch (error) {
+    console.error('AI Strategy Preview error:', error);
+
+    if (error instanceof z.ZodError) {
+      return NextResponse.json(
+        { 
+          error: 'Invalid request data',
+          details: error.errors,
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json(
+      { 
+        error: 'Failed to generate strategy',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      );
+    }
+
+    // Return available models and daily usage info
+    const recentGenerations = await prisma.strategy.count({
+      where: {
+        userId: session.user.id,
+        type: 'ai_generated',
+        createdAt: {
+          gte: new Date(new Date().setDate(new Date().getDate() - 1)), // Last 24 hours
+        },
+      },
+    });
+
+    const dailyLimit = 10;
+    const remainingLimit = Math.max(0, dailyLimit - recentGenerations);
+
+    return NextResponse.json({
+      models: [
+        { id: 'anthropic/claude-3-haiku:beta', name: 'Claude 3 Haiku (Fast)', recommended: true },
+        { id: 'anthropic/claude-3-sonnet:beta', name: 'Claude 3 Sonnet (Balanced)' },
+        { id: 'openai/gpt-3.5-turbo', name: 'GPT-3.5 Turbo (Fast)' },
+        { id: 'openai/gpt-4', name: 'GPT-4 (Advanced)' },
+      ],
+      usage: {
+        dailyLimit,
+        used: recentGenerations,
+        remaining: remainingLimit,
+      },
+    });
+
+  } catch (error) {
+    console.error('AI Strategy Preview GET error:', error);
+    return NextResponse.json(
+      { 
+        error: 'Internal server error',
+        details: error instanceof Error ? error.message : 'Unknown error',
+      },
+      { status: 500 }
+    );
+  }
+}
