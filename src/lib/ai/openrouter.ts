@@ -100,10 +100,18 @@ Your response must be a valid JSON object with the following structure:
   "parameters": {
     "riskPerTrade": 0.01,
     "maxPositions": 1,
-    "stopLoss": 0.002,
-    "takeProfit": 0.004,
+    "stopLoss": 30,
+    "takeProfit": 50,
     "maxDailyLoss": 100
   }
+  
+IMPORTANT - TP/SL VALUES IN PIPS:
+- Return stopLoss and takeProfit as PIP VALUES (numbers)
+- For XAUUSD (Gold): Use 30-100 pips for scalping (e.g., stopLoss: 30, takeProfit: 50)
+- For EURUSD: Use 20-50 pips for scalping (e.g., stopLoss: 20, takeProfit: 40)
+- For GBPUSD: Use 30-60 pips for scalping (e.g., stopLoss: 25, takeProfit: 50)
+- For Indices (US30, NAS100): Use 50-200 pips (e.g., stopLoss: 100, takeProfit: 200)
+- Scale values based on symbol volatility and timeframe
 }
 
 CRITICAL INSTRUCTIONS:
