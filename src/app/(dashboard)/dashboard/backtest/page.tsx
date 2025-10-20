@@ -112,6 +112,21 @@ export default function BacktestPage() {
     }
   };
 
+  // Convert strategy timeframe to backtest interval format
+  const convertTimeframeToInterval = (timeframe: string): string => {
+    const map: Record<string, string> = {
+      'M1': '1min',
+      'M5': '5min',
+      'M15': '15min',
+      'M30': '30min',
+      'H1': '1h',
+      'H4': '4h',
+      'D1': '1d',
+      'W1': '1w',
+    };
+    return map[timeframe.toUpperCase()] || '1h';
+  };
+
   const handleStrategyChange = (strategyId: string) => {
     const selectedStrategy = strategies.find(s => s.id === strategyId);
     if (selectedStrategy) {
@@ -119,7 +134,7 @@ export default function BacktestPage() {
         ...prev,
         strategyId,
         symbol: selectedStrategy.symbol,
-        interval: selectedStrategy.timeframe.toLowerCase(),
+        interval: convertTimeframeToInterval(selectedStrategy.timeframe),
       }));
     }
   };
