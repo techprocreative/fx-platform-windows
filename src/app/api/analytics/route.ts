@@ -152,7 +152,8 @@ export async function GET(request: NextRequest) {
       if (!monthlyGroups.has(month)) {
         monthlyGroups.set(month, { profits: [], tradeCount: 0 });
       }
-      monthlyGroups.get(month)!.profits.push(backtest.totalReturn || 0);
+      const results = backtest.results as any;
+      monthlyGroups.get(month)!.profits.push(results?.totalReturn || 0);
       monthlyGroups.get(month)!.tradeCount += 1;
     });
 

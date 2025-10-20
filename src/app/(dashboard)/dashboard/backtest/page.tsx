@@ -383,9 +383,9 @@ export default function BacktestPage() {
                   </div>
                   
                   <div className="flex items-center gap-4 text-sm text-neutral-600 mb-3">
-                    <span>{backtest.symbol} • {backtest.interval}</span>
+                    <span>{(backtest.settings as any)?.symbol} • {(backtest.settings as any)?.interval}</span>
                     <span>•</span>
-                    <span>{formatDuration(backtest.startDate, backtest.endDate)}</span>
+                    <span>{formatDuration(backtest.dateFrom, backtest.dateTo)}</span>
                     <span>•</span>
                     <span>Created {formatDate(backtest.createdAt)}</span>
                   </div>
@@ -405,29 +405,29 @@ export default function BacktestPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-neutral-100">
                   <div>
                     <p className="text-xs text-neutral-600 mb-1">Return</p>
-                    <p className={`text-lg font-semibold ${(backtest.returnPercentage || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {(backtest.returnPercentage || 0).toFixed(2)}%
+                    <p className={`text-lg font-semibold ${((backtest.results as any)?.returnPercentage || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {((backtest.results as any)?.returnPercentage || 0).toFixed(2)}%
                     </p>
                   </div>
                   
                   <div>
                     <p className="text-xs text-neutral-600 mb-1">Win Rate</p>
                     <p className="text-lg font-semibold text-neutral-900">
-                      {(backtest.winRate || 0).toFixed(1)}%
+                      {((backtest.results as any)?.winRate || 0).toFixed(1)}%
                     </p>
                   </div>
                   
                   <div>
                     <p className="text-xs text-neutral-600 mb-1">Total Trades</p>
                     <p className="text-lg font-semibold text-neutral-900">
-                      {backtest.totalTrades || 0}
+                      {(backtest.results as any)?.totalTrades || 0}
                     </p>
                   </div>
                   
                   <div>
                     <p className="text-xs text-neutral-600 mb-1">Max Drawdown</p>
                     <p className="text-lg font-semibold text-orange-600">
-                      {(backtest.maxDrawdown || 0).toFixed(1)}%
+                      {((backtest.results as any)?.maxDrawdown || 0).toFixed(1)}%
                     </p>
                   </div>
                 </div>

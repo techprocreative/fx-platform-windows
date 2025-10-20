@@ -68,12 +68,12 @@ export async function POST(request: NextRequest) {
         strategyId: validatedData.strategyId,
         userId: session.user.id,
         status: 'running',
-        startDate,
-        endDate,
-        symbol: validatedData.symbol,
-        interval: validatedData.interval,
+        dateFrom: startDate,
+        dateTo: endDate,
         initialBalance: validatedData.initialBalance,
-        metadata: {
+        settings: {
+          symbol: validatedData.symbol,
+          interval: validatedData.interval,
           preferredDataSource: validatedData.preferredDataSource,
         },
       },
@@ -125,36 +125,24 @@ export async function POST(request: NextRequest) {
         where: { id: backtest.id },
         data: {
           status: 'completed',
-          finalBalance: result.finalBalance,
-          totalReturn: result.totalReturn,
-          returnPercentage: result.returnPercentage,
-          maxDrawdown: result.maxDrawdown,
-          winRate: result.winRate,
-          totalTrades: result.totalTrades,
-          winningTrades: result.winningTrades,
-          losingTrades: result.losingTrades,
-          averageWin: result.averageWin,
-          averageLoss: result.averageLoss,
-          profitFactor: result.profitFactor,
-          sharpeRatio: result.sharpeRatio,
-          trades: result.trades,
-          equityCurve: result.equityCurve,
-          metadata: {
-            ...backtest.metadata,
-            ...result.metadata,
+          results: {
+            finalBalance: result.finalBalance,
+            totalReturn: result.totalReturn,
+            returnPercentage: result.returnPercentage,
+            maxDrawdown: result.maxDrawdown,
+            winRate: result.winRate,
+            totalTrades: result.totalTrades,
+            winningTrades: result.winningTrades,
+            losingTrades: result.losingTrades,
+            averageWin: result.averageWin,
+            averageLoss: result.averageLoss,
+            profitFactor: result.profitFactor,
+            sharpeRatio: result.sharpeRatio,
+            trades: result.trades,
+            equityCurve: result.equityCurve,
+            metadata: result.metadata,
           },
           completedAt: new Date(),
-        },
-      });
-
-      // Update strategy statistics
-      await prisma.strategy.update({
-        where: { id: validatedData.strategyId },
-        data: {
-          totalBacktests: {
-            increment: 1,
-          },
-          lastBacktestAt: new Date(),
         },
       });
 
@@ -172,8 +160,7 @@ export async function POST(request: NextRequest) {
         where: { id: backtest.id },
         data: {
           status: 'failed',
-          metadata: {
-            ...backtest.metadata,
+          results: {
             error: backtestError instanceof Error ? backtestError.message : 'Unknown error',
           },
           completedAt: new Date(),
