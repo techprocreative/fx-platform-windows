@@ -102,9 +102,27 @@ interface BacktestResult {
 }
 
 // Initialize TwelveData client
-const twelveDataClient = TwelveData({
-  key: process.env.TWELVEDATA_API_KEY || "",
-});
+// Lazy initialization function for TwelveData client
+function getTwelveDataClient() {
+  const apiKey = process.env.TWELVEDATA_API_KEY;
+
+  if (!apiKey) {
+    console.error("❌ TWELVEDATA_API_KEY is not set in environment variables");
+    console.error(
+      "Available env keys:",
+      Object.keys(process.env)
+        .filter((k) => k.includes("TWELVE") || k.includes("DATA"))
+        .join(", "),
+    );
+    return null;
+  }
+
+  console.log(`✅ TwelveData API key found: ${apiKey.substring(0, 8)}...`);
+
+  return TwelveData({
+    key: apiKey,
+  });
+}
 
 // Market data interface for backtesting
 interface MarketData {
@@ -180,15 +198,30 @@ export class HistoricalDataFetcher {
     try {
       // Check if API key is available
       if (!process.env.TWELVEDATA_API_KEY) {
-        console.warn("⚠️ TwelveData API key not configured, skipping fetch");
+        console.error("❌ TwelveData API key not configured");
+        console.error(
+          "Available env vars:",
+          Object.keys(process.env).filter(
+            (k) => k.includes("TWELVE") || k.includes("API"),
+          ),
+        );
         return [];
       }
 
       console.log(
         `📡 Fetching from TwelveData: ${symbol} ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`,
       );
+      console.log(
+        `🔑 Using API key: ${process.env.TWELVEDATA_API_KEY?.substring(0, 8)}...`,
+      );
 
-      const response = await twelveDataClient.timeSeries({
+      const client = getTwelveDataClient();
+      if (!client) {
+        console.error("❌ Failed to initialize TwelveData client");
+        return [];
+      }
+
+      const response = await client.timeSeries({
         symbol,
         interval,
         start_date: cacheKey.startDate,
@@ -196,7 +229,10 @@ export class HistoricalDataFetcher {
         outputsize: 5000,
       });
 
-      if (!response.values) return [];
+      if (!response.values) {
+        console.error("❌ TwelveData response missing values:", response);
+        return [];
+      }
 
       const data = response.values.map((chart: any) => ({
         timestamp: new Date(chart.datetime),
@@ -218,7 +254,17 @@ export class HistoricalDataFetcher {
 
       return data;
     } catch (error) {
-      console.error("TwelveData fetch error:", error);
+      console.error("❌ TwelveData fetch error:", error);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        symbol,
+        interval,
+        startDate: cacheKey.startDate,
+        endDate: cacheKey.endDate,
+        apiKeyExists: !!process.env.TWELVEDATA_API_KEY,
+        apiKeyLength: process.env.TWELVEDATA_API_KEY?.length || 0,
+      });
       return [];
     }
   }
