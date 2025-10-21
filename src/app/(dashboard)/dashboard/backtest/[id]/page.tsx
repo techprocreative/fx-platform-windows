@@ -15,6 +15,8 @@ import {
   Clock,
   Target,
   Percent,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -75,6 +77,8 @@ export default function BacktestDetailPage({
   const router = useRouter();
   const [backtest, setBacktest] = useState<BacktestResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -104,6 +108,29 @@ export default function BacktestDetailPage({
       console.error("Error fetching backtest:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!backtest) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/backtest/${backtest.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete backtest");
+      }
+
+      // Redirect to backtest list after successful deletion
+      router.push("/dashboard/backtest");
+    } catch (error) {
+      console.error("Error deleting backtest:", error);
+      alert("Failed to delete backtest. Please try again.");
+      setDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -166,7 +193,7 @@ export default function BacktestDetailPage({
               {backtest.strategy.symbol} • {backtest.strategy.timeframe}
             </p>
           </div>
-          <div>
+          <div className="flex items-center gap-3">
             <span
               className={`px-3 py-1 rounded-full text-sm font-medium ${
                 backtest.status === "completed"
@@ -181,9 +208,66 @@ export default function BacktestDetailPage({
               {backtest.status.charAt(0).toUpperCase() +
                 backtest.status.slice(1)}
             </span>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={deleting}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <div className="flex items-start gap-4 mb-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-full bg-red-100 flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg font-semibold text-neutral-900 mb-2">
+                  Delete Backtest
+                </h3>
+                <p className="text-sm text-neutral-600">
+                  Are you sure you want to delete this backtest? This action
+                  cannot be undone. All backtest results and trade history will
+                  be permanently removed.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-neutral-700 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? (
+                  <>
+                    <LoadingSpinner size="sm" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Delete Backtest
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Test Period & Settings */}
       <div className="grid md:grid-cols-3 gap-4 mb-6">

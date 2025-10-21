@@ -16,6 +16,7 @@ import {
   Calendar,
   DollarSign,
   Activity,
+  Trash2,
 } from "lucide-react";
 
 import { LoadingState, TableLoadingState } from "@/components/ui/LoadingState";
@@ -84,6 +85,7 @@ export default function BacktestPage() {
   );
   const [error, setError] = useState<Error | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -265,6 +267,39 @@ export default function BacktestPage() {
           initialBalance: 10000,
         });
       }
+    }
+  };
+
+  const handleDeleteBacktest = async (backtestId: string) => {
+    const confirmed = await confirm({
+      title: "Delete Backtest",
+      description:
+        "Are you sure you want to delete this backtest? This action cannot be undone.",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      variant: "danger",
+    });
+
+    if (!confirmed) return;
+
+    setDeletingId(backtestId);
+    try {
+      const response = await fetch(`/api/backtest/${backtestId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to delete backtest");
+      }
+
+      // Remove from local state
+      setBacktests(backtests.filter((bt) => bt.id !== backtestId));
+      toast.success("Backtest deleted successfully");
+    } catch (error) {
+      console.error("Error deleting backtest:", error);
+      toast.error("Failed to delete backtest");
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -547,14 +582,32 @@ export default function BacktestPage() {
                   </div>
                 </div>
 
-                {backtest.status === "completed" && (
-                  <Link
-                    href={`/dashboard/backtest/${backtest.id}`}
-                    className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+                <div className="flex items-center gap-2">
+                  {backtest.status === "completed" && (
+                    <Link
+                      href={`/dashboard/backtest/${backtest.id}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+                    >
+                      View Details
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => handleDeleteBacktest(backtest.id)}
+                    disabled={
+                      deletingId === backtest.id ||
+                      backtest.status === "running"
+                    }
+                    className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-red-300 text-red-600 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={
+                      backtest.status === "running"
+                        ? "Cannot delete running backtest"
+                        : "Delete backtest"
+                    }
                   >
-                    View Details
-                  </Link>
-                )}
+                    <Trash2 className="w-4 h-4" />
+                    {deletingId === backtest.id ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
               </div>
 
               {backtest.status === "completed" && (
