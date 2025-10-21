@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { 
+        {
           error: 'Invalid request data',
           details: error.errors,
         },
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to generate strategy',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('AI Strategy GET error:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
         details: error instanceof Error ? error.message : 'Unknown error',
       },

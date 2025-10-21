@@ -1,38 +1,47 @@
-export * from './logger';
-export * from './sentry';
-export * from './types';
-export * from './position-monitor';
-export * from './pnl-calculator';
-export * from './anomaly-detector';
+// Essential monitoring exports only
+export * from "./logger";
+export * from "./sentry";
+export * from "./position-monitor";
+export * from "./pnl-calculator";
+export * from "./alert-system";
 
-// Export advanced monitoring components with explicit exports to avoid conflicts
+// Keep only essential types that are actually exported
 export type {
-  LatencyMetrics,
-  ExecutionQuality,
-  SlippageMetrics,
-  SystemPerformance,
-  ResourceUsage,
+  MonitoredPosition,
+  PricePoint,
+  PnLReport,
+  PositionPnL,
+  Anomaly,
+  AnomalyType,
+  AnomalySeverity,
+  AnomalyAction,
+  PositionSubscription,
+  MonitoringConfig,
+  AlertChannel,
+  PositionAlert,
+  AlertType,
+  MonitoringStatus,
+  MonitoringError,
+  ExchangeRates,
+  PositionEvent,
+  PerformanceMetrics,
+} from "./types";
+
+// Export alert types from monitoring-types file
+export type {
   MonitoringAlert,
   AlertSeverity,
   AlertCategory,
   AlertStatus,
-  HistoricalDataPoint,
-  LatencyStatistics,
-  ComponentLatencyBreakdown,
-  SlippageDistribution,
-  SlippageBucket,
-  ExecutionQualityStatistics,
-  RejectionReasonCount,
-  AdvancedMonitoringConfig,
-  LatencyThresholds,
-  ExecutionQualityThresholds,
-  SlippageThresholds,
-  PerformanceThresholds,
-  ResourceThresholds
-} from './monitoring-types';
+  AlertFilter,
+} from "./monitoring-types";
 
-export { LatencyTracker } from './latency-tracker';
-export { ExecutionQualityTracker } from './execution-quality';
-export { SlippageTracker } from './slippage-tracker';
-export { ResourceMonitor } from './resource-monitor';
-export { AdvancedMonitor } from './advanced-monitor';
+// Removed overengineered monitoring components:
+// - LatencyTracker (only used in advanced monitor)
+// - ExecutionQualityTracker (only used in advanced monitor)
+// - SlippageTracker (only used in advanced monitor)
+// - ResourceMonitor (only used in advanced monitor)
+// - AdvancedMonitor (overkill for trading platform)
+// - AnomalyDetector (complex, rarely needed)
+// - BusinessMetrics (overkill for trading platform)
+// - PerformanceMonitor (duplicated functionality)

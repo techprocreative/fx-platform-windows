@@ -2,22 +2,25 @@
  * COMMAND QUEUE SERVICE
  * Manages trade commands between Brain (Web) and Executor (Windows)
  * DO NOT DELETE - CRITICAL ARCHITECTURE COMPONENT
+ * Simplified for Upstash Redis compatibility
  */
 
-import Bull from 'bull';
-import Redis from 'ioredis';
-import { prisma } from '../prisma';
+import { prisma } from "../prisma";
 
 export interface TradeCommand {
   id: string;
   strategyId: string;
   executorId?: string;
-  type: 'TRADE_SIGNAL' | 'RISK_UPDATE' | 'EMERGENCY_STOP' | 'STATUS_REQUEST';
-  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  type: "TRADE_SIGNAL" | "RISK_UPDATE" | "EMERGENCY_STOP" | "STATUS_REQUEST";
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT";
   command: {
-    action: 'OPEN_POSITION' | 'CLOSE_POSITION' | 'MODIFY_POSITION' | 'CLOSE_ALL';
+    action:
+      | "OPEN_POSITION"
+      | "CLOSE_POSITION"
+      | "MODIFY_POSITION"
+      | "CLOSE_ALL";
     symbol?: string;
-    type?: 'BUY' | 'SELL';
+    type?: "BUY" | "SELL";
     volume?: number;
     ticket?: number;
     stopLoss?: number;
@@ -33,6 +36,8 @@ export interface TradeCommand {
 
 export interface CommandResult {
   commandId: string;
+  strategyId?: string;
+  userId?: string;
   success: boolean;
   executorId: string;
   result?: {
@@ -51,37 +56,42 @@ export interface CommandResult {
 }
 
 export class CommandQueueService {
-  private commandQueue: Bull.Queue;
-  private resultQueue: Bull.Queue;
-  private redis: Redis;
+  private redis: any;
+  private queueKey = "trade:commands";
+  private resultKey = "command:results";
 
   constructor() {
     // Initialize Redis connection
-    this.redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: parseInt(process.env.REDIS_PORT || '6379'),
-      password: process.env.REDIS_PASSWORD,
-    });
+    this.initializeRedis();
+  }
 
-    // Initialize command queue
-    this.commandQueue = new Bull('trade-commands', {
-      redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-        password: process.env.REDIS_PASSWORD,
-      },
-    });
+  private async initializeRedis() {
+    try {
+      // Use Upstash Redis for Vercel deployment
+      if (
+        process.env.UPSTASH_REDIS_REST_URL &&
+        process.env.UPSTASH_REDIS_REST_TOKEN
+      ) {
+        const { Redis } = await import("@upstash/redis");
+        this.redis = new Redis({
+          url: process.env.UPSTASH_REDIS_REST_URL,
+          token: process.env.UPSTASH_REDIS_REST_TOKEN,
+        });
 
-    // Initialize result queue
-    this.resultQueue = new Bull('command-results', {
-      redis: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
-        password: process.env.REDIS_PASSWORD,
-      },
-    });
+        console.log(
+          "✅ Upstash Redis initialized for simplified command queue",
+        );
+        return;
+      }
 
-    this.setupQueueProcessors();
+      throw new Error("Upstash Redis configuration not found");
+    } catch (error) {
+      console.error(
+        "Failed to initialize command queue with Upstash Redis:",
+        error,
+      );
+      throw error;
+    }
   }
 
   /**
@@ -94,37 +104,28 @@ export class CommandQueueService {
         data: {
           id: command.id,
           userId: command.strategyId, // Will need to get userId from strategy
-          executorId: command.executorId || '',
+          executorId: command.executorId || "",
           command: command.type,
           parameters: command.command as any,
           priority: command.priority,
-          status: 'pending',
+          status: "pending",
         },
       });
 
-      // Add to queue with priority
+      // Add to Redis list with priority (using sorted set)
       const priority = this.getPriorityValue(command.priority);
-      await this.commandQueue.add('process-command', command, {
-        priority,
-        attempts: command.maxRetries || 3,
-        backoff: {
-          type: 'exponential',
-          delay: 2000,
-        },
-        removeOnComplete: false,
-        removeOnFail: false,
-      });
+      await this.redis.zadd(this.queueKey, priority, JSON.stringify(command));
 
       // Set expiry in Redis if specified
       if (command.expiry) {
         await this.redis.setex(
           `command:expiry:${command.id}`,
           Math.ceil(command.expiry / 1000),
-          'expired'
+          "expired",
         );
       }
     } catch (error) {
-      console.error('Failed to push command:', error);
+      console.error("Failed to push command:", error);
       throw error;
     }
   }
@@ -134,42 +135,45 @@ export class CommandQueueService {
    */
   async pop(executorId: string): Promise<TradeCommand | null> {
     try {
-      // Get jobs waiting in queue
-      const waitingJobs = await this.commandQueue.getWaiting();
-      
-      for (const job of waitingJobs) {
-        const command = job.data as TradeCommand;
-        
-        // Check if command is for this executor or any executor
-        if (!command.executorId || command.executorId === executorId) {
-          // Check if command has expired
-          const isExpired = await this.redis.get(`command:expiry:${command.id}`);
-          if (isExpired) {
-            await this.markCommandFailed(command.id, 'Command expired');
-            await job.remove();
-            continue;
-          }
+      // Get command with lowest priority (highest priority number = lowest priority)
+      const commands = await this.redis.zrange(this.queueKey, 0, 0);
 
-          // Move job to active state
-          await job.moveToCompleted('processing', true);
-          
-          // Update database
-          await prisma.command.update({
-            where: { id: command.id },
-            data: {
-              status: 'executing',
-              executorId,
-              acknowledgedAt: new Date(),
-            },
-          });
+      if (commands.length === 0) {
+        return null;
+      }
 
-          return command;
+      const commandStr = commands[0];
+      const command = JSON.parse(commandStr) as TradeCommand;
+
+      // Check if command is for this executor or any executor
+      if (!command.executorId || command.executorId === executorId) {
+        // Check if command has expired
+        const isExpired = await this.redis.get(`command:expiry:${command.id}`);
+        if (isExpired) {
+          await this.markCommandFailed(command.id, "Command expired");
+          await this.redis.zrem(this.queueKey, commandStr);
+          return await this.pop(executorId); // Try next command
         }
+
+        // Remove from queue
+        await this.redis.zrem(this.queueKey, commandStr);
+
+        // Update database
+        await prisma.command.update({
+          where: { id: command.id },
+          data: {
+            status: "executing",
+            executorId,
+            acknowledgedAt: new Date(),
+          },
+        });
+
+        return command;
       }
 
       return null;
     } catch (error) {
-      console.error('Failed to pop command:', error);
+      console.error("Failed to pop command:", error);
       return null;
     }
   }
@@ -183,19 +187,19 @@ export class CommandQueueService {
       await prisma.command.update({
         where: { id: commandId },
         data: {
-          status: result.success ? 'executed' : 'failed',
+          status: result.success ? "executed" : "failed",
           result: result as any,
           executedAt: new Date(),
         },
       });
 
-      // Add result to result queue for processing
-      await this.resultQueue.add('process-result', result);
+      // Add result to Redis list for processing
+      await this.redis.lpush(this.resultKey, JSON.stringify(result));
 
       // Clean up expiry key
       await this.redis.del(`command:expiry:${commandId}`);
     } catch (error) {
-      console.error('Failed to acknowledge command:', error);
+      console.error("Failed to acknowledge command:", error);
       throw error;
     }
   }
@@ -210,7 +214,7 @@ export class CommandQueueService {
       });
 
       if (!command) {
-        throw new Error('Command not found');
+        throw new Error("Command not found");
       }
 
       const retryCommand: TradeCommand = {
@@ -221,13 +225,13 @@ export class CommandQueueService {
         priority: command.priority as any,
         command: command.parameters as any,
         timestamp: new Date(),
-        retryCount: (command.retry_count || 0) + 1,
+        retryCount: ((command as any).retry_count || 0) + 1,
         maxRetries: 3,
       };
 
       await this.push(retryCommand);
     } catch (error) {
-      console.error('Failed to retry command:', error);
+      console.error("Failed to retry command:", error);
       throw error;
     }
   }
@@ -243,7 +247,7 @@ export class CommandQueueService {
 
       return command;
     } catch (error) {
-      console.error('Failed to get command status:', error);
+      console.error("Failed to get command status:", error);
       return null;
     }
   }
@@ -253,26 +257,28 @@ export class CommandQueueService {
    */
   async cancel(commandId: string): Promise<void> {
     try {
-      // Find job in queue
-      const jobs = await this.commandQueue.getJobs(['waiting', 'delayed']);
-      const job = jobs.find(j => j.data.id === commandId);
-      
-      if (job) {
-        await job.remove();
+      // Find and remove command from Redis queue
+      const commands = await this.redis.zrange(this.queueKey, 0, -1);
+      for (const commandStr of commands) {
+        const command = JSON.parse(commandStr) as TradeCommand;
+        if (command.id === commandId) {
+          await this.redis.zrem(this.queueKey, commandStr);
+          break;
+        }
       }
 
       // Update database
       await prisma.command.update({
         where: { id: commandId },
         data: {
-          status: 'cancelled',
+          status: "cancelled",
         },
       });
 
       // Clean up expiry key
       await this.redis.del(`command:expiry:${commandId}`);
     } catch (error) {
-      console.error('Failed to cancel command:', error);
+      console.error("Failed to cancel command:", error);
       throw error;
     }
   }
@@ -282,19 +288,23 @@ export class CommandQueueService {
    */
   async getPendingCommands(executorId?: string): Promise<TradeCommand[]> {
     try {
-      const jobs = await this.commandQueue.getWaiting();
-      const commands: TradeCommand[] = [];
+      const commands = await this.redis.zrange(this.queueKey, 0, -1);
+      const pendingCommands: TradeCommand[] = [];
 
-      for (const job of jobs) {
-        const command = job.data as TradeCommand;
-        if (!executorId || !command.executorId || command.executorId === executorId) {
-          commands.push(command);
+      for (const commandStr of commands) {
+        const command = JSON.parse(commandStr) as TradeCommand;
+        if (
+          !executorId ||
+          !command.executorId ||
+          command.executorId === executorId
+        ) {
+          pendingCommands.push(command);
         }
       }
 
-      return commands;
+      return pendingCommands;
     } catch (error) {
-      console.error('Failed to get pending commands:', error);
+      console.error("Failed to get pending commands:", error);
       return [];
     }
   }
@@ -304,27 +314,21 @@ export class CommandQueueService {
    */
   async emergencyStop(reason: string): Promise<void> {
     try {
-      // Clear all waiting jobs
-      await this.commandQueue.empty();
-      
-      // Cancel all active jobs
-      const activeJobs = await this.commandQueue.getActive();
-      for (const job of activeJobs) {
-        await job.moveToFailed({ message: `Emergency stop: ${reason}` }, true);
-      }
+      // Clear all commands from Redis queue
+      await this.redis.del(this.queueKey);
 
       // Update all pending/executing commands in database
       await prisma.command.updateMany({
         where: {
           status: {
-            in: ['pending', 'executing'],
+            in: ["pending", "executing"],
           },
         },
         data: {
-          status: 'cancelled',
+          status: "cancelled",
           result: {
             error: {
-              code: 'EMERGENCY_STOP',
+              code: "EMERGENCY_STOP",
               message: reason,
             },
           },
@@ -333,52 +337,51 @@ export class CommandQueueService {
 
       console.log(`Emergency stop executed: ${reason}`);
     } catch (error) {
-      console.error('Failed to execute emergency stop:', error);
+      console.error("Failed to execute emergency stop:", error);
       throw error;
     }
   }
 
   /**
-   * Setup queue processors
+   * Process results (simplified)
    */
-  private setupQueueProcessors(): void {
-    // Process command results
-    this.resultQueue.process('process-result', async (job) => {
-      const result = job.data as CommandResult;
-      
-      // Update strategy performance metrics
-      if (result.success && result.result?.profit !== undefined) {
-        // Update strategy statistics
-        await this.updateStrategyMetrics(result);
+  async processResults(): Promise<void> {
+    try {
+      // Get results from Redis list
+      const results = await this.redis.lrange(this.resultKey, 0, -1);
+
+      for (const resultStr of results) {
+        const result = JSON.parse(resultStr) as CommandResult;
+
+        // Update strategy performance metrics
+        if (result.success && result.result?.profit !== undefined) {
+          await this.updateStrategyMetrics(result);
+        }
+
+        // Trigger any follow-up actions
+        if (!result.success && result.error?.code === "CONNECTION_LOST") {
+          console.error("Executor connection lost:", result.executorId);
+        }
       }
 
-      // Trigger any follow-up actions
-      if (!result.success && result.error?.code === 'CONNECTION_LOST') {
-        // Handle connection loss
-        console.error('Executor connection lost:', result.executorId);
-      }
-    });
-
-    // Handle failed commands
-    this.commandQueue.on('failed', async (job, err) => {
-      console.error(`Command ${job.data.id} failed:`, err);
-      await this.markCommandFailed(job.data.id, err.message);
-    });
-
-    // Handle completed commands
-    this.commandQueue.on('completed', async (job) => {
-      console.log(`Command ${job.data.id} completed`);
-    });
+      // Clear processed results
+      await this.redis.del(this.resultKey);
+    } catch (error) {
+      console.error("Failed to process results:", error);
+    }
   }
 
   /**
    * Mark command as failed
    */
-  private async markCommandFailed(commandId: string, reason: string): Promise<void> {
+  private async markCommandFailed(
+    commandId: string,
+    reason: string,
+  ): Promise<void> {
     await prisma.command.update({
       where: { id: commandId },
       data: {
-        status: 'failed',
+        status: "failed",
         result: {
           error: {
             message: reason,
@@ -393,12 +396,11 @@ export class CommandQueueService {
    */
   private async updateStrategyMetrics(result: CommandResult): Promise<void> {
     try {
-      if (result.strategyId && result.success) {
+      if ((result as any).strategyId && result.success) {
         // Update strategy performance metrics
         await prisma.strategy.update({
-          where: { id: result.strategyId },
+          where: { id: (result as any).strategyId },
           data: {
-            lastTradeAt: new Date(),
             updatedAt: new Date(),
           },
         });
@@ -406,11 +408,11 @@ export class CommandQueueService {
         // Log activity
         await prisma.activityLog.create({
           data: {
-            userId: result.userId || 'system',
-            eventType: 'TRADE_EXECUTED',
+            userId: (result as any).userId || "system",
+            eventType: "TRADE_EXECUTED",
             metadata: {
               commandId: result.commandId,
-              strategyId: result.strategyId,
+              strategyId: (result as any).strategyId,
               success: result.success,
               executionTime: result.timestamp,
             },
@@ -418,7 +420,7 @@ export class CommandQueueService {
         });
       }
     } catch (error) {
-      console.error('Failed to update strategy metrics:', error);
+      console.error("Failed to update strategy metrics:", error);
     }
   }
 
@@ -427,11 +429,16 @@ export class CommandQueueService {
    */
   private getPriorityValue(priority: string): number {
     switch (priority) {
-      case 'URGENT': return 1;
-      case 'HIGH': return 2;
-      case 'NORMAL': return 3;
-      case 'LOW': return 4;
-      default: return 3;
+      case "URGENT":
+        return 1;
+      case "HIGH":
+        return 2;
+      case "NORMAL":
+        return 3;
+      case "LOW":
+        return 4;
+      default:
+        return 3;
     }
   }
 
@@ -439,9 +446,8 @@ export class CommandQueueService {
    * Cleanup and close connections
    */
   async close(): Promise<void> {
-    await this.commandQueue.close();
-    await this.resultQueue.close();
-    this.redis.disconnect();
+    // Upstash Redis doesn't need manual disconnect
+    console.log("Command queue service closed");
   }
 }
 

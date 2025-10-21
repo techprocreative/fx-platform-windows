@@ -63,7 +63,7 @@ export class MarketDataCache {
 
   private async initializeRedis() {
     try {
-      // Try Upstash Redis first (recommended for Vercel)
+      // Use Upstash Redis for Vercel deployment
       if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
         const { Redis } = await import('@upstash/redis');
         this.redis = new Redis({
@@ -76,21 +76,9 @@ export class MarketDataCache {
         return;
       }
 
-      // Fallback to standard Redis
-      if (process.env.REDIS_URL) {
-        const redis = await import('redis');
-        this.redis = redis.createClient({
-          url: process.env.REDIS_URL,
-        });
-        await this.redis.connect();
-        this.isRedisAvailable = true;
-        console.log('✅ Redis initialized for market data cache');
-        return;
-      }
-
-      console.log('⚠️  No Redis configuration found. Using in-memory cache fallback.');
+      console.log('⚠️  No Upstash Redis configuration found. Using in-memory cache fallback.');
     } catch (error) {
-      console.error('Redis initialization failed:', error);
+      console.error('Upstash Redis initialization failed:', error);
       console.log('⚠️  Using in-memory cache fallback');
     }
   }
@@ -107,7 +95,7 @@ export class MarketDataCache {
       const encoded = cacheKey.replace(CACHE_KEYS.PREFIX, '');
       const decoded = Buffer.from(encoded, 'base64').toString('utf-8');
       const [symbol, interval, startDate, endDate, source] = decoded.split('_');
-      
+
       return {
         symbol,
         interval,
@@ -144,7 +132,7 @@ export class MarketDataCache {
   // Decompress data from storage
   private decompressData(compressed: string): EnhancedMarketData[] {
     const data = JSON.parse(compressed);
-    
+
     if (Array.isArray(data) && data.length > 0 && typeof data[0] === 'object' && 't' in data[0]) {
       // Decompressed format
       return data.map((item: any) => ({
@@ -160,7 +148,7 @@ export class MarketDataCache {
         exchange: 'CACHED',
       }));
     }
-    
+
     // Original format (not compressed)
     return data.map((item: any) => ({
       ...item,
@@ -190,7 +178,7 @@ export class MarketDataCache {
       const cacheKey = this.generateCacheKey(key);
       const ttl = this.getTTL(key.interval);
       const now = Date.now();
-      
+
       const cacheData: CachedMarketData = {
         data,
         timestamp: now,
@@ -206,7 +194,7 @@ export class MarketDataCache {
       };
 
       const compressedData = this.compressData(data);
-      
+
       await this.redis.setex(
         cacheKey,
         ttl,
@@ -218,9 +206,9 @@ export class MarketDataCache {
 
       // Update cache metadata
       await this.updateCacheStats('set', key.interval, data.length);
-      
+
       console.log(`🎯 Cached ${data.length} data points for ${key.symbol} ${key.interval} (TTL: ${ttl}s)`);
-      
+
     } catch (error) {
       console.error('Cache set error:', error);
     }
@@ -235,9 +223,9 @@ export class MarketDataCache {
 
     try {
       const cacheKey = this.generateCacheKey(key);
-      
+
       const cached = await this.redis.get(cacheKey);
-      
+
       if (!cached) {
         console.log(`💨 Cache miss for ${key.symbol} ${key.interval}`);
         return null;
@@ -245,7 +233,7 @@ export class MarketDataCache {
 
       const parsed = JSON.parse(cached);
       const cacheData: CachedMarketData = parsed.cached;
-      
+
       // Check if cache is expired
       if (Date.now() > cacheData.expiresAt) {
         console.log(`⏰ Cache expired for ${key.symbol} ${key.interval}`);
@@ -254,14 +242,14 @@ export class MarketDataCache {
       }
 
       const data = this.decompressData(parsed.compressed);
-      
+
       console.log(`🎯 Cache hit: ${cacheData.metadata.totalPoints} data points for ${key.symbol} ${key.interval}`);
-      
+
       // Update cache stats
       await this.updateCacheStats('get', key.interval, data.length);
-      
+
       return data;
-      
+
     } catch (error) {
       console.error('Cache get error:', error);
       return null;
@@ -288,15 +276,15 @@ export class MarketDataCache {
     try {
       const pattern = `${CACHE_KEYS.PREFIX}*`;
       const keys = await this.redis.keys(pattern);
-      
+
       if (keys.length > 0) {
         await this.redis.del(...keys);
         console.log(`🗑️  Cleared ${keys.length} cache entries`);
       }
-      
+
       // Reset stats
       await this.redis.del(CACHE_KEYS.STATS);
-      
+
     } catch (error) {
       console.error('Cache clear error:', error);
     }
@@ -309,7 +297,7 @@ export class MarketDataCache {
     try {
       const statsKey = `${CACHE_KEYS.STATS}:${interval}`;
       const current = await this.redis.hgetall(statsKey);
-      
+
       if (operation === 'set') {
         await this.redis.hincrby(statsKey, 'sets', 1);
         await this.redis.hincrby(statsKey, 'total_data_points', dataPoints);
@@ -317,7 +305,7 @@ export class MarketDataCache {
         await this.redis.hincrby(statsKey, 'gets', 1);
         await this.redis.hincrby(statsKey, 'cache_hits', 1);
       }
-      
+
       await this.redis.hset(statsKey, 'last_updated', Date.now());
     } catch (error) {
       console.error('Cache stats update error:', error);
@@ -366,7 +354,7 @@ export class MarketDataCache {
     if (!this.isRedisAvailable) return;
 
     console.log('🚀 Preloading common market data...');
-    
+
     const commonPairs = [
       { symbol: 'EUR/USD', interval: '1h', days: 30 },
       { symbol: 'GBP/USD', interval: '1h', days: 30 },
@@ -380,7 +368,7 @@ export class MarketDataCache {
       // This would trigger fetching and caching via the main data fetcher
       // Implementation would depend on how you want to trigger the fetch
     }
-    
+
     console.log('✅ Preloading completed');
   }
 }

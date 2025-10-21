@@ -1,0 +1,14 @@
+// Folder-specific settings
+//
+// For a full list of overridable settings, and general information on folder-specific settings,
+// see the documentation: https://zed.dev/docs/configuring-zed#settings-files
+{
+  "context_servers": {
+    "mcp-server-byterover": {
+      "source": "extension",
+      "settings": {
+        "auth_header": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwdWJsaWNLZXkiOiJway1ici1iMDA0MDk1YS1jNWU5LTQyMzEtODk3Zi1iNzYwOWQyMGJiYjgiLCJ1c2VySWQiOiJ0ZWNocHJvY3JlYXRpdmUzNEBnbWFpbC5jb20iLCJpYXQiOjE3NjEwMTM2NTAsImV4cCI6MTc2NjE5NzY1MCwiaXNzIjoiQllURVJPVkVSIE1DUCBTRVJWRVIifQ.BO32fkXOI7W7MhHGsv9QpL-BG7VNUIlVHYy2W1JoheY"
+      }
+    }
+  }
+}

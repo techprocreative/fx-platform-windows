@@ -27,7 +27,7 @@ export class OpenRouterAI {
   constructor(apiKey?: string, model: string = DEFAULT_MODEL) {
     this.apiKey = apiKey || process.env.OPENROUTER_API_KEY || '';
     this.model = model;
-    
+
     if (!this.apiKey) {
       throw new Error('OpenRouter API key is required');
     }
@@ -57,7 +57,7 @@ export class OpenRouterAI {
       }
 
       const data: OpenRouterResponse = await response.json();
-      
+
       if (data.error) {
         throw new Error(data.error.message);
       }
@@ -104,7 +104,7 @@ Your response must be a valid JSON object with the following structure:
     "takeProfit": 50,
     "maxDailyLoss": 100
   }
-  
+
 IMPORTANT - TP/SL VALUES IN PIPS:
 - Return stopLoss and takeProfit as PIP VALUES (numbers)
 - For XAUUSD (Gold): Use 30-100 pips for scalping (e.g., stopLoss: 30, takeProfit: 50)
@@ -116,7 +116,7 @@ IMPORTANT - TP/SL VALUES IN PIPS:
 
 CRITICAL INSTRUCTIONS:
 1. SYMBOL: Extract the trading symbol from user request
-   
+
    MAJOR FOREX PAIRS:
    - Euro: EURUSD (keywords: "euro", "eur", "eurusd")
    - Pound: GBPUSD (keywords: "pound", "gbp", "cable", "sterling")
@@ -125,34 +125,34 @@ CRITICAL INSTRUCTIONS:
    - Aussie: AUDUSD (keywords: "aussie", "aud", "audusd")
    - Loonie: USDCAD (keywords: "cad", "loonie", "usdcad")
    - Kiwi: NZDUSD (keywords: "kiwi", "nzd", "nzdusd")
-   
+
    CROSS PAIRS:
    - EURJPY, GBPJPY, EURGBP, AUDJPY, EURAUD, EURCHF, AUDNZD, etc.
-   
+
    COMMODITIES:
    - Gold: XAUUSD (keywords: "gold", "xau", "xauusd")
    - Silver: XAGUSD (keywords: "silver", "xag", "xagusd")
    - Oil: USOIL/UKOIL (keywords: "oil", "crude", "wti", "brent")
-   
+
    INDICES:
    - US30 (Dow Jones), NAS100 (NASDAQ), SPX500 (S&P 500)
    - UK100 (FTSE), GER40 (DAX), JPN225 (Nikkei)
-   
+
    CRYPTO:
    - BTCUSD (keywords: "bitcoin", "btc"), ETHUSD (keywords: "ethereum", "eth")
-   
+
    If user doesn't specify → use EURUSD as default
-   
+
 2. TIMEFRAME: Extract timeframe from user request or use H1 as default
    - Valid values: M1, M5, M15, M30, H1, H4, D1, W1
-   
+
 3. Use realistic indicators and values appropriate for the symbol:
    - For XAUUSD (gold): larger pip values (100-200), higher volatility
    - For XAGUSD (silver): medium pip values (50-100), high volatility
    - For major forex pairs: typical RSI 30-70, SMAs, 20-50 pips TP/SL
    - For indices: larger point values
    - For oil: medium pip values
-   
+
 4. Keep strategies simple and executable
 5. Risk management is important (position sizes 0.01-0.1)
 6. Generate ONLY JSON, no additional text`;
@@ -175,10 +175,10 @@ CRITICAL REQUIREMENTS:
     ];
 
     const response = await this.makeRequest(messages);
-    
+
     try {
       const strategyData = JSON.parse(response);
-      
+
       // Debug: Log raw AI response
       console.log('🤖 Raw AI Response (Full):', JSON.stringify(strategyData, null, 2));
       console.log('🤖 Raw AI Response (Summary):', {
@@ -189,12 +189,12 @@ CRITICAL REQUIREMENTS:
         exitParams: strategyData.parameters?.exit,
         riskParams: strategyData.parameters?.riskManagement,
       });
-      
+
       // Validate and enhance the strategy
       // ALWAYS extract symbol from user prompt to override AI if needed
       const promptLower = prompt.toLowerCase();
       let finalSymbol = null;
-        
+
         // Commodities
         if (promptLower.includes('xauusd') || promptLower.includes('gold') || promptLower.includes('xau')) {
           finalSymbol = 'XAUUSD';
@@ -261,7 +261,7 @@ CRITICAL REQUIREMENTS:
         if (!finalSymbol) {
           finalSymbol = strategyData.symbol || 'EURUSD';
         }
-      
+
       // Extract timeframe from prompt (prioritize user input over AI)
       // IMPORTANT: Check longer strings FIRST to avoid false matches (m15 contains m1!)
       let finalTimeframe = null;
@@ -282,12 +282,12 @@ CRITICAL REQUIREMENTS:
       } else if (promptLower.includes('d1') || promptLower.includes('daily') || promptLower.includes('1 day')) {
         finalTimeframe = 'D1';
       }
-      
+
       // Use AI response if no timeframe found in prompt
       if (!finalTimeframe) {
         finalTimeframe = strategyData.timeframe || 'H1';
       }
-      
+
       // Debug: Log extraction results
       console.log('🔍 Extraction Results:', {
         prompt: prompt.substring(0, 50) + '...',
@@ -302,19 +302,19 @@ CRITICAL REQUIREMENTS:
       // We need to normalize to decimal format (pips / 10000 for most pairs)
       const rawStopLoss = strategyData.parameters?.stopLoss || 0.002;
       const rawTakeProfit = strategyData.parameters?.takeProfit || 0.004;
-      
+
       // If AI returns values >= 1, assume they are in pips and convert to decimal
       // e.g., 30 pips = 0.0030, 50 pips = 0.0050
       const stopLoss = rawStopLoss >= 1 ? rawStopLoss / 10000 : rawStopLoss;
       const takeProfit = rawTakeProfit >= 1 ? rawTakeProfit / 10000 : rawTakeProfit;
-      
+
       console.log('💰 TP/SL Conversion:', {
         rawStopLoss,
         rawTakeProfit,
         convertedStopLoss: stopLoss,
         convertedTakeProfit: takeProfit,
       });
-      
+
       // Store parameters within rules Json structure
       const rulesWithParameters = {
         rules: Array.isArray(strategyData.rules) ? strategyData.rules : [],
@@ -326,7 +326,7 @@ CRITICAL REQUIREMENTS:
           maxDailyLoss: strategyData.parameters?.maxDailyLoss || 100,
         },
       };
-      
+
       return {
         name: strategyData.name || 'AI Generated Strategy',
         description: strategyData.description || 'Strategy generated by AI',
@@ -399,14 +399,14 @@ ${JSON.stringify(performanceData, null, 2)}`;
     ];
 
     const response = await this.makeRequest(messages);
-    
+
     try {
       const optimizedData = JSON.parse(response);
-      
+
       // Extract parameters from strategy rules if stored there
       const strategyRulesData = strategy.rules as any;
       const existingParams = strategyRulesData?.parameters || {};
-      
+
       // Store parameters within rules Json structure
       const optimizedRulesWithParameters = {
         rules: Array.isArray(optimizedData.rules) ? optimizedData.rules : (strategyRulesData?.rules || []),
@@ -415,7 +415,7 @@ ${JSON.stringify(performanceData, null, 2)}`;
           ...optimizedData.parameters,
         },
       };
-      
+
       return {
         name: optimizedData.name || strategy.name,
         description: optimizedData.description || strategy.description,
@@ -475,7 +475,7 @@ Analysis guidelines:
     ];
 
     const response = await this.makeRequest(messages);
-    
+
     try {
       return JSON.parse(response);
     } catch (parseError) {
@@ -486,7 +486,7 @@ Analysis guidelines:
 
   private generateTags(strategyData: any): string[] {
     const tags = ['ai-generated'];
-    
+
     // Extract indicators used
     if (strategyData.rules) {
       strategyData.rules.forEach((rule: any) => {
@@ -499,7 +499,7 @@ Analysis guidelines:
         }
       });
     }
-    
+
     // Add general strategy characteristics
     if (strategyData.description) {
       const desc = strategyData.description.toLowerCase();
@@ -510,7 +510,7 @@ Analysis guidelines:
       if (desc.includes('swing')) tags.push('swing-trading');
       if (desc.includes('breakout')) tags.push('breakout');
     }
-    
+
     // Remove duplicates and limit to 10 tags
     return [...new Set(tags)].slice(0, 10);
   }

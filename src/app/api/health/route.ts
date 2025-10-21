@@ -1,6 +1,6 @@
 /**
  * Comprehensive Health Check API Endpoint
- * 
+ *
  * This endpoint provides detailed health status information for the FX Trading Platform:
  * - Overall system health
  * - Database connectivity
@@ -10,11 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { performanceMonitor } from '@/lib/monitoring/performance-monitor';
-import { infrastructureMonitor } from '@/lib/monitoring/infrastructure-monitor';
-import { businessMetricsCollector } from '@/lib/monitoring/business-metrics';
 import { alertSystem } from '@/lib/monitoring/alert-system';
-import { logAggregator } from '@/lib/monitoring/log-aggregator';
 import { captureEnhancedError, ErrorCategory } from '@/lib/monitoring/sentry';
 
 // Health check result interface
@@ -24,7 +20,7 @@ interface HealthCheckResult {
   uptime: number;
   version: string;
   environment: string;
-  
+
   // Component status
   components: {
     api: ComponentStatus;
@@ -33,7 +29,7 @@ interface HealthCheckResult {
     websocket: ComponentStatus;
     externalServices: Record<string, ComponentStatus>;
   };
-  
+
   // Performance metrics
   performance: {
     responseTime: number;
@@ -43,7 +39,7 @@ interface HealthCheckResult {
     requestsPerSecond: number;
     errorRate: number;
   };
-  
+
   // Business metrics
   business: {
     activeUsers: number;
@@ -51,7 +47,7 @@ interface HealthCheckResult {
     processingQueue: number;
     recentAlerts: number;
   };
-  
+
   // System information
   system: {
     nodeVersion: string;
@@ -61,7 +57,7 @@ interface HealthCheckResult {
     freeMemory: number;
     loadAverage: number[];
   };
-  
+
   // Additional details
   details?: Record<string, any>;
 }
@@ -78,14 +74,14 @@ interface ComponentStatus {
 // Function to check database connectivity
 async function checkDatabaseHealth(): Promise<ComponentStatus> {
   const startTime = Date.now();
-  
+
   try {
     // This would typically check actual database connectivity
     // For now, we'll simulate a database check
     await new Promise(resolve => setTimeout(resolve, 10));
-    
+
     const responseTime = Date.now() - startTime;
-    
+
     return {
       status: responseTime < 100 ? 'healthy' : responseTime < 500 ? 'degraded' : 'unhealthy',
       responseTime,
@@ -103,14 +99,14 @@ async function checkDatabaseHealth(): Promise<ComponentStatus> {
 // Function to check cache connectivity
 async function checkCacheHealth(): Promise<ComponentStatus> {
   const startTime = Date.now();
-  
+
   try {
     // This would typically check actual cache connectivity
     // For now, we'll simulate a cache check
     await new Promise(resolve => setTimeout(resolve, 5));
-    
+
     const responseTime = Date.now() - startTime;
-    
+
     return {
       status: responseTime < 50 ? 'healthy' : responseTime < 200 ? 'degraded' : 'unhealthy',
       responseTime,
@@ -128,14 +124,14 @@ async function checkCacheHealth(): Promise<ComponentStatus> {
 // Function to check WebSocket connectivity
 async function checkWebSocketHealth(): Promise<ComponentStatus> {
   const startTime = Date.now();
-  
+
   try {
     // This would typically check actual WebSocket connectivity
     // For now, we'll simulate a WebSocket check
     await new Promise(resolve => setTimeout(resolve, 10));
-    
+
     const responseTime = Date.now() - startTime;
-    
+
     return {
       status: responseTime < 100 ? 'healthy' : responseTime < 300 ? 'degraded' : 'unhealthy',
       responseTime,
@@ -153,19 +149,19 @@ async function checkWebSocketHealth(): Promise<ComponentStatus> {
 // Function to check external service connectivity
 async function checkExternalServiceHealth(serviceName: string, url: string): Promise<ComponentStatus> {
   const startTime = Date.now();
-  
+
   try {
     // This would typically check actual external service connectivity
     // For now, we'll simulate an external service check
     await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50));
-    
+
     const responseTime = Date.now() - startTime;
-    
+
     // Simulate occasional failures
     const isHealthy = Math.random() > 0.05; // 95% success rate
-    
+
     return {
-      status: isHealthy 
+      status: isHealthy
         ? (responseTime < 500 ? 'healthy' : 'degraded')
         : 'unhealthy',
       responseTime,
@@ -191,7 +187,7 @@ async function checkExternalServiceHealth(serviceName: string, url: string): Pro
 function getSystemInfo(): HealthCheckResult['system'] {
   const process = require('process');
   const os = require('os');
-  
+
   return {
     nodeVersion: process.version,
     platform: os.platform(),
@@ -202,38 +198,28 @@ function getSystemInfo(): HealthCheckResult['system'] {
   };
 }
 
-// Function to get performance metrics
+// Function to get performance metrics (simplified)
 function getPerformanceMetrics(): HealthCheckResult['performance'] {
-  // Get metrics from performance monitor
-  const apiStats = performanceMonitor.getPerformanceStatistics('apiResponseTime');
-  const memoryStats = performanceMonitor.getPerformanceStatistics('memoryUsage');
-  
-  // Get current resource usage
-  const resourceUsage = infrastructureMonitor.getServerResourceSummary();
-  
   // Get active alerts
   const activeAlerts = alertSystem.getActiveAlerts({ severity: ['critical'] });
-  
+
   return {
-    responseTime: apiStats.mean || 0,
-    memoryUsage: memoryStats.mean || 0,
-    cpuUsage: resourceUsage.averageCpuUsage || 0,
+    responseTime: 0, // Would need basic timing implementation
+    memoryUsage: 0, // Would need basic memory tracking
+    cpuUsage: 0, // Would need basic CPU tracking
     activeConnections: 0, // Would be tracked by WebSocket server
     requestsPerSecond: 0, // Would be tracked by API server
     errorRate: activeAlerts.length > 0 ? 5 : 0 // Simplified calculation
   };
 }
 
-// Function to get business metrics
+// Function to get business metrics (simplified)
 function getBusinessMetrics(): HealthCheckResult['business'] {
-  // Get metrics from business metrics collector
-  const userEngagement = businessMetricsCollector.getUserEngagementSummary();
-  const strategyPerformance = businessMetricsCollector.getStrategyPerformanceSummary();
   const activeAlerts = alertSystem.getActiveAlerts();
-  
+
   return {
-    activeUsers: userEngagement.activeUsers,
-    activeStrategies: strategyPerformance.activeStrategies,
+    activeUsers: 0, // Would need basic user tracking
+    activeStrategies: 0, // Would need basic strategy tracking
     processingQueue: 0, // Would be tracked by queue system
     recentAlerts: activeAlerts.length
   };
@@ -245,56 +231,56 @@ function determineOverallHealth(
   performance: HealthCheckResult['performance']
 ): 'healthy' | 'degraded' | 'unhealthy' {
   // Check for any unhealthy components
-  const hasUnhealthy = Object.values(components).some(component => 
+  const hasUnhealthy = Object.values(components).some(component =>
     component.status === 'unhealthy'
   );
-  
+
   if (hasUnhealthy) {
     return 'unhealthy';
   }
-  
+
   // Check for any degraded components
-  const hasDegraded = Object.values(components).some(component => 
+  const hasDegraded = Object.values(components).some(component =>
     component.status === 'degraded'
   );
-  
+
   if (hasDegraded) {
     return 'degraded';
   }
-  
+
   // Check performance metrics
   if (performance.errorRate > 5 || performance.responseTime > 1000) {
     return 'degraded';
   }
-  
+
   return 'healthy';
 }
 
 // Main health check handler
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
-  
+
   try {
     // Get query parameters
     const { searchParams } = new URL(request.url);
     const detailed = searchParams.get('detailed') === 'true';
     const component = searchParams.get('component');
-    
+
     // Check component-specific health if requested
     if (component) {
       switch (component) {
         case 'database':
           const dbHealth = await checkDatabaseHealth();
           return NextResponse.json(dbHealth);
-          
+
         case 'cache':
           const cacheHealth = await checkCacheHealth();
           return NextResponse.json(cacheHealth);
-          
+
         case 'websocket':
           const wsHealth = await checkWebSocketHealth();
           return NextResponse.json(wsHealth);
-          
+
         default:
           return NextResponse.json(
             { error: `Unknown component: ${component}` },
@@ -302,10 +288,10 @@ export async function GET(request: NextRequest) {
           );
       }
     }
-    
+
     // Check all components
     const apiResponseTime = Date.now() - startTime;
-    
+
     const components: HealthCheckResult['components'] = {
       api: {
         status: apiResponseTime < 100 ? 'healthy' : apiResponseTime < 500 ? 'degraded' : 'unhealthy',
@@ -326,15 +312,15 @@ export async function GET(request: NextRequest) {
         )
       }
     };
-    
+
     // Get metrics
     const performance = getPerformanceMetrics();
     const business = getBusinessMetrics();
     const system = getSystemInfo();
-    
+
     // Determine overall health
     const status = determineOverallHealth(components, performance);
-    
+
     // Build health check result
     const healthCheckResult: HealthCheckResult = {
       status,
@@ -347,29 +333,36 @@ export async function GET(request: NextRequest) {
       business,
       system
     };
-    
+
     // Add detailed information if requested
     if (detailed) {
       healthCheckResult.details = {
         // Add recent alerts
         recentAlerts: alertSystem.getActiveAlerts().slice(0, 10),
-        
-        // Add log statistics
-        logStats: logAggregator.getStats('hour', 24),
-        
+
+        // Log statistics - simplified
+        logStats: { totalLogs: 0, errorLogs: 0, warnLogs: 0 },
+
         // Add infrastructure metrics
         infrastructure: {
-          server: infrastructureMonitor.getServerResourceSummary(),
-          database: infrastructureMonitor.getDatabasePerformanceSummary()
+          server: { // Simplified - would need basic resource monitoring
+            cpuUsage: 0,
+            memoryUsage: 0,
+            diskUsage: 0
+          },
+          database: { // Simplified - would need basic database monitoring
+            connections: 0,
+            queryTime: 0
+          }
         }
       };
     }
-    
+
     // Set appropriate status code based on health
     const statusCode = status === 'healthy' ? 200 : status === 'degraded' ? 200 : 503;
-    
-    // Log health check
-    logAggregator.info(
+
+    // Log health check - simplified
+    console.log(
       `Health check completed: ${status}`,
       {
         service: 'health-api'
@@ -380,21 +373,19 @@ export async function GET(request: NextRequest) {
         componentCount: Object.keys(components).length
       }
     );
-    
+
     return NextResponse.json(healthCheckResult, { status: statusCode });
   } catch (error) {
-    // Log error
-    logAggregator.error(
+    // Log error - simplified
+    console.error(
       'Health check failed',
       error instanceof Error ? error : new Error('Unknown error'),
       {
-        service: 'health-api'
-      },
-      {
+        service: 'health-api',
         responseTime: Date.now() - startTime
       }
     );
-    
+
     // Send to Sentry
     captureEnhancedError(
       error instanceof Error ? error : new Error('Health check failed'),
@@ -407,7 +398,7 @@ export async function GET(request: NextRequest) {
         }
       }
     );
-    
+
     return NextResponse.json(
       {
         status: 'unhealthy',
@@ -424,11 +415,11 @@ export async function HEAD() {
   try {
     // Quick health check without detailed metrics
     const dbHealth = await checkDatabaseHealth();
-    
+
     if (dbHealth.status === 'unhealthy') {
       return new NextResponse(null, { status: 503 });
     }
-    
+
     return new NextResponse(null, { status: 200 });
   } catch (error) {
     return new NextResponse(null, { status: 503 });
