@@ -1,38 +1,44 @@
-'use client';
+"use client";
 
-import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react';
-import { useEffect, useState } from 'react';
-import toast from 'react-hot-toast';
+import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
 
-import type { StrategyFormData, StrategyRules } from '@/components/forms/StrategyForm';
-import { StrategyFormSkeleton } from '@/components/forms/StrategyForm';
+import type {
+  StrategyFormData,
+  StrategyRules,
+} from "@/components/forms/StrategyForm";
+import { StrategyFormSkeleton } from "@/components/forms/StrategyForm";
 
 const StrategyForm = dynamic(
-  () => import('@/components/forms/StrategyForm').then((mod) => mod.StrategyForm),
+  () =>
+    import("@/components/forms/StrategyForm").then((mod) => mod.StrategyForm),
   {
     loading: () => <StrategyFormSkeleton />,
     ssr: false,
-  }
+  },
 );
 
 export default function NewStrategyPage() {
+  // ALL HOOKS MUST BE CALLED BEFORE ANY EARLY RETURNS
   const router = useRouter();
   const { status } = useSession();
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
+    if (status === "unauthenticated") {
+      router.replace("/login");
     }
   }, [router, status]);
 
-  if (status === 'loading') {
+  // Early returns AFTER all hooks
+  if (status === "loading") {
     return <StrategyFormSkeleton />;
   }
 
-  if (status === 'unauthenticated') {
+  if (status === "unauthenticated") {
     return null;
   }
 
@@ -46,9 +52,9 @@ export default function NewStrategyPage() {
     setSubmitting(true);
 
     try {
-      const response = await fetch('/api/strategy', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/strategy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...formData,
           rules,
@@ -57,15 +63,17 @@ export default function NewStrategyPage() {
 
       if (!response.ok) {
         const error = await response.json().catch(() => null);
-        throw new Error(error?.error || 'Failed to create strategy');
+        throw new Error(error?.error || "Failed to create strategy");
       }
 
       const data = await response.json();
-      toast.success('Strategy created successfully!');
+      toast.success("Strategy created successfully!");
       router.push(`/dashboard/strategies/${data.id}`);
     } catch (error) {
       setSubmitting(false);
-      throw error instanceof Error ? error : new Error('Failed to create strategy');
+      throw error instanceof Error
+        ? error
+        : new Error("Failed to create strategy");
     }
   };
 
