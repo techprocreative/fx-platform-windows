@@ -72,7 +72,7 @@
     "tailwind-merge": "^2.2.1",
     "tailwindcss": "^3.4.1",
     "tailwindcss-animate": "^1.0.7",
-    "twelvedata": "^3.10.1",
+    "twelvedata": "^3.0.1",
     "typescript": "^5.9.3",
     "ws": "^8.18.3",
     "yahoo-finance2": "^3.10.0",

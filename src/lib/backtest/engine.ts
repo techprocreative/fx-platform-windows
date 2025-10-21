@@ -1,19 +1,19 @@
-import { BacktestResults, Strategy } from '../../types';
-import TwelveData from 'twelvedata';
-import { marketDataCache, CacheKey } from '../cache/market-data-cache';
+import { BacktestResults, Strategy } from "../../types";
+import TwelveData from "twelvedata";
+import { marketDataCache, CacheKey } from "../cache/market-data-cache";
 
 // Symbol-specific pip configuration for accurate calculations
 const SYMBOL_CONFIG = {
-  'EURUSD': { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
-  'USDJPY': { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
-  'XAUUSD': { pipMultiplier: 0.1, minPips: 30, maxPips: 100 },
-  'BTCUSD': { pipMultiplier: 1, minPips: 100, maxPips: 500 },
-  'US30': { pipMultiplier: 1, minPips: 50, maxPips: 200 },
-  'GBPUSD': { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
-  'USDCHF': { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
-  'AUDUSD': { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
-  'USDCAD': { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
-  'NZDUSD': { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  EURUSD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  USDJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
+  XAUUSD: { pipMultiplier: 0.1, minPips: 30, maxPips: 100 },
+  BTCUSD: { pipMultiplier: 1, minPips: 100, maxPips: 500 },
+  US30: { pipMultiplier: 1, minPips: 50, maxPips: 200 },
+  GBPUSD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  USDCHF: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  AUDUSD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  USDCAD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  NZDUSD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
 };
 
 // Default pip configuration for unknown symbols
@@ -25,7 +25,9 @@ const DEFAULT_PIP_CONFIG = {
 
 // Get pip configuration for a symbol
 export function getPipConfig(symbol: string) {
-  return SYMBOL_CONFIG[symbol as keyof typeof SYMBOL_CONFIG] || DEFAULT_PIP_CONFIG;
+  return (
+    SYMBOL_CONFIG[symbol as keyof typeof SYMBOL_CONFIG] || DEFAULT_PIP_CONFIG
+  );
 }
 
 // Define BacktestResult interface locally to avoid import issues
@@ -55,7 +57,7 @@ interface BacktestResult {
 
 // Initialize TwelveData client
 const twelveDataClient = TwelveData({
-  apikey: process.env.TWELVEDATA_API_KEY || '',
+  apikey: process.env.TWELVEDATA_API_KEY || "",
 });
 
 // Market data interface for backtesting
@@ -109,14 +111,19 @@ interface EnhancedStrategy {
 
 // Historical data fetcher with multiple sources
 export class HistoricalDataFetcher {
-  static async fetchFromTwelveData(symbol: string, interval: string, startDate: Date, endDate: Date): Promise<EnhancedMarketData[]> {
+  static async fetchFromTwelveData(
+    symbol: string,
+    interval: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<EnhancedMarketData[]> {
     // Check cache first
     const cacheKey: CacheKey = {
       symbol,
       interval,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
-      source: 'twelvedata',
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
+      source: "twelvedata",
     };
 
     const cachedData = await marketDataCache.get(cacheKey);
@@ -125,8 +132,10 @@ export class HistoricalDataFetcher {
     }
 
     try {
-      console.log(`📡 Fetching from TwelveData: ${symbol} ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`);
-      
+      console.log(
+        `📡 Fetching from TwelveData: ${symbol} ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`,
+      );
+
       const response = await twelveDataClient.timeSeries({
         symbol,
         interval,
@@ -143,33 +152,38 @@ export class HistoricalDataFetcher {
         high: parseFloat(chart.high),
         low: parseFloat(chart.low),
         close: parseFloat(chart.close),
-        volume: parseInt(chart.volume || '0'),
+        volume: parseInt(chart.volume || "0"),
         symbol,
         interval,
-        currency: chart.currency || 'USD',
-        exchange: chart.exchange || 'FX',
+        currency: chart.currency || "USD",
+        exchange: chart.exchange || "FX",
       }));
 
       // Cache the fetched data
       if (data.length > 0) {
-        await marketDataCache.set(cacheKey, data, 'twelvedata');
+        await marketDataCache.set(cacheKey, data, "twelvedata");
       }
 
       return data;
     } catch (error) {
-      console.error('TwelveData fetch error:', error);
+      console.error("TwelveData fetch error:", error);
       return [];
     }
   }
 
-  static async fetchFromYahooFinance(symbol: string, interval: string, startDate: Date, endDate: Date): Promise<EnhancedMarketData[]> {
+  static async fetchFromYahooFinance(
+    symbol: string,
+    interval: string,
+    startDate: Date,
+    endDate: Date,
+  ): Promise<EnhancedMarketData[]> {
     // Check cache first
     const cacheKey: CacheKey = {
       symbol,
       interval,
-      startDate: startDate.toISOString().split('T')[0],
-      endDate: endDate.toISOString().split('T')[0],
-      source: 'yahoo',
+      startDate: startDate.toISOString().split("T")[0],
+      endDate: endDate.toISOString().split("T")[0],
+      source: "yahoo",
     };
 
     const cachedData = await marketDataCache.get(cacheKey);
@@ -178,27 +192,34 @@ export class HistoricalDataFetcher {
     }
 
     // Yahoo Finance temporarily disabled due to compilation issues
-    console.log('Yahoo Finance temporarily disabled - using TwelveData only');
+    console.log("Yahoo Finance temporarily disabled - using TwelveData only");
     return [];
   }
 
   private static convertIntervalToYahoo(interval: string): string {
     const intervalMap: Record<string, string> = {
-      '1min': '1m',
-      '5min': '5m',
-      '15min': '15m',
-      '30min': '30m',
-      '1h': '1h',
-      '4h': '1d',
-      '1d': '1d',
-      '1w': '1wk',
+      "1min": "1m",
+      "5min": "5m",
+      "15min": "15m",
+      "30min": "30m",
+      "1h": "1h",
+      "4h": "1d",
+      "1d": "1d",
+      "1w": "1wk",
     };
-    return intervalMap[interval] || '1d';
+    return intervalMap[interval] || "1d";
   }
 
   // Sample data generation removed - only real market data allowed
-  static generateSampleData(symbol: string, interval: string, startDate: Date, endDate: Date): EnhancedMarketData[] {
-    throw new Error(`Sample data generation disabled. Real market data is required for ${symbol} ${interval} from ${startDate.toISOString()} to ${endDate.toISOString()}. Please ensure TwelveData and/or Yahoo Finance APIs are properly configured.`);
+  static generateSampleData(
+    symbol: string,
+    interval: string,
+    startDate: Date,
+    endDate: Date,
+  ): EnhancedMarketData[] {
+    throw new Error(
+      `Sample data generation disabled. Real market data is required for ${symbol} ${interval} from ${startDate.toISOString()} to ${endDate.toISOString()}. Please ensure TwelveData and/or Yahoo Finance APIs are properly configured.`,
+    );
   }
 }
 
@@ -210,21 +231,31 @@ export class BacktestEngine {
   private positions: any[] = [];
   private trades: any[] = [];
   private equityCurve: { timestamp: Date; equity: number }[] = [];
-  private strategyParameters: { stopLoss: number; takeProfit: number; maxPositions: number; maxDailyLoss: number } = {
+  private strategyParameters: {
+    stopLoss: number;
+    takeProfit: number;
+    maxPositions: number;
+    maxDailyLoss: number;
+  } = {
     stopLoss: 0.002,
     takeProfit: 0.004,
     maxPositions: 1,
     maxDailyLoss: 100,
   };
-  private symbol: string = '';
+  private symbol: string = "";
   private pipConfig: typeof DEFAULT_PIP_CONFIG = DEFAULT_PIP_CONFIG;
 
   constructor(initialBalance: number = 10000) {
     this.balance = initialBalance;
     this.equity = initialBalance;
   }
-  
-  setStrategyParameters(params: { stopLoss: number; takeProfit: number; maxPositions: number; maxDailyLoss: number }) {
+
+  setStrategyParameters(params: {
+    stopLoss: number;
+    takeProfit: number;
+    maxPositions: number;
+    maxDailyLoss: number;
+  }) {
     this.strategyParameters = params;
   }
 
@@ -233,72 +264,109 @@ export class BacktestEngine {
     interval: string,
     startDate: Date,
     endDate: Date,
-    preferredSource: 'twelvedata' | 'yahoo' = 'twelvedata'
+    preferredSource: "twelvedata" | "yahoo" = "twelvedata",
   ): Promise<void> {
     // Store symbol and get pip configuration
     this.symbol = symbol;
     this.pipConfig = getPipConfig(symbol);
-    console.log(`🔧 Using pip configuration for ${symbol}: multiplier=${this.pipConfig.pipMultiplier}, minPips=${this.pipConfig.minPips}, maxPips=${this.pipConfig.maxPips}`);
+    console.log(
+      `🔧 Using pip configuration for ${symbol}: multiplier=${this.pipConfig.pipMultiplier}, minPips=${this.pipConfig.minPips}, maxPips=${this.pipConfig.maxPips}`,
+    );
     // Try preferred source first, then fallback to the other
     let data: EnhancedMarketData[] = [];
 
-    if (preferredSource === 'twelvedata') {
-      data = await HistoricalDataFetcher.fetchFromTwelveData(symbol, interval, startDate, endDate);
+    if (preferredSource === "twelvedata") {
+      data = await HistoricalDataFetcher.fetchFromTwelveData(
+        symbol,
+        interval,
+        startDate,
+        endDate,
+      );
       if (data.length === 0) {
-        data = await HistoricalDataFetcher.fetchFromYahooFinance(symbol, interval, startDate, endDate);
+        data = await HistoricalDataFetcher.fetchFromYahooFinance(
+          symbol,
+          interval,
+          startDate,
+          endDate,
+        );
       }
-    } else if (preferredSource === 'yahoo') {
-      data = await HistoricalDataFetcher.fetchFromYahooFinance(symbol, interval, startDate, endDate);
+    } else if (preferredSource === "yahoo") {
+      data = await HistoricalDataFetcher.fetchFromYahooFinance(
+        symbol,
+        interval,
+        startDate,
+        endDate,
+      );
       if (data.length === 0) {
-        data = await HistoricalDataFetcher.fetchFromTwelveData(symbol, interval, startDate, endDate);
+        data = await HistoricalDataFetcher.fetchFromTwelveData(
+          symbol,
+          interval,
+          startDate,
+          endDate,
+        );
       }
     }
 
     // No fallback to sample data - throw error if no data available
     if (data.length === 0) {
-      throw new Error(`Failed to fetch real market data for ${symbol} from both TwelveData and Yahoo Finance APIs. Please check your API keys and internet connection.`);
+      throw new Error(
+        `Failed to fetch real market data for ${symbol} from both TwelveData and Yahoo Finance APIs. Please check your API keys and internet connection.`,
+      );
     }
 
-    console.log(`✅ Successfully loaded ${data.length} data points for ${symbol} from real market data sources`);
+    console.log(
+      `✅ Successfully loaded ${data.length} data points for ${symbol} from real market data sources`,
+    );
 
     // Sort by timestamp and store
-    this.data = data.sort((a: any, b: any) => a.timestamp.getTime() - b.timestamp.getTime());
+    this.data = data.sort(
+      (a: any, b: any) => a.timestamp.getTime() - b.timestamp.getTime(),
+    );
   }
 
-  private applyStrategy(strategy: EnhancedStrategy, data: EnhancedMarketData, index: number): void {
+  private applyStrategy(
+    strategy: EnhancedStrategy,
+    data: EnhancedMarketData,
+    index: number,
+  ): void {
     const { rules } = strategy;
-    
+
     // Simple strategy execution based on rules
     rules.forEach((rule: StrategyRule) => {
       const { conditions, action } = rule;
-      
+
       let shouldExecute = true;
-      
+
       // Check all conditions
       conditions.forEach((condition: StrategyCondition) => {
         const { indicator, operator, value, timeframes } = condition;
-        
+
         if (!timeframes.includes(timeframes[0])) {
           shouldExecute = false;
           return;
         }
 
-        const currentValue = this.calculateIndicator(indicator, this.data, index);
-        
+        const currentValue = this.calculateIndicator(
+          indicator,
+          this.data,
+          index,
+        );
+
         switch (operator) {
-          case 'gt':
+          case "gt":
             if (!(currentValue > value)) shouldExecute = false;
             break;
-          case 'lt':
+          case "lt":
             if (!(currentValue < value)) shouldExecute = false;
             break;
-          case 'eq':
-            if (!(Math.abs(currentValue - value) < 0.0001)) shouldExecute = false;
+          case "eq":
+            if (!(Math.abs(currentValue - value) < 0.0001))
+              shouldExecute = false;
             break;
-          case 'gte':
+          case "gte":
             if (!(currentValue >= value)) shouldExecute = false;
             break;
-          case 'lte':
+          case "lte":
             if (!(currentValue <= value)) shouldExecute = false;
             break;
         }
@@ -310,28 +378,36 @@ export class BacktestEngine {
     });
   }
 
-  private calculateIndicator(indicator: string, data: EnhancedMarketData[], index: number): number {
+  private calculateIndicator(
+    indicator: string,
+    data: EnhancedMarketData[],
+    index: number,
+  ): number {
     switch (indicator) {
-      case 'price':
+      case "price":
         return data[index].close;
-      case 'sma_20':
+      case "sma_20":
         return this.calculateSMA(data, index, 20);
-      case 'sma_50':
+      case "sma_50":
         return this.calculateSMA(data, index, 50);
-      case 'ema_12':
+      case "ema_12":
         return this.calculateEMA(data, index, 12);
-      case 'ema_26':
+      case "ema_26":
         return this.calculateEMA(data, index, 26);
-      case 'rsi':
+      case "rsi":
         return this.calculateRSI(data, index, 14);
       default:
         return data[index].close;
     }
   }
 
-  private calculateSMA(data: EnhancedMarketData[], index: number, period: number): number {
+  private calculateSMA(
+    data: EnhancedMarketData[],
+    index: number,
+    period: number,
+  ): number {
     if (index < period - 1) return data[index].close;
-    
+
     let sum = 0;
     for (let i = index - period + 1; i <= index; i++) {
       sum += data[i].close;
@@ -339,20 +415,28 @@ export class BacktestEngine {
     return sum / period;
   }
 
-  private calculateEMA(data: EnhancedMarketData[], index: number, period: number): number {
+  private calculateEMA(
+    data: EnhancedMarketData[],
+    index: number,
+    period: number,
+  ): number {
     if (index === 0) return data[index].close;
-    
+
     const multiplier = 2 / (period + 1);
     const previousEMA = this.calculateEMA(data, index - 1, period);
     return (data[index].close - previousEMA) * multiplier + previousEMA;
   }
 
-  private calculateRSI(data: EnhancedMarketData[], index: number, period: number): number {
+  private calculateRSI(
+    data: EnhancedMarketData[],
+    index: number,
+    period: number,
+  ): number {
     if (index < period) return 50;
-    
+
     let gains = 0;
     let losses = 0;
-    
+
     for (let i = index - period + 1; i <= index; i++) {
       const change = data[i].close - data[i - 1].close;
       if (change > 0) {
@@ -361,44 +445,61 @@ export class BacktestEngine {
         losses += Math.abs(change);
       }
     }
-    
+
     const avgGain = gains / period;
     const avgLoss = losses / period;
-    
+
     if (avgLoss === 0) return 100;
-    
+
     const rs = avgGain / avgLoss;
-    return 100 - (100 / (1 + rs));
+    return 100 - 100 / (1 + rs);
   }
 
   private executeAction(action: any, data: EnhancedMarketData): void {
     const { type, parameters } = action;
-    
+
     switch (type) {
-      case 'buy':
-        this.openPosition('buy', parameters.size || 0.01, data.close, data.timestamp);
+      case "buy":
+        this.openPosition(
+          "buy",
+          parameters.size || 0.01,
+          data.close,
+          data.timestamp,
+        );
         break;
-      case 'sell':
-        this.openPosition('sell', parameters.size || 0.01, data.close, data.timestamp);
+      case "sell":
+        this.openPosition(
+          "sell",
+          parameters.size || 0.01,
+          data.close,
+          data.timestamp,
+        );
         break;
-      case 'close':
+      case "close":
         this.closePosition(data.close, data.timestamp);
         break;
     }
   }
 
-  private openPosition(type: 'buy' | 'sell', size: number, price: number, timestamp: Date): void {
+  private openPosition(
+    type: "buy" | "sell",
+    size: number,
+    price: number,
+    timestamp: Date,
+  ): void {
     if (this.positions.length >= this.strategyParameters.maxPositions) return;
-    
+
     // Calculate SL and TP based on strategy parameters
-    const stopLossPrice = type === 'buy' 
-      ? price - (price * this.strategyParameters.stopLoss)
-      : price + (price * this.strategyParameters.stopLoss);
-      
-    const takeProfitPrice = type === 'buy'
-      ? price + (price * this.strategyParameters.takeProfit)
-      : price - (price * this.strategyParameters.takeProfit);
-    
+    const stopLossPrice =
+      type === "buy"
+        ? price - price * this.strategyParameters.stopLoss
+        : price + price * this.strategyParameters.stopLoss;
+
+    const takeProfitPrice =
+      type === "buy"
+        ? price + price * this.strategyParameters.takeProfit
+        : price - price * this.strategyParameters.takeProfit;
+
     this.positions.push({
       type,
       size,
@@ -412,22 +513,22 @@ export class BacktestEngine {
 
   private closePosition(price: number, timestamp: Date): void {
     if (this.positions.length === 0) return;
-    
+
     const position = this.positions.pop();
     if (!position) return;
-    
+
     // Use symbol-specific pip configuration
     const pipValue = this.pipConfig.pipMultiplier;
     let profit = 0;
-    
-    if (position.type === 'buy') {
-      profit = (price - position.openPrice) / pipValue * position.size * 10;
+
+    if (position.type === "buy") {
+      profit = ((price - position.openPrice) / pipValue) * position.size * 10;
     } else {
-      profit = (position.openPrice - price) / pipValue * position.size * 10;
+      profit = ((position.openPrice - price) / pipValue) * position.size * 10;
     }
-    
+
     this.balance += profit;
-    
+
     this.trades.push({
       type: position.type,
       size: position.size,
@@ -442,85 +543,94 @@ export class BacktestEngine {
 
   private updateEquity(currentPrice: number, timestamp: Date): void {
     let unrealizedPnL = 0;
-    
-    this.positions.forEach(position => {
+
+    this.positions.forEach((position) => {
       // Use symbol-specific pip configuration
       const pipValue = this.pipConfig.pipMultiplier;
       let positionProfit = 0;
-      
-      if (position.type === 'buy') {
-        positionProfit = (currentPrice - position.openPrice) / pipValue * position.size * 10;
+
+      if (position.type === "buy") {
+        positionProfit =
+          ((currentPrice - position.openPrice) / pipValue) * position.size * 10;
       } else {
-        positionProfit = (position.openPrice - currentPrice) / pipValue * position.size * 10;
+        positionProfit =
+          ((position.openPrice - currentPrice) / pipValue) * position.size * 10;
       }
-      
+
       unrealizedPnL += positionProfit;
     });
-    
+
     this.equity = this.balance + unrealizedPnL;
     this.equityCurve.push({ timestamp, equity: this.equity });
   }
 
-  private checkStopLossAndTakeProfit(currentPrice: number, timestamp: Date): void {
+  private checkStopLossAndTakeProfit(
+    currentPrice: number,
+    timestamp: Date,
+  ): void {
     const positionsToClose: any[] = [];
-    
+
     this.positions.forEach((position, index) => {
       let shouldClose = false;
-      let closeReason = '';
-      
-      if (position.type === 'buy') {
+      let closeReason = "";
+
+      if (position.type === "buy") {
         // Check stop loss
         if (currentPrice <= position.stopLoss) {
           shouldClose = true;
-          closeReason = 'Stop Loss';
+          closeReason = "Stop Loss";
         }
         // Check take profit
         else if (currentPrice >= position.takeProfit) {
           shouldClose = true;
-          closeReason = 'Take Profit';
+          closeReason = "Take Profit";
         }
-      } else if (position.type === 'sell') {
+      } else if (position.type === "sell") {
         // Check stop loss
         if (currentPrice >= position.stopLoss) {
           shouldClose = true;
-          closeReason = 'Stop Loss';
+          closeReason = "Stop Loss";
         }
         // Check take profit
         else if (currentPrice <= position.takeProfit) {
           shouldClose = true;
-          closeReason = 'Take Profit';
+          closeReason = "Take Profit";
         }
       }
-      
+
       if (shouldClose) {
         positionsToClose.push({ position, index, reason: closeReason });
       }
     });
-    
+
     // Close positions that hit SL/TP
     positionsToClose.reverse().forEach(({ position, reason }) => {
       this.closePositionWithReason(currentPrice, timestamp, reason);
     });
   }
-  
-  private closePositionWithReason(price: number, timestamp: Date, reason: string = 'Manual'): void {
+
+  private closePositionWithReason(
+    price: number,
+    timestamp: Date,
+    reason: string = "Manual",
+  ): void {
     if (this.positions.length === 0) return;
-    
+
     const position = this.positions.pop();
     if (!position) return;
-    
+
     // Use symbol-specific pip configuration
     const pipValue = this.pipConfig.pipMultiplier;
     let profit = 0;
-    
-    if (position.type === 'buy') {
-      profit = (price - position.openPrice) / pipValue * position.size * 10;
+
+    if (position.type === "buy") {
+      profit = ((price - position.openPrice) / pipValue) * position.size * 10;
     } else {
-      profit = (position.openPrice - price) / pipValue * position.size * 10;
+      profit = ((position.openPrice - price) / pipValue) * position.size * 10;
     }
-    
+
     this.balance += profit;
-    
+
     this.trades.push({
       type: position.type,
       size: position.size,
@@ -536,51 +646,58 @@ export class BacktestEngine {
 
   async runBacktest(strategy: EnhancedStrategy): Promise<BacktestResult> {
     if (this.data.length === 0) {
-      throw new Error('No data loaded for backtesting');
+      throw new Error("No data loaded for backtesting");
     }
 
     const initialBalance = this.balance;
-    
+
     // Run strategy through all data points
     for (let i = 0; i < this.data.length; i++) {
       const candle = this.data[i];
-      
+
       // Check SL/TP for open positions FIRST
       this.checkStopLossAndTakeProfit(candle.close, candle.timestamp);
-      
+
       // Apply strategy rules
       this.applyStrategy(strategy, candle, i);
-      
+
       // Update equity
       this.updateEquity(candle.close, candle.timestamp);
     }
-    
+
     // Close any remaining positions at the end
     if (this.positions.length > 0) {
       const lastCandle = this.data[this.data.length - 1];
       this.closePosition(lastCandle.close, lastCandle.timestamp);
     }
-    
+
     // Calculate statistics
     const totalReturn = this.balance - initialBalance;
     const returnPercentage = (totalReturn / initialBalance) * 100;
-    
-    const winningTrades = this.trades.filter(trade => trade.profit > 0);
-    const losingTrades = this.trades.filter(trade => trade.profit <= 0);
-    
-    const winRate = this.trades.length > 0 ? (winningTrades.length / this.trades.length) * 100 : 0;
-    const averageWin = winningTrades.length > 0 
-      ? winningTrades.reduce((sum, trade) => sum + trade.profit, 0) / winningTrades.length 
-      : 0;
-    const averageLoss = losingTrades.length > 0 
-      ? losingTrades.reduce((sum, trade) => sum + Math.abs(trade.profit), 0) / losingTrades.length 
-      : 0;
-    
+
+    const winningTrades = this.trades.filter((trade) => trade.profit > 0);
+    const losingTrades = this.trades.filter((trade) => trade.profit <= 0);
+
+    const winRate =
+      this.trades.length > 0
+        ? (winningTrades.length / this.trades.length) * 100
+        : 0;
+    const averageWin =
+      winningTrades.length > 0
+        ? winningTrades.reduce((sum, trade) => sum + trade.profit, 0) /
+          winningTrades.length
+        : 0;
+    const averageLoss =
+      losingTrades.length > 0
+        ? losingTrades.reduce((sum, trade) => sum + Math.abs(trade.profit), 0) /
+          losingTrades.length
+        : 0;
+
     // Calculate maximum drawdown
     let maxDrawdown = 0;
     let peakEquity = initialBalance;
-    
-    this.equityCurve.forEach(point => {
+
+    this.equityCurve.forEach((point) => {
       if (point.equity > peakEquity) {
         peakEquity = point.equity;
       }
@@ -589,18 +706,25 @@ export class BacktestEngine {
         maxDrawdown = drawdown;
       }
     });
-    
+
     const maxDrawdownPercentage = (maxDrawdown / peakEquity) * 100;
-    
+
     // Calculate profit factor
-    const totalProfit = winningTrades.reduce((sum, trade) => sum + trade.profit, 0);
-    const totalLoss = losingTrades.reduce((sum, trade) => sum + Math.abs(trade.profit), 0);
-    const profitFactor = totalLoss > 0 ? totalProfit / totalLoss : totalProfit > 0 ? Infinity : 0;
-    
+    const totalProfit = winningTrades.reduce(
+      (sum, trade) => sum + trade.profit,
+      0,
+    );
+    const totalLoss = losingTrades.reduce(
+      (sum, trade) => sum + Math.abs(trade.profit),
+      0,
+    );
+    const profitFactor =
+      totalLoss > 0 ? totalProfit / totalLoss : totalProfit > 0 ? Infinity : 0;
+
     return {
       id: `bt_${Date.now()}`,
       strategyId: strategy.id,
-      status: 'completed',
+      status: "completed",
       startDate: this.data[0].timestamp,
       endDate: this.data[this.data.length - 1].timestamp,
       initialBalance,
@@ -616,13 +740,13 @@ export class BacktestEngine {
       averageLoss,
       profitFactor,
       sharpeRatio: this.calculateSharpeRatio(),
-      trades: this.trades.map(trade => ({
+      trades: this.trades.map((trade) => ({
         id: `trade_${Date.now()}_${Math.random()}`,
         ...trade,
       })),
       equityCurve: this.equityCurve,
       metadata: {
-        dataSource: 'twelvedata_yahoo_finance',
+        dataSource: "twelvedata_yahoo_finance",
         totalDataPoints: this.data.length,
         executionTime: new Date(),
       },
@@ -631,35 +755,43 @@ export class BacktestEngine {
 
   private calculateSharpeRatio(): number {
     if (this.equityCurve.length < 2) return 0;
-    
+
     const returns = [];
     for (let i = 1; i < this.equityCurve.length; i++) {
-      const returnRate = (this.equityCurve[i].equity - this.equityCurve[i - 1].equity) / this.equityCurve[i - 1].equity;
+      const returnRate =
+        (this.equityCurve[i].equity - this.equityCurve[i - 1].equity) /
+        this.equityCurve[i - 1].equity;
       returns.push(returnRate);
     }
-    
+
     if (returns.length === 0) return 0;
-    
-    const avgReturn = returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
-    const variance = returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) / returns.length;
+
+    const avgReturn =
+      returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
+    const variance =
+      returns.reduce((sum, ret) => sum + Math.pow(ret - avgReturn, 2), 0) /
+      returns.length;
     const stdDev = Math.sqrt(variance);
-    
+
     return stdDev > 0 ? (avgReturn / stdDev) * Math.sqrt(252) : 0; // Annualized Sharpe Ratio
   }
 }
 
 // Main running function
-export async function runBacktest(strategyId: string, params: {
-  startDate: Date;
-  endDate: Date;
-  initialBalance: number;
-  symbol: string;
-  interval: string;
-  strategy: EnhancedStrategy;
-  preferredDataSource?: 'twelvedata' | 'yahoo';
-}): Promise<BacktestResult> {
+export async function runBacktest(
+  strategyId: string,
+  params: {
+    startDate: Date;
+    endDate: Date;
+    initialBalance: number;
+    symbol: string;
+    interval: string;
+    strategy: EnhancedStrategy;
+    preferredDataSource?: "twelvedata" | "yahoo";
+  },
+): Promise<BacktestResult> {
   const engine = new BacktestEngine(params.initialBalance);
-  
+
   // Set strategy parameters from strategy object
   if (params.strategy.parameters) {
     engine.setStrategyParameters({
@@ -669,14 +801,14 @@ export async function runBacktest(strategyId: string, params: {
       maxDailyLoss: params.strategy.parameters.maxDailyLoss || 100,
     });
   }
-  
+
   await engine.loadData(
     params.symbol,
     params.interval,
     params.startDate,
     params.endDate,
-    params.preferredDataSource || 'twelvedata'
+    params.preferredDataSource || "twelvedata",
   );
-  
+
   return await engine.runBacktest(params.strategy);
 }
