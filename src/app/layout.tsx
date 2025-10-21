@@ -1,17 +1,9 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import dynamic from "next/dynamic";
 import "../styles/globals.css";
 import { DefaultSkipLinks } from "../components/accessibility/SkipLink";
 import { InteractionTracker } from "../components/client/InteractionTracker";
-
-const ClientProvider = dynamic(
-  () =>
-    import("../components/providers/ClientProvider").then(
-      (mod) => mod.ClientProvider,
-    ),
-  { ssr: false },
-);
+import { ClientProvider } from "../components/providers/ClientProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
