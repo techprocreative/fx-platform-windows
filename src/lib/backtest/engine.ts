@@ -103,7 +103,7 @@ interface BacktestResult {
 
 // Initialize TwelveData client
 const twelveDataClient = TwelveData({
-  apikey: process.env.TWELVEDATA_API_KEY || "",
+  key: process.env.TWELVEDATA_API_KEY || "",
 });
 
 // Market data interface for backtesting
@@ -178,6 +178,12 @@ export class HistoricalDataFetcher {
     }
 
     try {
+      // Check if API key is available
+      if (!process.env.TWELVEDATA_API_KEY) {
+        console.warn("⚠️ TwelveData API key not configured, skipping fetch");
+        return [];
+      }
+
       console.log(
         `📡 Fetching from TwelveData: ${symbol} ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`,
       );
