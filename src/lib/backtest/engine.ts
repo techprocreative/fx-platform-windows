@@ -507,51 +507,107 @@ export class BacktestEngine {
   ): void {
     const { rules } = strategy;
 
-    // Simple strategy execution based on rules
-    rules.forEach((rule: StrategyRule) => {
-      const { conditions, action } = rule;
+    // Separate entry and exit rules
+    const entryRules = rules.filter(
+      (rule: StrategyRule) =>
+        rule.action.type === "buy" || rule.action.type === "sell",
+    );
+    const exitRules = rules.filter(
+      (rule: StrategyRule) => rule.action.type === "close",
+    );
 
-      let shouldExecute = true;
+    // Only process entry rules if no positions open
+    if (this.positions.length === 0) {
+      entryRules.forEach((rule: StrategyRule) => {
+        const { conditions, action } = rule;
+        let shouldExecute = true;
 
-      // Check all conditions
-      conditions.forEach((condition: StrategyCondition) => {
-        const { indicator, operator, value, timeframes } = condition;
+        // Check all conditions
+        conditions.forEach((condition: StrategyCondition) => {
+          const { indicator, operator, value, timeframes } = condition;
 
-        if (!timeframes.includes(timeframes[0])) {
-          shouldExecute = false;
-          return;
-        }
+          if (!timeframes.includes(timeframes[0])) {
+            shouldExecute = false;
+            return;
+          }
 
-        const currentValue = this.calculateIndicator(
-          indicator,
-          this.data,
-          index,
-        );
+          const currentValue = this.calculateIndicator(
+            indicator,
+            this.data,
+            index,
+          );
 
-        switch (operator) {
-          case "gt":
-            if (!(currentValue > value)) shouldExecute = false;
-            break;
-          case "lt":
-            if (!(currentValue < value)) shouldExecute = false;
-            break;
-          case "eq":
-            if (!(Math.abs(currentValue - value) < 0.0001))
-              shouldExecute = false;
-            break;
-          case "gte":
-            if (!(currentValue >= value)) shouldExecute = false;
-            break;
-          case "lte":
-            if (!(currentValue <= value)) shouldExecute = false;
-            break;
+          switch (operator) {
+            case "gt":
+              if (!(currentValue > value)) shouldExecute = false;
+              break;
+            case "lt":
+              if (!(currentValue < value)) shouldExecute = false;
+              break;
+            case "eq":
+              if (!(Math.abs(currentValue - value) < 0.0001))
+                shouldExecute = false;
+              break;
+            case "gte":
+              if (!(currentValue >= value)) shouldExecute = false;
+              break;
+            case "lte":
+              if (!(currentValue <= value)) shouldExecute = false;
+              break;
+          }
+        });
+
+        if (shouldExecute) {
+          this.executeAction(action, data);
         }
       });
+    }
+    // Only process exit rules if positions are open
+    else {
+      exitRules.forEach((rule: StrategyRule) => {
+        const { conditions, action } = rule;
+        let shouldExecute = true;
 
-      if (shouldExecute) {
-        this.executeAction(action, data);
-      }
-    });
+        // Check all conditions
+        conditions.forEach((condition: StrategyCondition) => {
+          const { indicator, operator, value, timeframes } = condition;
+
+          if (!timeframes.includes(timeframes[0])) {
+            shouldExecute = false;
+            return;
+          }
+
+          const currentValue = this.calculateIndicator(
+            indicator,
+            this.data,
+            index,
+          );
+
+          switch (operator) {
+            case "gt":
+              if (!(currentValue > value)) shouldExecute = false;
+              break;
+            case "lt":
+              if (!(currentValue < value)) shouldExecute = false;
+              break;
+            case "eq":
+              if (!(Math.abs(currentValue - value) < 0.0001))
+                shouldExecute = false;
+              break;
+            case "gte":
+              if (!(currentValue >= value)) shouldExecute = false;
+              break;
+            case "lte":
+              if (!(currentValue <= value)) shouldExecute = false;
+              break;
+          }
+        });
+
+        if (shouldExecute) {
+          this.executeAction(action, data);
+        }
+      });
+    }
   }
 
   private calculateIndicator(
