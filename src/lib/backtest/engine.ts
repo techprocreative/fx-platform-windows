@@ -4,16 +4,62 @@ import { marketDataCache, CacheKey } from "../cache/market-data-cache";
 
 // Symbol-specific pip configuration for accurate calculations
 const SYMBOL_CONFIG = {
+  // Major Forex Pairs
   EURUSD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
-  USDJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
-  XAUUSD: { pipMultiplier: 0.1, minPips: 30, maxPips: 100 },
-  BTCUSD: { pipMultiplier: 1, minPips: 100, maxPips: 500 },
-  US30: { pipMultiplier: 1, minPips: 50, maxPips: 200 },
   GBPUSD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  USDJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
   USDCHF: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
   AUDUSD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
   USDCAD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
   NZDUSD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+
+  // Cross Currency Pairs
+  EURGBP: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  EURJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
+  GBPJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
+  EURCHF: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  EURAUD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  EURCAD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  EURNZD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  GBPCHF: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  GBPAUD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  GBPCAD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  GBPNZD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  AUDJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
+  AUDNZD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  NZDJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
+  AUDCAD: { pipMultiplier: 0.0001, minPips: 20, maxPips: 50 },
+  CADJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
+  CHFJPY: { pipMultiplier: 0.01, minPips: 20, maxPips: 50 },
+
+  // Commodities
+  XAUUSD: { pipMultiplier: 0.1, minPips: 30, maxPips: 100 }, // Gold
+  XAGUSD: { pipMultiplier: 0.001, minPips: 50, maxPips: 200 }, // Silver
+  USOIL: { pipMultiplier: 0.01, minPips: 20, maxPips: 100 }, // WTI Crude Oil
+  UKOIL: { pipMultiplier: 0.01, minPips: 20, maxPips: 100 }, // Brent Crude Oil
+  NATGAS: { pipMultiplier: 0.001, minPips: 20, maxPips: 100 }, // Natural Gas
+  COPPER: { pipMultiplier: 0.0005, minPips: 50, maxPips: 200 }, // Copper
+  PLAT: { pipMultiplier: 0.1, minPips: 30, maxPips: 100 }, // Platinum
+  PALLAD: { pipMultiplier: 0.05, minPips: 30, maxPips: 100 }, // Palladium
+
+  // Indices
+  US30: { pipMultiplier: 1, minPips: 50, maxPips: 200 }, // Dow Jones
+  NAS100: { pipMultiplier: 0.5, minPips: 20, maxPips: 100 }, // NASDAQ
+  SPX500: { pipMultiplier: 0.1, minPips: 20, maxPips: 100 }, // S&P 500
+  UK100: { pipMultiplier: 1, minPips: 30, maxPips: 150 }, // FTSE 100
+  GER40: { pipMultiplier: 1, minPips: 30, maxPips: 150 }, // DAX
+  JPN225: { pipMultiplier: 50, minPips: 50, maxPips: 200 }, // Nikkei
+  CHN50: { pipMultiplier: 1, minPips: 30, maxPips: 150 }, // China A50
+  AUS200: { pipMultiplier: 1, minPips: 20, maxPips: 100 }, // ASX 200
+  ESP35: { pipMultiplier: 1, minPips: 30, maxPips: 150 }, // IBEX 35
+  FRA40: { pipMultiplier: 1, minPips: 30, maxPips: 150 }, // CAC 40
+
+  // Cryptocurrencies
+  BTCUSD: { pipMultiplier: 1, minPips: 100, maxPips: 500 }, // Bitcoin
+  ETHUSD: { pipMultiplier: 0.01, minPips: 50, maxPips: 300 }, // Ethereum
+  LTCUSD: { pipMultiplier: 0.01, minPips: 50, maxPips: 300 }, // Litecoin
+  XRPUSD: { pipMultiplier: 0.0001, minPips: 50, maxPips: 300 }, // Ripple
+  BCHUSD: { pipMultiplier: 0.1, minPips: 50, maxPips: 300 }, // Bitcoin Cash
 };
 
 // Default pip configuration for unknown symbols

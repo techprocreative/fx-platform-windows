@@ -6,6 +6,9 @@ import {
   OHLCV,
   DataProviderException,
   COMMON_FOREX_PAIRS,
+  COMMON_COMMODITIES,
+  COMMON_INDICES,
+  COMMON_CRYPTO,
   COMMON_TIMEFRAMES,
 } from "../common/types";
 
@@ -376,10 +379,28 @@ export class YahooFinanceProvider implements MarketDataProvider {
   }
 
   private calculateSpread(price: number, symbol: string): number {
-    // Simplified spread calculation
-    const pair = COMMON_FOREX_PAIRS.find((p) => p.symbol === symbol);
-    if (pair) {
-      return pair.pipSize * 2; // Typical 2-pip spread for major pairs
+    // Check forex pairs first
+    const forexPair = COMMON_FOREX_PAIRS.find((p) => p.symbol === symbol);
+    if (forexPair) {
+      return forexPair.pipSize * 2; // Typical 2-pip spread for major pairs
+    }
+
+    // Check commodities
+    const commodity = COMMON_COMMODITIES.find((c) => c.symbol === symbol);
+    if (commodity) {
+      return commodity.pipSize * 5; // Wider spreads for commodities
+    }
+
+    // Check indices
+    const index = COMMON_INDICES.find((i) => i.symbol === symbol);
+    if (index) {
+      return index.pipSize * 2; // Typical spread for indices
+    }
+
+    // Check crypto
+    const crypto = COMMON_CRYPTO.find((c) => c.symbol === symbol);
+    if (crypto) {
+      return crypto.pipSize * 10; // Wider spreads for crypto
     }
 
     // Default spread calculation
@@ -451,31 +472,127 @@ export class YahooFinanceProvider implements MarketDataProvider {
   }
 
   private getForexPairInfo(symbol: string): SymbolInfo {
-    const pair = COMMON_FOREX_PAIRS.find((p) => p.symbol === symbol);
-
-    if (!pair) {
-      throw new DataProviderException(
-        `Unknown symbol: ${symbol}`,
-        "UNKNOWN_SYMBOL",
-        "yahoo-finance",
-        { symbol },
-      );
+    // Check forex pairs first
+    const forexPair = COMMON_FOREX_PAIRS.find((p) => p.symbol === symbol);
+    if (forexPair) {
+      return {
+        symbol: forexPair.symbol,
+        name: `${forexPair.base}/${forexPair.quote}`,
+        type: "forex",
+        exchange: "FOREX",
+        currency: forexPair.quote,
+        description: `${forexPair.base}/${forexPair.quote} Forex Pair`,
+        minLot: 0.01,
+        maxLot: 100.0,
+        lotStep: 0.01,
+        minStopLoss: forexPair.pipSize * 5,
+        minTakeProfit: forexPair.pipSize * 5,
+        swapLong: 0,
+        swapShort: 0,
+      };
     }
 
-    return {
-      symbol: pair.symbol,
-      name: `${pair.base}/${pair.quote}`,
-      type: "forex",
-      exchange: "FOREX",
-      currency: pair.quote,
-      description: `${pair.base} to ${pair.quote} exchange rate`,
-      minLot: 0.01,
-      maxLot: 100.0,
-      lotStep: 0.01,
-      minStopLoss: pair.pipSize,
-      minTakeProfit: pair.pipSize,
-      swapLong: 0,
-      swapShort: 0,
-    };
+    // Check commodities
+    const commodity = COMMON_COMMODITIES.find((c) => c.symbol === symbol);
+    if (commodity) {
+      const commodityNames: Record<string, string> = {
+        XAUUSD: "Gold vs US Dollar",
+        XAGUSD: "Silver vs US Dollar",
+        USOIL: "WTI Crude Oil",
+        UKOIL: "Brent Crude Oil",
+        NATGAS: "Natural Gas",
+        COPPER: "Copper",
+        PLAT: "Platinum",
+        PALLAD: "Palladium",
+      };
+
+      return {
+        symbol: commodity.symbol,
+        name: commodityNames[symbol] || `${commodity.base}/${commodity.quote}`,
+        type: "commodity",
+        exchange: "COMEX",
+        currency: "USD",
+        description:
+          commodityNames[symbol] ||
+          `${commodity.base}/${commodity.quote} Commodity`,
+        minLot: 0.01,
+        maxLot: 50.0,
+        lotStep: 0.01,
+        minStopLoss: commodity.pipSize * 10,
+        minTakeProfit: commodity.pipSize * 10,
+        swapLong: 0,
+        swapShort: 0,
+      };
+    }
+
+    // Check indices
+    const index = COMMON_INDICES.find((i) => i.symbol === symbol);
+    if (index) {
+      const indexNames: Record<string, string> = {
+        US30: "Dow Jones Industrial Average",
+        SPX500: "S&P 500",
+        NAS100: "NASDAQ 100",
+        UK100: "FTSE 100",
+        GER40: "DAX",
+        FRA40: "CAC 40",
+        ESP35: "IBEX 35",
+        JPN225: "Nikkei 225",
+        CHN50: "China A50",
+        AUS200: "ASX 200",
+      };
+
+      return {
+        symbol: index.symbol,
+        name: indexNames[symbol] || `${index.base}/${index.quote}`,
+        type: "stock", // Indices are treated as stock type
+        exchange: "INDEX",
+        currency: index.quote,
+        description: indexNames[symbol] || `${index.base}/${index.quote} Index`,
+        minLot: 0.01,
+        maxLot: 100.0,
+        lotStep: 0.01,
+        minStopLoss: index.pipSize * 5,
+        minTakeProfit: index.pipSize * 5,
+        swapLong: 0,
+        swapShort: 0,
+      };
+    }
+
+    // Check crypto
+    const crypto = COMMON_CRYPTO.find((c) => c.symbol === symbol);
+    if (crypto) {
+      const cryptoNames: Record<string, string> = {
+        BTCUSD: "Bitcoin vs US Dollar",
+        ETHUSD: "Ethereum vs US Dollar",
+        LTCUSD: "Litecoin vs US Dollar",
+        XRPUSD: "Ripple vs US Dollar",
+        BCHUSD: "Bitcoin Cash vs US Dollar",
+      };
+
+      return {
+        symbol: crypto.symbol,
+        name: cryptoNames[symbol] || `${crypto.base}/${crypto.quote}`,
+        type: "crypto",
+        exchange: "CRYPTO",
+        currency: "USD",
+        description:
+          cryptoNames[symbol] ||
+          `${crypto.base}/${crypto.quote} Cryptocurrency`,
+        minLot: 0.001,
+        maxLot: 10.0,
+        lotStep: 0.001,
+        minStopLoss: crypto.pipSize * 20,
+        minTakeProfit: crypto.pipSize * 20,
+        swapLong: 0,
+        swapShort: 0,
+      };
+    }
+
+    throw new DataProviderException(
+      `Unknown symbol: ${symbol}`,
+      "UNKNOWN_SYMBOL",
+      "yahoo-finance",
+      { symbol },
+    );
   }
 }

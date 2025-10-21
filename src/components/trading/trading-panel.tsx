@@ -26,7 +26,17 @@ export function TradingPanel({
   accountInfo,
   symbolInfo,
   onTrade,
-  symbols = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"],
+  symbols = [
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY",
+    "AUDUSD",
+    "USDCAD",
+    "XAUUSD",
+    "XAGUSD",
+    "USOIL",
+    "UKOIL",
+  ],
   className = "",
 }: TradingPanelProps) {
   const [selectedSymbol, setSelectedSymbol] = useState(symbols[0]);

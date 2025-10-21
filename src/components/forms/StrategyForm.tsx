@@ -168,7 +168,7 @@ const SYMBOLS = [
   "AUDUSD",
   "USDCAD",
   "NZDUSD",
-  
+
   // Cross Currency Pairs
   "EURJPY",
   "GBPJPY",
@@ -182,21 +182,21 @@ const SYMBOLS = [
   "GBPCAD",
   "GBPNZD",
   "AUDCAD",
-  
+
   // Commodities
   "XAUUSD", // Gold
   "XAGUSD", // Silver
-  "USOIL",  // WTI Crude Oil
-  "UKOIL",  // Brent Crude Oil
-  
+  "USOIL", // WTI Crude Oil
+  "UKOIL", // Brent Crude Oil
+
   // Indices
-  "US30",   // Dow Jones
+  "US30", // Dow Jones
   "NAS100", // NASDAQ
   "SPX500", // S&P 500
-  "UK100",  // FTSE 100
-  "GER40",  // DAX
+  "UK100", // FTSE 100
+  "GER40", // DAX
   "JPN225", // Nikkei
-  
+
   // Crypto (if supported)
   "BTCUSD",
   "ETHUSD",
@@ -208,7 +208,8 @@ const DEFAULT_TEMPLATES: StrategyTemplate[] = [
   {
     id: "rsi-oversold",
     name: "RSI Oversold Bounce",
-    description: "Buy when RSI indicates oversold conditions. Great for beginners!",
+    description:
+      "Buy when RSI indicates oversold conditions. Great for beginners!",
     difficulty: "beginner",
     icon: <TrendingUp className="h-5 w-5" />,
     config: {
@@ -322,26 +323,25 @@ export function StrategyForm({
   loading,
   showModeToggle = true,
 }: StrategyFormProps) {
+  // Note: onSubmit is intentionally not serialized as it's a client-side callback function
   const router = useRouter();
-
-  const availableTemplates = templates ?? DEFAULT_TEMPLATES;
   const [mode, setMode] = useState<StrategyMode>(
-    initialData?.mode ?? initialMode
+    initialData?.mode ?? initialMode,
   );
   const [selectedTemplate, setSelectedTemplate] = useState<string | null>(
-    initialData?.selectedTemplateId ?? null
+    initialData?.selectedTemplateId ?? null,
   );
   const [showTemplates, setShowTemplates] = useState(mode === "simple");
   const [formData, setFormData] = useState<StrategyFormData>(
-    initialData?.formData ?? DEFAULT_FORM_DATA
+    initialData?.formData ?? DEFAULT_FORM_DATA,
   );
   const [entryConditions, setEntryConditions] = useState<StrategyCondition[]>(
-    initialData?.conditions ?? []
+    initialData?.conditions ?? [],
   );
   const [exitRules, setExitRules] = useState(DEFAULT_EXIT_RULES);
   const [riskManagement, setRiskManagement] = useState(DEFAULT_RISK_MANAGEMENT);
   const [entryLogic, setEntryLogic] = useState<"AND" | "OR">(
-    initialData?.rules?.entry.logic ?? "AND"
+    initialData?.rules?.entry.logic ?? "AND",
   );
   const [errors, setErrors] = useState<string[]>([]);
   const [aiGeneratedData, setAIGeneratedData] = useState<any>(null);
@@ -355,13 +355,15 @@ export function StrategyForm({
     }
   }, [initialData?.rules]);
 
+  const availableTemplates = templates ?? DEFAULT_TEMPLATES;
+
   const templatesMap = useMemo(() => {
     return availableTemplates.reduce<Record<string, StrategyTemplate>>(
       (acc, template) => {
         acc[template.id] = template;
         return acc;
       },
-      {}
+      {},
     );
   }, [availableTemplates]);
 
@@ -382,7 +384,7 @@ export function StrategyForm({
       template.config.entryConditions.map((condition, index) => ({
         id: `${template.id}-${index}`,
         ...condition,
-      }))
+      })),
     );
 
     setExitRules(template.config.exitRules);
@@ -394,7 +396,7 @@ export function StrategyForm({
   const handleFormChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({
@@ -407,17 +409,26 @@ export function StrategyForm({
     setEntryConditions((prev) => [
       ...prev,
       {
-        id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        id:
+          typeof crypto !== "undefined" && crypto.randomUUID
+            ? crypto.randomUUID()
+            : `${Date.now()}-${Math.random()}`,
         ...DEFAULT_ENTRY_CONDITION,
       },
     ]);
   };
 
   const removeCondition = (id: string) => {
-    setEntryConditions((prev) => prev.filter((condition) => condition.id !== id));
+    setEntryConditions((prev) =>
+      prev.filter((condition) => condition.id !== id),
+    );
   };
 
-  const updateCondition = (id: string, field: keyof StrategyCondition, value: any) => {
+  const updateCondition = (
+    id: string,
+    field: keyof StrategyCondition,
+    value: any,
+  ) => {
     setEntryConditions((prev) =>
       prev.map((condition) =>
         condition.id === id
@@ -425,8 +436,8 @@ export function StrategyForm({
               ...condition,
               [field]: value,
             }
-          : condition
-      )
+          : condition,
+      ),
     );
   };
 
@@ -537,8 +548,14 @@ export function StrategyForm({
       });
 
       setExitRules({
-        takeProfit: { type: "pips", value: (data.parameters.takeProfit || 0.004) * 10000 },
-        stopLoss: { type: "pips", value: (data.parameters.stopLoss || 0.002) * 10000 },
+        takeProfit: {
+          type: "pips",
+          value: (data.parameters.takeProfit || 0.004) * 10000,
+        },
+        stopLoss: {
+          type: "pips",
+          value: (data.parameters.stopLoss || 0.002) * 10000,
+        },
         trailing: { enabled: false, distance: 10 },
       });
     }
@@ -573,9 +590,11 @@ export function StrategyForm({
 
     // Smooth scroll to basic information section
     setTimeout(() => {
-      const basicInfoSection = document.getElementById('basic-information-section');
+      const basicInfoSection = document.getElementById(
+        "basic-information-section",
+      );
       if (basicInfoSection) {
-        basicInfoSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        basicInfoSection.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     }, 100);
 
@@ -590,26 +609,29 @@ export function StrategyForm({
       toast.loading("Creating strategy...");
 
       // Prepare conditions from AI data
-      const conditions = aiGeneratedData.rules?.[0]?.conditions?.map((cond: any, index: number) => ({
-        indicator: cond.indicator || "RSI",
-        condition: cond.operator || "greater_than",
-        value: cond.value || null,
-        period: 14,
-      })) || [];
+      const conditions =
+        aiGeneratedData.rules?.[0]?.conditions?.map(
+          (cond: any, index: number) => ({
+            indicator: cond.indicator || "RSI",
+            condition: cond.operator || "greater_than",
+            value: cond.value || null,
+            period: 14,
+          }),
+        ) || [];
 
       // Extract parameters from rules structure if available
       const rulesData = aiGeneratedData.rules as any;
       const params = rulesData?.parameters || {};
-      
+
       // Prepare exit rules
       const exitRulesFromAI = {
-        takeProfit: { 
-          type: "pips" as const, 
-          value: Math.round((params?.takeProfit || 0.004) * 10000) 
+        takeProfit: {
+          type: "pips" as const,
+          value: Math.round((params?.takeProfit || 0.004) * 10000),
         },
-        stopLoss: { 
-          type: "pips" as const, 
-          value: Math.round((params?.stopLoss || 0.002) * 10000) 
+        stopLoss: {
+          type: "pips" as const,
+          value: Math.round((params?.stopLoss || 0.002) * 10000),
         },
         trailing: { enabled: false, distance: 10 },
       };
@@ -641,12 +663,11 @@ export function StrategyForm({
       };
 
       await onSubmit(payload);
-      
+
       // Hide preview on success
       setShowAIPreview(false);
       toast.dismiss();
       toast.success("Strategy created successfully! Ready for backtest.");
-      
     } catch (error) {
       toast.dismiss();
       if (error instanceof Error) {
@@ -673,9 +694,7 @@ export function StrategyForm({
             )}
             <h1 className="text-3xl font-bold text-neutral-900">{title}</h1>
           </div>
-          {subtitle && (
-            <p className="text-neutral-600">{subtitle}</p>
-          )}
+          {subtitle && <p className="text-neutral-600">{subtitle}</p>}
         </div>
 
         {showModeToggle && (
@@ -733,7 +752,9 @@ export function StrategyForm({
           <CardHeader className="flex flex-row items-start gap-3 border-none pb-2">
             <AlertCircle className="h-5 w-5 text-red-600" />
             <div>
-              <CardTitle className="text-red-700">Please review the following</CardTitle>
+              <CardTitle className="text-red-700">
+                Please review the following
+              </CardTitle>
               <CardDescription className="text-red-600">
                 These issues must be resolved before continuing
               </CardDescription>
@@ -769,7 +790,7 @@ export function StrategyForm({
                     "rounded-lg border-2 p-4 transition-all",
                     selectedTemplate === template.id
                       ? "border-primary-500 shadow-md"
-                      : "border-neutral-200 hover:border-primary-200 hover:shadow"
+                      : "border-neutral-200 hover:border-primary-200 hover:shadow",
                   )}
                 >
                   <div className="flex items-start gap-3">
@@ -779,8 +800,8 @@ export function StrategyForm({
                         template.difficulty === "beginner"
                           ? "bg-green-100 text-green-600"
                           : template.difficulty === "intermediate"
-                          ? "bg-yellow-100 text-yellow-600"
-                          : "bg-red-100 text-red-600"
+                            ? "bg-yellow-100 text-yellow-600"
+                            : "bg-red-100 text-red-600",
                       )}
                     >
                       {template.icon}
@@ -798,8 +819,8 @@ export function StrategyForm({
                           template.difficulty === "beginner"
                             ? "bg-green-100 text-green-700"
                             : template.difficulty === "intermediate"
-                            ? "bg-yellow-100 text-yellow-700"
-                            : "bg-red-100 text-red-700"
+                              ? "bg-yellow-100 text-yellow-700"
+                              : "bg-red-100 text-red-700",
                         )}
                       >
                         {template.difficulty}
@@ -816,8 +837,8 @@ export function StrategyForm({
                 <div className="space-y-1 text-sm text-blue-900">
                   <p className="font-medium">Need inspiration?</p>
                   <p>
-                    Each template comes with preconfigured risk management and exit rules.
-                    Customize them after selecting a template.
+                    Each template comes with preconfigured risk management and
+                    exit rules. Customize them after selecting a template.
                   </p>
                 </div>
               </div>
@@ -838,11 +859,15 @@ export function StrategyForm({
         />
       )}
 
-      <Card id="basic-information-section" className={highlightFields ? "ai-highlighted-section" : ""}>
+      <Card
+        id="basic-information-section"
+        className={highlightFields ? "ai-highlighted-section" : ""}
+      >
         <CardHeader className="border-none pb-0">
           <CardTitle>Basic Information</CardTitle>
           <CardDescription>
-            Describe your strategy and select the market conditions where it operates
+            Describe your strategy and select the market conditions where it
+            operates
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -938,7 +963,12 @@ export function StrategyForm({
               Define the indicators and thresholds that trigger your entries
             </CardDescription>
           </div>
-          <Button type="button" variant="secondary" size="sm" onClick={addCondition}>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={addCondition}
+          >
             <Plus className="h-4 w-4" /> Add Condition
           </Button>
         </CardHeader>
@@ -972,7 +1002,9 @@ export function StrategyForm({
           {entryConditions.length === 0 ? (
             <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-neutral-300 p-8 text-center text-neutral-600">
               <HelpCircle className="h-6 w-6" />
-              <p className="text-sm">No conditions yet. Add your first condition to begin.</p>
+              <p className="text-sm">
+                No conditions yet. Add your first condition to begin.
+              </p>
               <Button type="button" size="sm" onClick={addCondition}>
                 <Plus className="h-4 w-4" /> Add Condition
               </Button>
@@ -987,7 +1019,11 @@ export function StrategyForm({
                   <select
                     value={condition.indicator}
                     onChange={(event) =>
-                      updateCondition(condition.id, "indicator", event.target.value)
+                      updateCondition(
+                        condition.id,
+                        "indicator",
+                        event.target.value,
+                      )
                     }
                     className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 sm:w-48"
                   >
@@ -1001,7 +1037,11 @@ export function StrategyForm({
                   <select
                     value={condition.condition}
                     onChange={(event) =>
-                      updateCondition(condition.id, "condition", event.target.value)
+                      updateCondition(
+                        condition.id,
+                        "condition",
+                        event.target.value,
+                      )
                     }
                     className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-transparent focus:outline-none focus:ring-2 focus:ring-primary-500 sm:w-48"
                   >
@@ -1019,7 +1059,7 @@ export function StrategyForm({
                       updateCondition(
                         condition.id,
                         "value",
-                        event.target.value ? Number(event.target.value) : null
+                        event.target.value ? Number(event.target.value) : null,
                       )
                     }
                     placeholder="Value"
@@ -1033,7 +1073,9 @@ export function StrategyForm({
                       updateCondition(
                         condition.id,
                         "period",
-                        event.target.value ? Number(event.target.value) : undefined
+                        event.target.value
+                          ? Number(event.target.value)
+                          : undefined,
                       )
                     }
                     placeholder="Period"
@@ -1213,8 +1255,8 @@ export function StrategyForm({
                 <div className="space-y-1">
                   <p className="font-medium">Smart tip</p>
                   <p>
-                    Keep your max daily loss under 2% of your account balance to follow
-                    professional risk management rules.
+                    Keep your max daily loss under 2% of your account balance to
+                    follow professional risk management rules.
                   </p>
                 </div>
               </div>
