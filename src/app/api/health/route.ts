@@ -9,13 +9,16 @@
  * - System resource usage
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { alertSystem } from '@/lib/monitoring/alert-system';
-import { captureEnhancedError, ErrorCategory } from '@/lib/monitoring/sentry';
+import { NextRequest, NextResponse } from "next/server";
+
+// Force dynamic rendering for this route
+export const dynamic = "force-dynamic";
+import { alertSystem } from "@/lib/monitoring/alert-system";
+import { captureEnhancedError, ErrorCategory } from "@/lib/monitoring/sentry";
 
 // Health check result interface
 interface HealthCheckResult {
-  status: 'healthy' | 'degraded' | 'unhealthy';
+  status: "healthy" | "degraded" | "unhealthy";
   timestamp: string;
   uptime: number;
   version: string;
@@ -64,7 +67,7 @@ interface HealthCheckResult {
 
 // Component status interface
 interface ComponentStatus {
-  status: 'healthy' | 'degraded' | 'unhealthy';
+  status: "healthy" | "degraded" | "unhealthy";
   responseTime?: number;
   lastCheck: string;
   error?: string;
@@ -78,20 +81,25 @@ async function checkDatabaseHealth(): Promise<ComponentStatus> {
   try {
     // This would typically check actual database connectivity
     // For now, we'll simulate a database check
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const responseTime = Date.now() - startTime;
 
     return {
-      status: responseTime < 100 ? 'healthy' : responseTime < 500 ? 'degraded' : 'unhealthy',
+      status:
+        responseTime < 100
+          ? "healthy"
+          : responseTime < 500
+            ? "degraded"
+            : "unhealthy",
       responseTime,
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     };
   } catch (error) {
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       lastCheck: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown database error'
+      error: error instanceof Error ? error.message : "Unknown database error",
     };
   }
 }
@@ -103,20 +111,25 @@ async function checkCacheHealth(): Promise<ComponentStatus> {
   try {
     // This would typically check actual cache connectivity
     // For now, we'll simulate a cache check
-    await new Promise(resolve => setTimeout(resolve, 5));
+    await new Promise((resolve) => setTimeout(resolve, 5));
 
     const responseTime = Date.now() - startTime;
 
     return {
-      status: responseTime < 50 ? 'healthy' : responseTime < 200 ? 'degraded' : 'unhealthy',
+      status:
+        responseTime < 50
+          ? "healthy"
+          : responseTime < 200
+            ? "degraded"
+            : "unhealthy",
       responseTime,
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     };
   } catch (error) {
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       lastCheck: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown cache error'
+      error: error instanceof Error ? error.message : "Unknown cache error",
     };
   }
 }
@@ -128,32 +141,42 @@ async function checkWebSocketHealth(): Promise<ComponentStatus> {
   try {
     // This would typically check actual WebSocket connectivity
     // For now, we'll simulate a WebSocket check
-    await new Promise(resolve => setTimeout(resolve, 10));
+    await new Promise((resolve) => setTimeout(resolve, 10));
 
     const responseTime = Date.now() - startTime;
 
     return {
-      status: responseTime < 100 ? 'healthy' : responseTime < 300 ? 'degraded' : 'unhealthy',
+      status:
+        responseTime < 100
+          ? "healthy"
+          : responseTime < 300
+            ? "degraded"
+            : "unhealthy",
       responseTime,
-      lastCheck: new Date().toISOString()
+      lastCheck: new Date().toISOString(),
     };
   } catch (error) {
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       lastCheck: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown WebSocket error'
+      error: error instanceof Error ? error.message : "Unknown WebSocket error",
     };
   }
 }
 
 // Function to check external service connectivity
-async function checkExternalServiceHealth(serviceName: string, url: string): Promise<ComponentStatus> {
+async function checkExternalServiceHealth(
+  serviceName: string,
+  url: string,
+): Promise<ComponentStatus> {
   const startTime = Date.now();
 
   try {
     // This would typically check actual external service connectivity
     // For now, we'll simulate an external service check
-    await new Promise(resolve => setTimeout(resolve, Math.random() * 200 + 50));
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.random() * 200 + 50),
+    );
 
     const responseTime = Date.now() - startTime;
 
@@ -162,31 +185,34 @@ async function checkExternalServiceHealth(serviceName: string, url: string): Pro
 
     return {
       status: isHealthy
-        ? (responseTime < 500 ? 'healthy' : 'degraded')
-        : 'unhealthy',
+        ? responseTime < 500
+          ? "healthy"
+          : "degraded"
+        : "unhealthy",
       responseTime,
       lastCheck: new Date().toISOString(),
       details: {
         url,
-        responseTime
-      }
+        responseTime,
+      },
     };
   } catch (error) {
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       lastCheck: new Date().toISOString(),
-      error: error instanceof Error ? error.message : `Unknown ${serviceName} error`,
+      error:
+        error instanceof Error ? error.message : `Unknown ${serviceName} error`,
       details: {
-        url
-      }
+        url,
+      },
     };
   }
 }
 
 // Function to get system information
-function getSystemInfo(): HealthCheckResult['system'] {
-  const process = require('process');
-  const os = require('os');
+function getSystemInfo(): HealthCheckResult["system"] {
+  const process = require("process");
+  const os = require("os");
 
   return {
     nodeVersion: process.version,
@@ -194,14 +220,14 @@ function getSystemInfo(): HealthCheckResult['system'] {
     arch: os.arch(),
     totalMemory: os.totalmem(),
     freeMemory: os.freemem(),
-    loadAverage: os.loadavg()
+    loadAverage: os.loadavg(),
   };
 }
 
 // Function to get performance metrics (simplified)
-function getPerformanceMetrics(): HealthCheckResult['performance'] {
+function getPerformanceMetrics(): HealthCheckResult["performance"] {
   // Get active alerts
-  const activeAlerts = alertSystem.getActiveAlerts({ severity: ['critical'] });
+  const activeAlerts = alertSystem.getActiveAlerts({ severity: ["critical"] });
 
   return {
     responseTime: 0, // Would need basic timing implementation
@@ -209,51 +235,51 @@ function getPerformanceMetrics(): HealthCheckResult['performance'] {
     cpuUsage: 0, // Would need basic CPU tracking
     activeConnections: 0, // Would be tracked by WebSocket server
     requestsPerSecond: 0, // Would be tracked by API server
-    errorRate: activeAlerts.length > 0 ? 5 : 0 // Simplified calculation
+    errorRate: activeAlerts.length > 0 ? 5 : 0, // Simplified calculation
   };
 }
 
 // Function to get business metrics (simplified)
-function getBusinessMetrics(): HealthCheckResult['business'] {
+function getBusinessMetrics(): HealthCheckResult["business"] {
   const activeAlerts = alertSystem.getActiveAlerts();
 
   return {
     activeUsers: 0, // Would need basic user tracking
     activeStrategies: 0, // Would need basic strategy tracking
     processingQueue: 0, // Would be tracked by queue system
-    recentAlerts: activeAlerts.length
+    recentAlerts: activeAlerts.length,
   };
 }
 
 // Function to determine overall health status
 function determineOverallHealth(
-  components: HealthCheckResult['components'],
-  performance: HealthCheckResult['performance']
-): 'healthy' | 'degraded' | 'unhealthy' {
+  components: HealthCheckResult["components"],
+  performance: HealthCheckResult["performance"],
+): "healthy" | "degraded" | "unhealthy" {
   // Check for any unhealthy components
-  const hasUnhealthy = Object.values(components).some(component =>
-    component.status === 'unhealthy'
+  const hasUnhealthy = Object.values(components).some(
+    (component) => component.status === "unhealthy",
   );
 
   if (hasUnhealthy) {
-    return 'unhealthy';
+    return "unhealthy";
   }
 
   // Check for any degraded components
-  const hasDegraded = Object.values(components).some(component =>
-    component.status === 'degraded'
+  const hasDegraded = Object.values(components).some(
+    (component) => component.status === "degraded",
   );
 
   if (hasDegraded) {
-    return 'degraded';
+    return "degraded";
   }
 
   // Check performance metrics
   if (performance.errorRate > 5 || performance.responseTime > 1000) {
-    return 'degraded';
+    return "degraded";
   }
 
-  return 'healthy';
+  return "healthy";
 }
 
 // Main health check handler
@@ -262,29 +288,29 @@ export async function GET(request: NextRequest) {
 
   try {
     // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const detailed = searchParams.get('detailed') === 'true';
-    const component = searchParams.get('component');
+    const searchParams = request.nextUrl.searchParams;
+    const detailed = searchParams.get("detailed") === "true";
+    const component = searchParams.get("component");
 
     // Check component-specific health if requested
     if (component) {
       switch (component) {
-        case 'database':
+        case "database":
           const dbHealth = await checkDatabaseHealth();
           return NextResponse.json(dbHealth);
 
-        case 'cache':
+        case "cache":
           const cacheHealth = await checkCacheHealth();
           return NextResponse.json(cacheHealth);
 
-        case 'websocket':
+        case "websocket":
           const wsHealth = await checkWebSocketHealth();
           return NextResponse.json(wsHealth);
 
         default:
           return NextResponse.json(
             { error: `Unknown component: ${component}` },
-            { status: 400 }
+            { status: 400 },
           );
       }
     }
@@ -292,25 +318,30 @@ export async function GET(request: NextRequest) {
     // Check all components
     const apiResponseTime = Date.now() - startTime;
 
-    const components: HealthCheckResult['components'] = {
+    const components: HealthCheckResult["components"] = {
       api: {
-        status: apiResponseTime < 100 ? 'healthy' : apiResponseTime < 500 ? 'degraded' : 'unhealthy',
+        status:
+          apiResponseTime < 100
+            ? "healthy"
+            : apiResponseTime < 500
+              ? "degraded"
+              : "unhealthy",
         responseTime: apiResponseTime,
-        lastCheck: new Date().toISOString()
+        lastCheck: new Date().toISOString(),
       },
       database: await checkDatabaseHealth(),
       cache: await checkCacheHealth(),
       websocket: await checkWebSocketHealth(),
       externalServices: {
-        'twelve-data': await checkExternalServiceHealth(
-          'twelve-data',
-          'https://api.twelvedata.com'
+        "twelve-data": await checkExternalServiceHealth(
+          "twelve-data",
+          "https://api.twelvedata.com",
         ),
-        'broker-api': await checkExternalServiceHealth(
-          'broker-api',
-          'https://api.broker.com'
-        )
-      }
+        "broker-api": await checkExternalServiceHealth(
+          "broker-api",
+          "https://api.broker.com",
+        ),
+      },
     };
 
     // Get metrics
@@ -326,12 +357,12 @@ export async function GET(request: NextRequest) {
       status,
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      version: process.env.APP_VERSION || '1.0.0',
-      environment: process.env.NODE_ENV || 'development',
+      version: process.env.APP_VERSION || "1.0.0",
+      environment: process.env.NODE_ENV || "development",
       components,
       performance,
       business,
-      system
+      system,
     };
 
     // Add detailed information if requested
@@ -345,67 +376,70 @@ export async function GET(request: NextRequest) {
 
         // Add infrastructure metrics
         infrastructure: {
-          server: { // Simplified - would need basic resource monitoring
+          server: {
+            // Simplified - would need basic resource monitoring
             cpuUsage: 0,
             memoryUsage: 0,
-            diskUsage: 0
+            diskUsage: 0,
           },
-          database: { // Simplified - would need basic database monitoring
+          database: {
+            // Simplified - would need basic database monitoring
             connections: 0,
-            queryTime: 0
-          }
-        }
+            queryTime: 0,
+          },
+        },
       };
     }
 
     // Set appropriate status code based on health
-    const statusCode = status === 'healthy' ? 200 : status === 'degraded' ? 200 : 503;
+    const statusCode =
+      status === "healthy" ? 200 : status === "degraded" ? 200 : 503;
 
     // Log health check - simplified
     console.log(
       `Health check completed: ${status}`,
       {
-        service: 'health-api'
+        service: "health-api",
       },
       {
         responseTime: Date.now() - startTime,
         status,
-        componentCount: Object.keys(components).length
-      }
+        componentCount: Object.keys(components).length,
+      },
     );
 
     return NextResponse.json(healthCheckResult, { status: statusCode });
   } catch (error) {
     // Log error - simplified
     console.error(
-      'Health check failed',
-      error instanceof Error ? error : new Error('Unknown error'),
+      "Health check failed",
+      error instanceof Error ? error : new Error("Unknown error"),
       {
-        service: 'health-api',
-        responseTime: Date.now() - startTime
-      }
+        service: "health-api",
+        responseTime: Date.now() - startTime,
+      },
     );
 
     // Send to Sentry
     captureEnhancedError(
-      error instanceof Error ? error : new Error('Health check failed'),
+      error instanceof Error ? error : new Error("Health check failed"),
       {
-        component: 'HealthAPI',
-        action: 'health_check',
-        route: '/api/health',
+        component: "HealthAPI",
+        action: "health_check",
+        route: "/api/health",
         additionalData: {
-          responseTime: Date.now() - startTime
-        }
-      }
+          responseTime: Date.now() - startTime,
+        },
+      },
     );
 
     return NextResponse.json(
       {
-        status: 'unhealthy',
+        status: "unhealthy",
         timestamp: new Date().toISOString(),
-        error: error instanceof Error ? error.message : 'Unknown error'
+        error: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 503 }
+      { status: 503 },
     );
   }
 }
@@ -416,7 +450,7 @@ export async function HEAD() {
     // Quick health check without detailed metrics
     const dbHealth = await checkDatabaseHealth();
 
-    if (dbHealth.status === 'unhealthy') {
+    if (dbHealth.status === "unhealthy") {
       return new NextResponse(null, { status: 503 });
     }
 
