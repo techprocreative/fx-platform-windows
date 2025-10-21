@@ -1,9 +1,9 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   ArrowLeft,
   Calendar,
@@ -15,10 +15,10 @@ import {
   Clock,
   Target,
   Percent,
-} from 'lucide-react';
+} from "lucide-react";
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/Card";
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 
 interface BacktestResult {
   id: string;
@@ -30,7 +30,7 @@ interface BacktestResult {
     timeframe: string;
     rules: any;
   };
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   dateFrom: string;
   dateTo: string;
   initialBalance: number;
@@ -77,10 +77,10 @@ export default function BacktestDetailPage({
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
+    if (status === "unauthenticated") {
+      router.replace("/login");
     }
-    if (status === 'authenticated') {
+    if (status === "authenticated") {
       fetchBacktest();
     }
   }, [status, params.id]);
@@ -88,26 +88,26 @@ export default function BacktestDetailPage({
   const fetchBacktest = async () => {
     try {
       const response = await fetch(`/api/backtest/${params.id}`);
-      
+
       if (response.status === 401) {
-        router.replace('/login');
+        router.replace("/login");
         return;
       }
 
       if (!response.ok) {
-        throw new Error('Failed to fetch backtest');
+        throw new Error("Failed to fetch backtest");
       }
 
       const data = await response.json();
       setBacktest(data);
     } catch (error) {
-      console.error('Error fetching backtest:', error);
+      console.error("Error fetching backtest:", error);
     } finally {
       setLoading(false);
     }
   };
 
-  if (status === 'loading' || loading) {
+  if (status === "loading" || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <LoadingSpinner size="lg" />
@@ -119,7 +119,9 @@ export default function BacktestDetailPage({
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-neutral-900">Backtest not found</h2>
+          <h2 className="text-2xl font-bold text-neutral-900">
+            Backtest not found
+          </h2>
           <Link
             href="/dashboard/backtest"
             className="mt-4 inline-flex items-center gap-2 text-primary-600 hover:text-primary-700"
@@ -132,7 +134,7 @@ export default function BacktestDetailPage({
     );
   }
 
-  const isCompleted = backtest.status === 'completed';
+  const isCompleted = backtest.status === "completed";
   const results = backtest.results;
 
   return (
@@ -148,26 +150,36 @@ export default function BacktestDetailPage({
         </Link>
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-neutral-900">
-              {backtest.strategy.name}
-            </h1>
-            <p className="text-neutral-600 mt-1">
+            <div className="flex items-center gap-3 mb-1">
+              <h1 className="text-3xl font-bold text-neutral-900">
+                {backtest.strategy.name}
+              </h1>
+              <Link
+                href={`/dashboard/strategies/${backtest.strategyId}`}
+                className="inline-flex items-center gap-1 px-3 py-1 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+              >
+                <TrendingUp className="w-4 h-4" />
+                View Strategy
+              </Link>
+            </div>
+            <p className="text-neutral-600">
               {backtest.strategy.symbol} • {backtest.strategy.timeframe}
             </p>
           </div>
           <div>
             <span
               className={`px-3 py-1 rounded-full text-sm font-medium ${
-                backtest.status === 'completed'
-                  ? 'bg-green-100 text-green-800'
-                  : backtest.status === 'running'
-                  ? 'bg-blue-100 text-blue-800'
-                  : backtest.status === 'failed'
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-neutral-100 text-neutral-800'
+                backtest.status === "completed"
+                  ? "bg-green-100 text-green-800"
+                  : backtest.status === "running"
+                    ? "bg-blue-100 text-blue-800"
+                    : backtest.status === "failed"
+                      ? "bg-red-100 text-red-800"
+                      : "bg-neutral-100 text-neutral-800"
               }`}
             >
-              {backtest.status.charAt(0).toUpperCase() + backtest.status.slice(1)}
+              {backtest.status.charAt(0).toUpperCase() +
+                backtest.status.slice(1)}
             </span>
           </div>
         </div>
@@ -182,7 +194,7 @@ export default function BacktestDetailPage({
               <div>
                 <p className="text-sm text-neutral-600">Test Period</p>
                 <p className="text-lg font-semibold text-neutral-900">
-                  {new Date(backtest.dateFrom).toLocaleDateString()} -{' '}
+                  {new Date(backtest.dateFrom).toLocaleDateString()} -{" "}
                   {new Date(backtest.dateTo).toLocaleDateString()}
                 </p>
               </div>
@@ -213,7 +225,7 @@ export default function BacktestDetailPage({
                 <p className="text-lg font-semibold text-neutral-900">
                   {backtest.completedAt
                     ? new Date(backtest.completedAt).toLocaleDateString()
-                    : 'In Progress'}
+                    : "In Progress"}
                 </p>
               </div>
             </div>
@@ -333,7 +345,7 @@ export default function BacktestDetailPage({
                   <div className="flex justify-between items-center py-2 border-b border-neutral-100">
                     <span className="text-neutral-600">Sharpe Ratio</span>
                     <span className="font-semibold text-neutral-900">
-                      {results.sharpeRatio?.toFixed(2) || 'N/A'}
+                      {results.sharpeRatio?.toFixed(2) || "N/A"}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-neutral-100">
@@ -351,7 +363,9 @@ export default function BacktestDetailPage({
           {results.trades && results.trades.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Trade History ({results.trades.length} trades)</CardTitle>
+                <CardTitle>
+                  Trade History ({results.trades.length} trades)
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -387,9 +401,9 @@ export default function BacktestDetailPage({
                           <td className="py-3 px-4">
                             <span
                               className={`px-2 py-1 rounded text-xs font-medium ${
-                                trade.type === 'BUY'
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
+                                trade.type === "BUY"
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-red-100 text-red-800"
                               }`}
                             >
                               {trade.type}
@@ -412,7 +426,9 @@ export default function BacktestDetailPage({
                           </td>
                           <td
                             className={`py-3 px-4 text-right font-semibold ${
-                              trade.profit >= 0 ? 'text-green-600' : 'text-red-600'
+                              trade.profit >= 0
+                                ? "text-green-600"
+                                : "text-red-600"
                             }`}
                           >
                             ${trade.profit.toFixed(2)}
@@ -431,12 +447,14 @@ export default function BacktestDetailPage({
           <CardContent className="py-12 text-center">
             <Activity className="w-12 h-12 text-neutral-400 mx-auto mb-4" />
             <h3 className="text-lg font-semibold text-neutral-900 mb-2">
-              {backtest.status === 'running' ? 'Backtest in Progress' : 'No Results Available'}
+              {backtest.status === "running"
+                ? "Backtest in Progress"
+                : "No Results Available"}
             </h3>
             <p className="text-neutral-600">
-              {backtest.status === 'running'
-                ? 'Please wait while the backtest is being executed...'
-                : 'Results will appear here once the backtest is completed.'}
+              {backtest.status === "running"
+                ? "Please wait while the backtest is being executed..."
+                : "Results will appear here once the backtest is completed."}
             </p>
           </CardContent>
         </Card>

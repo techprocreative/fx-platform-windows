@@ -1,6 +1,6 @@
 /**
  * Risk Management System Types
- * 
+ *
  * This file contains all the type definitions for the Risk Management System,
  * including interfaces for risk parameters, validation results, and trade parameters.
  */
@@ -49,13 +49,18 @@ export interface RiskExposure {
 
 export interface RiskViolation {
   /** Type of risk limit violation */
-  type: 'MAX_DAILY_LOSS' | 'MAX_DRAWDOWN' | 'MAX_POSITIONS' | 'MAX_RISK_EXPOSURE' | 'MAX_LEVERAGE';
+  type:
+    | "MAX_DAILY_LOSS"
+    | "MAX_DRAWDOWN"
+    | "MAX_POSITIONS"
+    | "MAX_RISK_EXPOSURE"
+    | "MAX_LEVERAGE";
   /** Current value that triggered the violation */
   currentValue: number;
   /** Limit that was exceeded */
   limit: number;
   /** Severity of the violation */
-  severity: 'WARNING' | 'CRITICAL' | 'EMERGENCY';
+  severity: "WARNING" | "CRITICAL" | "EMERGENCY";
   /** Description of the violation */
   message: string;
 }
@@ -75,7 +80,7 @@ export interface TradeParams {
   /** Trading symbol (e.g., 'EURUSD') */
   symbol: string;
   /** Trade type: BUY or SELL */
-  type: 'BUY' | 'SELL';
+  type: "BUY" | "SELL";
   /** Requested lot size */
   lotSize: number;
   /** Entry price */
@@ -100,7 +105,7 @@ export interface Position {
   /** Trading symbol */
   symbol: string;
   /** Trade type: BUY or SELL */
-  type: 'BUY' | 'SELL';
+  type: "BUY" | "SELL";
   /** Position size in lots */
   lotSize: number;
   /** Opening price */
@@ -149,6 +154,26 @@ export interface AccountInfo {
   marginLevel: number;
   /** Account leverage */
   leverage: number;
+  /** Current profit/loss */
+  profit?: number;
+  /** Number of open positions */
+  openPositions?: number;
+  /** Account number */
+  accountNumber?: string;
+  /** Account type */
+  accountType?: string;
+  /** Account currency */
+  currency?: string;
+  /** Server name */
+  server?: string;
+  /** Company name */
+  company?: string;
+  /** Account name */
+  name?: string;
+  /** Whether trading is allowed */
+  tradeAllowed?: boolean;
+  /** Whether expert advisors are allowed */
+  tradeExpertAllowed?: boolean;
 }
 
 export interface SymbolInfo {

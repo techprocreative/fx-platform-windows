@@ -1,18 +1,18 @@
-'use client';
+"use client";
 
-import React, { useState, useEffect } from 'react';
-import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { 
-  TrendingUp, 
-  TrendingDown, 
+import React, { useState, useEffect } from "react";
+import { Card } from "@/components/ui/Card";
+import { Button } from "@/components/ui/Button";
+import {
+  TrendingUp,
+  TrendingDown,
   DollarSign,
   AlertTriangle,
   Settings,
   Info,
-  Calculator
-} from 'lucide-react';
-import { TradeParams, AccountInfo, SymbolInfo } from '@/lib/risk/types';
+  Calculator,
+} from "lucide-react";
+import { TradeParams, AccountInfo, SymbolInfo } from "@/lib/risk/types";
 
 interface TradingPanelProps {
   accountInfo?: AccountInfo;
@@ -26,60 +26,92 @@ export function TradingPanel({
   accountInfo,
   symbolInfo,
   onTrade,
-  symbols = ['EURUSD', 'GBPUSD', 'USDJPY', 'AUDUSD', 'USDCAD'],
-  className = ''
+  symbols = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD"],
+  className = "",
 }: TradingPanelProps) {
   const [selectedSymbol, setSelectedSymbol] = useState(symbols[0]);
-  const [tradeType, setTradeType] = useState<'BUY' | 'SELL'>('BUY');
+  const [tradeType, setTradeType] = useState<"BUY" | "SELL">("BUY");
   const [lotSize, setLotSize] = useState(0.01);
   const [stopLoss, setStopLoss] = useState<number | undefined>();
   const [takeProfit, setTakeProfit] = useState<number | undefined>();
-  const [currentPrice, setCurrentPrice] = useState({ bid: 1.0850, ask: 1.0852 });
+  const [currentPrice, setCurrentPrice] = useState({ bid: 1.085, ask: 1.0852 });
   const [riskPercent, setRiskPercent] = useState(2);
   const [calculatedLotSize, setCalculatedLotSize] = useState(0.01);
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
+  const [priceLoading, setPriceLoading] = useState(false);
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
 
-  // Simulate real-time price updates
+  // Fetch real-time price updates
   useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentPrice(prev => ({
-        bid: prev.bid + (Math.random() - 0.5) * 0.0001,
-        ask: prev.ask + (Math.random() - 0.5) * 0.0001
-      }));
-    }, 1500);
+    const fetchPrices = async () => {
+      if (!selectedSymbol) return;
+
+      setPriceLoading(true);
+      try {
+        const response = await fetch(
+          `/api/market/quotes?symbols=${selectedSymbol}`,
+        );
+        const data = await response.json();
+
+        if (data.success && data.data && data.data.length > 0) {
+          const quote = data.data[0];
+          setCurrentPrice({
+            bid: quote.bid,
+            ask: quote.ask,
+          });
+          setLastPriceUpdate(new Date());
+        }
+      } catch (error) {
+        console.error("Failed to fetch real-time prices:", error);
+        // Keep existing prices on error
+      } finally {
+        setPriceLoading(false);
+      }
+    };
+
+    // Initial fetch
+    fetchPrices();
+
+    // Set up real-time updates every 2 seconds
+    const interval = setInterval(fetchPrices, 2000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [selectedSymbol]);
 
   // Calculate position size based on risk
   useEffect(() => {
     if (accountInfo && stopLoss) {
-      const entryPrice = tradeType === 'BUY' ? currentPrice.ask : currentPrice.bid;
+      const entryPrice =
+        tradeType === "BUY" ? currentPrice.ask : currentPrice.bid;
       const stopLossDistance = Math.abs(entryPrice - stopLoss);
       const riskAmount = accountInfo.balance * (riskPercent / 100);
       const pipValue = 10; // Simplified pip value for standard lot
-      const calculatedSize = riskAmount / (stopLossDistance * 100000 * pipValue / entryPrice);
-      setCalculatedLotSize(Math.max(0.01, Math.min(calculatedSize, symbolInfo?.maxLot || 1.0)));
+      const calculatedSize =
+        riskAmount / ((stopLossDistance * 100000 * pipValue) / entryPrice);
+      setCalculatedLotSize(
+        Math.max(0.01, Math.min(calculatedSize, symbolInfo?.maxLot || 1.0)),
+      );
     }
   }, [accountInfo, stopLoss, riskPercent, tradeType, currentPrice, symbolInfo]);
 
   const handleTrade = async () => {
     if (!onTrade) return;
-    
+
     setIsExecuting(true);
     try {
-      const entryPrice = tradeType === 'BUY' ? currentPrice.ask : currentPrice.bid;
+      const entryPrice =
+        tradeType === "BUY" ? currentPrice.ask : currentPrice.bid;
       await onTrade({
         symbol: selectedSymbol,
         type: tradeType,
         lotSize,
         entryPrice,
         stopLoss: stopLoss || 0,
-        takeProfit: takeProfit,
-        userId: 'current-user', // This would come from session
-        comment: 'Manual trade'
+        takeProfit,
+        userId: "current-user", // This would come from session
+        comment: "Manual trade",
       });
       setShowConfirmation(false);
       // Reset form
@@ -87,7 +119,7 @@ export function TradingPanel({
       setStopLoss(undefined);
       setTakeProfit(undefined);
     } catch (error) {
-      console.error('Trade failed:', error);
+      console.error("Trade failed:", error);
     } finally {
       setIsExecuting(false);
     }
@@ -95,12 +127,13 @@ export function TradingPanel({
 
   const calculateRiskReward = () => {
     if (!stopLoss || !takeProfit) return { risk: 0, reward: 0, ratio: 0 };
-    
-    const entryPrice = tradeType === 'BUY' ? currentPrice.ask : currentPrice.bid;
+
+    const entryPrice =
+      tradeType === "BUY" ? currentPrice.ask : currentPrice.bid;
     const risk = Math.abs(entryPrice - stopLoss);
     const reward = Math.abs(takeProfit - entryPrice);
     const ratio = risk > 0 ? reward / risk : 0;
-    
+
     return { risk, reward, ratio };
   };
 
@@ -120,10 +153,7 @@ export function TradingPanel({
               <Calculator className="h-4 w-4 mr-1" />
               Calculator
             </Button>
-            <Button
-              variant="secondary"
-              size="sm"
-            >
+            <Button variant="secondary" size="sm">
               <Settings className="h-4 w-4" />
             </Button>
           </div>
@@ -139,8 +169,10 @@ export function TradingPanel({
             onChange={(e) => setSelectedSymbol(e.target.value)}
             className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
-            {symbols.map(symbol => (
-              <option key={symbol} value={symbol}>{symbol}</option>
+            {symbols.map((symbol) => (
+              <option key={symbol} value={symbol}>
+                {symbol}
+              </option>
             ))}
           </select>
         </div>
@@ -149,27 +181,37 @@ export function TradingPanel({
         <div className="grid grid-cols-2 gap-3 mb-4">
           <div className="bg-neutral-50 p-3 rounded-lg">
             <p className="text-xs text-neutral-500 mb-1">Bid</p>
-            <p className="text-lg font-bold text-red-600">{currentPrice.bid.toFixed(5)}</p>
+            <p className="text-lg font-bold text-red-600">
+              {priceLoading ? "..." : currentPrice.bid.toFixed(5)}
+            </p>
           </div>
           <div className="bg-neutral-50 p-3 rounded-lg">
             <p className="text-xs text-neutral-500 mb-1">Ask</p>
-            <p className="text-lg font-bold text-green-600">{currentPrice.ask.toFixed(5)}</p>
+            <p className="text-lg font-bold text-green-600">
+              {priceLoading ? "..." : currentPrice.ask.toFixed(5)}
+            </p>
           </div>
         </div>
+
+        {lastPriceUpdate && (
+          <p className="text-xs text-neutral-500 mb-4">
+            Last updated: {lastPriceUpdate.toLocaleTimeString()}
+          </p>
+        )}
 
         {/* Trade Type Selection */}
         <div className="grid grid-cols-2 gap-3 mb-4">
           <Button
-            variant={tradeType === 'BUY' ? 'primary' : 'secondary'}
-            onClick={() => setTradeType('BUY')}
+            variant={tradeType === "BUY" ? "primary" : "secondary"}
+            onClick={() => setTradeType("BUY")}
             className="flex items-center justify-center gap-2"
           >
             <TrendingUp className="h-4 w-4" />
             BUY
           </Button>
           <Button
-            variant={tradeType === 'SELL' ? 'danger' : 'secondary'}
-            onClick={() => setTradeType('SELL')}
+            variant={tradeType === "SELL" ? "danger" : "secondary"}
+            onClick={() => setTradeType("SELL")}
             className="flex items-center justify-center gap-2"
           >
             <TrendingDown className="h-4 w-4" />
@@ -210,8 +252,10 @@ export function TradingPanel({
             </label>
             <input
               type="number"
-              value={stopLoss || ''}
-              onChange={(e) => setStopLoss(parseFloat(e.target.value) || undefined)}
+              value={stopLoss || ""}
+              onChange={(e) =>
+                setStopLoss(parseFloat(e.target.value) || undefined)
+              }
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="Optional"
               step="0.00001"
@@ -223,8 +267,10 @@ export function TradingPanel({
             </label>
             <input
               type="number"
-              value={takeProfit || ''}
-              onChange={(e) => setTakeProfit(parseFloat(e.target.value) || undefined)}
+              value={takeProfit || ""}
+              onChange={(e) =>
+                setTakeProfit(parseFloat(e.target.value) || undefined)
+              }
               className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
               placeholder="Optional"
               step="0.00001"
@@ -235,8 +281,10 @@ export function TradingPanel({
         {/* Risk Management */}
         {showCalculator && (
           <div className="bg-neutral-50 p-4 rounded-lg mb-4">
-            <h3 className="font-semibold text-neutral-900 mb-3">Risk Management</h3>
-            
+            <h3 className="font-semibold text-neutral-900 mb-3">
+              Risk Management
+            </h3>
+
             <div className="mb-3">
               <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Risk Per Trade (%)
@@ -261,20 +309,28 @@ export function TradingPanel({
               <div className="text-sm space-y-1">
                 <div className="flex justify-between">
                   <span className="text-neutral-600">Account Balance:</span>
-                  <span className="font-medium">${accountInfo.balance.toFixed(2)}</span>
+                  <span className="font-medium">
+                    ${accountInfo.balance.toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-600">Risk Amount:</span>
-                  <span className="font-medium">${(accountInfo.balance * riskPercent / 100).toFixed(2)}</span>
+                  <span className="font-medium">
+                    ${((accountInfo.balance * riskPercent) / 100).toFixed(2)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-neutral-600">Calculated Size:</span>
-                  <span className="font-medium">{calculatedLotSize.toFixed(2)} lots</span>
+                  <span className="font-medium">
+                    {calculatedLotSize.toFixed(2)} lots
+                  </span>
                 </div>
                 {ratio > 0 && (
                   <div className="flex justify-between">
                     <span className="text-neutral-600">Risk/Reward:</span>
-                    <span className={`font-medium ${ratio >= 1.5 ? 'text-green-600' : 'text-amber-600'}`}>
+                    <span
+                      className={`font-medium ${ratio >= 1.5 ? "text-green-600" : "text-amber-600"}`}
+                    >
                       1:{ratio.toFixed(2)}
                     </span>
                   </div>
@@ -286,12 +342,12 @@ export function TradingPanel({
 
         {/* Trade Button */}
         <Button
-          variant={tradeType === 'BUY' ? 'primary' : 'danger'}
+          variant={tradeType === "BUY" ? "primary" : "danger"}
           onClick={() => setShowConfirmation(true)}
-          disabled={!accountInfo || isExecuting}
+          disabled={!accountInfo || isExecuting || priceLoading}
           className="w-full py-3 text-base font-semibold"
         >
-          {isExecuting ? 'Executing...' : `Place ${tradeType} Order`}
+          {isExecuting ? "Executing..." : `Place ${tradeType} Order`}
         </Button>
 
         {/* Account Info */}
@@ -308,11 +364,15 @@ export function TradingPanel({
               </div>
               <div>
                 <p className="text-neutral-500">Free Margin</p>
-                <p className="font-medium">${accountInfo.freeMargin.toFixed(2)}</p>
+                <p className="font-medium">
+                  ${accountInfo.freeMargin.toFixed(2)}
+                </p>
               </div>
               <div>
                 <p className="text-neutral-500">Margin Level</p>
-                <p className="font-medium">{accountInfo.marginLevel.toFixed(0)}%</p>
+                <p className="font-medium">
+                  {accountInfo.marginLevel.toFixed(0)}%
+                </p>
               </div>
             </div>
           </div>
@@ -324,7 +384,7 @@ export function TradingPanel({
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Confirm Trade</h3>
-            
+
             <div className="space-y-3 mb-6">
               <div className="flex justify-between">
                 <span className="text-neutral-600">Symbol:</span>
@@ -332,7 +392,9 @@ export function TradingPanel({
               </div>
               <div className="flex justify-between">
                 <span className="text-neutral-600">Type:</span>
-                <span className={`font-medium ${tradeType === 'BUY' ? 'text-green-600' : 'text-red-600'}`}>
+                <span
+                  className={`font-medium ${tradeType === "BUY" ? "text-green-600" : "text-red-600"}`}
+                >
                   {tradeType}
                 </span>
               </div>
@@ -343,7 +405,9 @@ export function TradingPanel({
               <div className="flex justify-between">
                 <span className="text-neutral-600">Entry Price:</span>
                 <span className="font-medium">
-                  {tradeType === 'BUY' ? currentPrice.ask.toFixed(5) : currentPrice.bid.toFixed(5)}
+                  {tradeType === "BUY"
+                    ? currentPrice.ask.toFixed(5)
+                    : currentPrice.bid.toFixed(5)}
                 </span>
               </div>
               {stopLoss && (
@@ -375,12 +439,12 @@ export function TradingPanel({
                 Cancel
               </Button>
               <Button
-                variant={tradeType === 'BUY' ? 'primary' : 'danger'}
+                variant={tradeType === "BUY" ? "primary" : "danger"}
                 onClick={handleTrade}
                 disabled={isExecuting}
                 className="flex-1"
               >
-                {isExecuting ? 'Executing...' : 'Confirm Trade'}
+                {isExecuting ? "Executing..." : "Confirm Trade"}
               </Button>
             </div>
           </div>
