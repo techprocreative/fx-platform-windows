@@ -1,55 +1,63 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { Sparkles, Loader2 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { useState, useEffect } from "react";
+import { Sparkles, Loader2 } from "lucide-react";
+import toast from "react-hot-toast";
 
-import { Button } from '@/components/ui/Button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Button } from "@/components/ui/Button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/Card";
 
 interface AIStrategyGeneratorProps {
-  onGenerate: (data: {
-    name: string;
-    description: string;
-    rules: any;
-  }) => void;
+  onGenerate: (data: { name: string; description: string; rules: any }) => void;
 }
 
 export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
-  const [prompt, setPrompt] = useState('');
+  const [prompt, setPrompt] = useState("");
   const [loading, setLoading] = useState(false);
-  const [usage, setUsage] = useState<{ used: number; remaining: number; dailyLimit: number } | null>(null);
-  
+  const [usage, setUsage] = useState<{
+    used: number;
+    remaining: number;
+    dailyLimit: number;
+  } | null>(null);
+
   // Fixed model - Grok (from OpenRouter)
-  const AI_MODEL = 'x-ai/grok-4-fast';
+  const AI_MODEL = "x-ai/grok-4-fast";
 
   // Load usage info on mount
-  useState(() => {
-    fetch('/api/ai/generate-strategy-preview')
-      .then(res => res.json())
-      .then(data => {
+  useEffect(() => {
+    fetch("/api/ai/generate-strategy-preview")
+      .then((res) => res.json())
+      .then((data) => {
         if (data.usage) setUsage(data.usage);
       })
-      .catch(err => console.error('Failed to load usage info:', err));
-  });
+      .catch((err) => console.error("Failed to load usage info:", err));
+  }, []);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
-      toast.error('Please describe what strategy you want to create');
+      toast.error("Please describe what strategy you want to create");
       return;
     }
 
     if (prompt.length < 10) {
-      toast.error('Please provide a more detailed description (at least 10 characters)');
+      toast.error(
+        "Please provide a more detailed description (at least 10 characters)",
+      );
       return;
     }
 
     setLoading(true);
 
     try {
-      const response = await fetch('/api/ai/generate-strategy-preview', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/ai/generate-strategy-preview", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: prompt.trim(),
           model: AI_MODEL,
@@ -59,12 +67,17 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
       const data = await response.json();
 
       if (!response.ok) {
-        if (data.code === 'LIMIT_REACHED') {
-          toast.error(data.error || 'Daily limit reached');
-        } else if (data.code === 'SERVICE_UNAVAILABLE' || data.code === 'AUTH_ERROR') {
-          toast.error('AI service is temporarily unavailable. Please try again later or contact support.');
+        if (data.code === "LIMIT_REACHED") {
+          toast.error(data.error || "Daily limit reached");
+        } else if (
+          data.code === "SERVICE_UNAVAILABLE" ||
+          data.code === "AUTH_ERROR"
+        ) {
+          toast.error(
+            "AI service is temporarily unavailable. Please try again later or contact support.",
+          );
         } else {
-          toast.error(data.error || 'Failed to generate strategy');
+          toast.error(data.error || "Failed to generate strategy");
         }
         return;
       }
@@ -81,21 +94,21 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
         rules: strategy.rules,
       });
 
-      toast.success('Strategy generated! Review and customize it below.');
-      setPrompt(''); // Clear prompt after successful generation
+      toast.success("Strategy generated! Review and customize it below.");
+      setPrompt(""); // Clear prompt after successful generation
     } catch (error) {
-      console.error('AI Generation error:', error);
-      toast.error('An error occurred while generating strategy');
+      console.error("AI Generation error:", error);
+      toast.error("An error occurred while generating strategy");
     } finally {
       setLoading(false);
     }
   };
 
   const promptExamples = [
-    'Create a scalping strategy using RSI and MACD for EURUSD on 5-minute timeframe',
-    'Build a trend-following strategy with EMA crossover and ADX filter for GBPUSD daily chart',
-    'Generate a breakout strategy using Bollinger Bands with tight risk management',
-    'Create a mean-reversion strategy using RSI oversold/overbought conditions',
+    "Create a scalping strategy using RSI and MACD for EURUSD on 5-minute timeframe",
+    "Build a trend-following strategy with EMA crossover and ADX filter for GBPUSD daily chart",
+    "Generate a breakout strategy using Bollinger Bands with tight risk management",
+    "Create a mean-reversion strategy using RSI oversold/overbought conditions",
   ];
 
   return (
@@ -115,7 +128,9 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-purple-600" />
-              <span className="text-sm font-medium text-neutral-700">Powered by Grok</span>
+              <span className="text-sm font-medium text-neutral-700">
+                Powered by Grok
+              </span>
             </div>
             {usage && (
               <span className="text-sm font-semibold text-purple-600">
@@ -124,7 +139,8 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
             )}
           </div>
           <p className="text-xs text-neutral-500">
-            Using xAI's Grok 4 Fast model for fast and accurate strategy generation
+            Using xAI's Grok 4 Fast model for fast and accurate strategy
+            generation
           </p>
         </div>
 
@@ -145,14 +161,18 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
           <div className="flex items-center justify-between text-xs text-neutral-500">
             <span>{prompt.length}/1000 characters</span>
             {prompt.length < 10 && prompt.length > 0 && (
-              <span className="text-amber-600">Minimum 10 characters required</span>
+              <span className="text-amber-600">
+                Minimum 10 characters required
+              </span>
             )}
           </div>
         </div>
 
         {/* Example Prompts */}
         <div className="space-y-2">
-          <p className="text-sm font-medium text-neutral-700">Example Prompts:</p>
+          <p className="text-sm font-medium text-neutral-700">
+            Example Prompts:
+          </p>
           <div className="grid gap-2">
             {promptExamples.map((example, index) => (
               <button
@@ -172,7 +192,12 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
         <Button
           type="button"
           onClick={handleGenerate}
-          disabled={loading || prompt.length < 10 || (usage && usage.remaining === 0) || false}
+          disabled={
+            loading ||
+            prompt.length < 10 ||
+            (usage && usage.remaining === 0) ||
+            false
+          }
           className="w-full bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
           size="lg"
         >
