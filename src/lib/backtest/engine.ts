@@ -696,23 +696,27 @@ export class BacktestEngine {
     // Use symbol-specific pip configuration
     const pipValue = this.pipConfig.pipMultiplier;
     let profit = 0;
+    let pips = 0;
 
     if (position.type === "buy") {
       profit = ((price - position.openPrice) / pipValue) * position.size * 10;
+      pips = (price - position.openPrice) / pipValue;
     } else {
       profit = ((position.openPrice - price) / pipValue) * position.size * 10;
+      pips = (position.openPrice - price) / pipValue;
     }
 
     this.balance += profit;
 
     this.trades.push({
-      type: position.type,
+      type: position.type.toUpperCase(),
       size: position.size,
-      openPrice: position.openPrice,
-      closePrice: price,
-      openTime: position.openTime,
-      closeTime: timestamp,
+      entryPrice: position.openPrice,
+      exitPrice: price,
+      entryTime: position.openTime.toISOString(),
+      exitTime: timestamp.toISOString(),
       profit,
+      pips,
       duration: timestamp.getTime() - position.openTime.getTime(),
     });
   }
@@ -788,7 +792,7 @@ export class BacktestEngine {
   private closePositionWithReason(
     price: number,
     timestamp: Date,
-    reason: string = "Manual",
+    reason: string,
   ): void {
     if (this.positions.length === 0) return;
 
@@ -798,23 +802,27 @@ export class BacktestEngine {
     // Use symbol-specific pip configuration
     const pipValue = this.pipConfig.pipMultiplier;
     let profit = 0;
+    let pips = 0;
 
     if (position.type === "buy") {
       profit = ((price - position.openPrice) / pipValue) * position.size * 10;
+      pips = (price - position.openPrice) / pipValue;
     } else {
       profit = ((position.openPrice - price) / pipValue) * position.size * 10;
+      pips = (position.openPrice - price) / pipValue;
     }
 
     this.balance += profit;
 
     this.trades.push({
-      type: position.type,
+      type: position.type.toUpperCase(),
       size: position.size,
-      openPrice: position.openPrice,
-      closePrice: price,
-      openTime: position.openTime,
-      closeTime: timestamp,
+      entryPrice: position.openPrice,
+      exitPrice: price,
+      entryTime: position.openTime.toISOString(),
+      exitTime: timestamp.toISOString(),
       profit,
+      pips,
       duration: timestamp.getTime() - position.openTime.getTime(),
       closeReason: reason,
     });

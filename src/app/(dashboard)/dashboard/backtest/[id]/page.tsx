@@ -416,22 +416,22 @@ export default function BacktestDetailPage({
                             {new Date(trade.exitTime).toLocaleString()}
                           </td>
                           <td className="py-3 px-4 text-right text-neutral-900">
-                            {trade.entryPrice.toFixed(5)}
+                            {trade.entryPrice?.toFixed(5) || "N/A"}
                           </td>
                           <td className="py-3 px-4 text-right text-neutral-900">
-                            {trade.exitPrice.toFixed(5)}
+                            {trade.exitPrice?.toFixed(5) || "N/A"}
                           </td>
                           <td className="py-3 px-4 text-right text-neutral-900">
-                            {trade.pips.toFixed(1)}
+                            {trade.pips?.toFixed(1) || "N/A"}
                           </td>
                           <td
                             className={`py-3 px-4 text-right font-semibold ${
-                              trade.profit >= 0
+                              (trade.profit || 0) >= 0
                                 ? "text-green-600"
                                 : "text-red-600"
                             }`}
                           >
-                            ${trade.profit.toFixed(2)}
+                            ${trade.profit?.toFixed(2) || "0.00"}
                           </td>
                         </tr>
                       ))}
