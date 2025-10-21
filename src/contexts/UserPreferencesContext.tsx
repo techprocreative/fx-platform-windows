@@ -231,11 +231,6 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Prevent hydration mismatch by not rendering until mounted
-  if (!mounted) {
-    return <div style={{ visibility: "hidden" }}>{children}</div>;
-  }
-
   const value: UserPreferencesContextType = {
     preferences,
     updatePreferences,
@@ -248,7 +243,9 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
 
   return (
     <UserPreferencesContext.Provider value={value}>
-      {children}
+      <div style={{ visibility: mounted ? "visible" : "hidden" }}>
+        {children}
+      </div>
     </UserPreferencesContext.Provider>
   );
 }

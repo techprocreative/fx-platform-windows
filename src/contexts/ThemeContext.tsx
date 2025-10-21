@@ -107,16 +107,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Prevent flash of incorrect theme and hydration mismatch
-  if (!mounted) {
-    return <div style={{ visibility: "hidden" }}>{children}</div>;
-  }
-
   return (
     <ThemeContext.Provider
       value={{ theme, setTheme, resolvedTheme, toggleTheme }}
     >
-      {children}
+      <div style={{ visibility: mounted ? "visible" : "hidden" }}>
+        {children}
+      </div>
     </ThemeContext.Provider>
   );
 }
