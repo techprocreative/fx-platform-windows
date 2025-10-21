@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { SessionProvider } from 'next-auth/react';
-import { Toaster } from 'react-hot-toast';
-import { ThemeProvider } from '@/contexts/ThemeContext';
-import { HelpProvider } from '@/contexts/HelpContext';
-import { UserPreferencesProvider } from '@/contexts/UserPreferencesContext';
+import { SessionProvider } from "next-auth/react";
+import { Toaster } from "react-hot-toast";
+import { ThemeProvider } from "@/contexts/ThemeContext";
+import { HelpProvider } from "@/contexts/HelpContext";
+import { UserPreferencesProvider } from "@/contexts/UserPreferencesContext";
 
 export function ClientProvider({ children }: { children: React.ReactNode }) {
   return (
@@ -17,9 +17,9 @@ export function ClientProvider({ children }: { children: React.ReactNode }) {
               position="top-right"
               toastOptions={{
                 style: {
-                  background: 'var(--bg-primary)',
-                  color: 'var(--text-primary)',
-                  border: '1px solid var(--border-primary)',
+                  background: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                  border: "1px solid var(--border-primary)",
                 },
               }}
             />

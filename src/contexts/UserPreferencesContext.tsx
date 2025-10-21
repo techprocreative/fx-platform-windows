@@ -1,6 +1,16 @@
-'use client';
+"use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useCallback,
+} from "react";
+
+// Helper to check if we're on the client side
+const isClient = typeof window !== "undefined";
 
 export interface DashboardLayout {
   sidebarCollapsed: boolean;
@@ -15,16 +25,15 @@ export interface DashboardLayout {
 }
 
 export interface DisplayPreferences {
-  theme: 'light' | 'dark' | 'system';
   language: string;
   timezone: string;
   dateFormat: string;
-  timeFormat: '12h' | '24h';
+  timeFormat: "12h" | "24h";
   currency: string;
   compactMode: boolean;
   showAnimations: boolean;
   highContrast: boolean;
-  fontSize: 'small' | 'medium' | 'large';
+  fontSize: "small" | "medium" | "large";
 }
 
 export interface NotificationPreferences {
@@ -44,7 +53,7 @@ export interface NotificationPreferences {
 }
 
 export interface TradingPreferences {
-  defaultOrderType: 'market' | 'limit' | 'stop';
+  defaultOrderType: "market" | "limit" | "stop";
   defaultTimeframe: string;
   defaultLotSize: number;
   riskPerTrade: number;
@@ -80,16 +89,15 @@ const defaultPreferences: UserPreferences = {
     widgets: [],
   },
   display: {
-    theme: 'system',
-    language: 'en',
-    timezone: 'UTC',
-    dateFormat: 'MM/DD/YYYY',
-    timeFormat: '24h',
-    currency: 'USD',
+    language: "en",
+    timezone: "UTC",
+    dateFormat: "MM/DD/YYYY",
+    timeFormat: "24h",
+    currency: "USD",
     compactMode: false,
     showAnimations: true,
     highContrast: false,
-    fontSize: 'medium',
+    fontSize: "medium",
   },
   notifications: {
     email: true,
@@ -102,35 +110,46 @@ const defaultPreferences: UserPreferences = {
     soundEnabled: true,
     quietHours: {
       enabled: false,
-      start: '22:00',
-      end: '08:00',
+      start: "22:00",
+      end: "08:00",
     },
   },
   trading: {
-    defaultOrderType: 'market',
-    defaultTimeframe: '1h',
+    defaultOrderType: "market",
+    defaultTimeframe: "1h",
     defaultLotSize: 0.01,
     riskPerTrade: 2,
     maxDailyLoss: 100,
     confirmTrades: true,
     autoClosePositions: false,
     slippageTolerance: 5,
-    preferredPairs: ['EURUSD', 'GBPUSD', 'USDJPY'],
+    preferredPairs: ["EURUSD", "GBPUSD", "USDJPY"],
   },
   customSettings: {},
 };
 
-const UserPreferencesContext = createContext<UserPreferencesContextType | undefined>(undefined);
+const UserPreferencesContext = createContext<
+  UserPreferencesContextType | undefined
+>(undefined);
 
 export function UserPreferencesProvider({ children }: { children: ReactNode }) {
-  const [preferences, setPreferences] = useState<UserPreferences>(defaultPreferences);
+  const [preferences, setPreferences] =
+    useState<UserPreferences>(defaultPreferences);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
 
-  // Load preferences from localStorage on mount
+  // Set mounted state on client side
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Load preferences from localStorage on mount (client-side only)
+  useEffect(() => {
+    if (!isClient || !mounted) return;
+
     try {
-      const stored = localStorage.getItem('userPreferences');
+      const stored = localStorage.getItem("userPreferences");
       if (stored) {
         const parsed = JSON.parse(stored);
         // Merge with defaults to ensure all fields exist
@@ -138,54 +157,50 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
         setPreferences(merged);
       }
     } catch (err) {
-      console.error('Failed to load user preferences:', err);
-      setError('Failed to load preferences');
+      console.error("Failed to load user preferences:", err);
+      setError("Failed to load preferences");
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [mounted]);
 
   // Save preferences to localStorage whenever they change
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && isClient && mounted) {
       try {
-        localStorage.setItem('userPreferences', JSON.stringify(preferences));
+        localStorage.setItem("userPreferences", JSON.stringify(preferences));
       } catch (err) {
-        console.error('Failed to save user preferences:', err);
-        setError('Failed to save preferences');
+        console.error("Failed to save user preferences:", err);
+        setError("Failed to save preferences");
       }
     }
-  }, [preferences, isLoading]);
+  }, [preferences, isLoading, mounted]);
 
-  // Apply theme preference
-  useEffect(() => {
-    const { theme } = preferences.display;
-    if (theme === 'system') {
-      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      document.documentElement.setAttribute('data-theme', systemTheme);
-    } else {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-  }, [preferences.display.theme]);
+  // Theme handling is now managed by ThemeContext
+  // This effect is removed to avoid conflicts
 
   // Apply font size preference
   useEffect(() => {
+    if (!isClient || !mounted) return;
+
     const { fontSize } = preferences.display;
-    document.documentElement.setAttribute('data-font-size', fontSize);
-  }, [preferences.display.fontSize]);
+    document.documentElement.setAttribute("data-font-size", fontSize);
+  }, [preferences.display.fontSize, mounted]);
 
   // Apply high contrast preference
   useEffect(() => {
+    if (!isClient || !mounted) return;
+
     const { highContrast } = preferences.display;
     if (highContrast) {
-      document.documentElement.setAttribute('data-high-contrast', 'true');
+      document.documentElement.setAttribute("data-high-contrast", "true");
     } else {
-      document.documentElement.removeAttribute('data-high-contrast');
+      document.documentElement.removeAttribute("data-high-contrast");
     }
-  }, [preferences.display.highContrast]);
+  }, [preferences.display.highContrast, mounted]);
 
   const updatePreferences = useCallback((updates: Partial<UserPreferences>) => {
-    setPreferences(prev => mergePreferences(prev, updates));
+    setPreferences((prev) => mergePreferences(prev, updates));
     setError(null);
   }, []);
 
@@ -198,9 +213,9 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
     try {
       return JSON.stringify(preferences, null, 2);
     } catch (err) {
-      console.error('Failed to export preferences:', err);
-      setError('Failed to export preferences');
-      return '';
+      console.error("Failed to export preferences:", err);
+      setError("Failed to export preferences");
+      return "";
     }
   }, [preferences]);
 
@@ -211,10 +226,15 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
       setPreferences(merged);
       setError(null);
     } catch (err) {
-      console.error('Failed to import preferences:', err);
-      setError('Failed to import preferences: Invalid format');
+      console.error("Failed to import preferences:", err);
+      setError("Failed to import preferences: Invalid format");
     }
   }, []);
+
+  // Prevent hydration mismatch by not rendering until mounted
+  if (!mounted) {
+    return <div style={{ visibility: "hidden" }}>{children}</div>;
+  }
 
   const value: UserPreferencesContextType = {
     preferences,
@@ -236,20 +256,29 @@ export function UserPreferencesProvider({ children }: { children: ReactNode }) {
 export function useUserPreferences() {
   const context = useContext(UserPreferencesContext);
   if (context === undefined) {
-    throw new Error('useUserPreferences must be used within a UserPreferencesProvider');
+    throw new Error(
+      "useUserPreferences must be used within a UserPreferencesProvider",
+    );
   }
   return context;
 }
 
 // Helper function to deeply merge preferences
-function mergePreferences(base: UserPreferences, updates: Partial<UserPreferences>): UserPreferences {
+function mergePreferences(
+  base: UserPreferences,
+  updates: Partial<UserPreferences>,
+): UserPreferences {
   const merged = { ...base };
-  
+
   for (const key in updates) {
     const updateValue = updates[key as keyof UserPreferences];
     if (updateValue === undefined) continue;
-    
-    if (typeof updateValue === 'object' && updateValue !== null && !Array.isArray(updateValue)) {
+
+    if (
+      typeof updateValue === "object" &&
+      updateValue !== null &&
+      !Array.isArray(updateValue)
+    ) {
       merged[key as keyof UserPreferences] = {
         ...merged[key as keyof UserPreferences],
         ...updateValue,
@@ -258,40 +287,54 @@ function mergePreferences(base: UserPreferences, updates: Partial<UserPreference
       merged[key as keyof UserPreferences] = updateValue as any;
     }
   }
-  
+
   return merged;
 }
 
 // Validation functions
-export function validatePreferences(preferences: Partial<UserPreferences>): string[] {
+export function validatePreferences(
+  preferences: Partial<UserPreferences>,
+): string[] {
   const errors: string[] = [];
 
   // Validate display preferences
   if (preferences.display) {
-    if (preferences.display.theme && !['light', 'dark', 'system'].includes(preferences.display.theme)) {
-      errors.push('Invalid theme value');
+    if (
+      preferences.display.fontSize &&
+      !["small", "medium", "large"].includes(preferences.display.fontSize)
+    ) {
+      errors.push("Invalid font size");
     }
-    if (preferences.display.fontSize && !['small', 'medium', 'large'].includes(preferences.display.fontSize)) {
-      errors.push('Invalid font size');
-    }
-    if (preferences.display.timeFormat && !['12h', '24h'].includes(preferences.display.timeFormat)) {
-      errors.push('Invalid time format');
+    if (
+      preferences.display.timeFormat &&
+      !["12h", "24h"].includes(preferences.display.timeFormat)
+    ) {
+      errors.push("Invalid time format");
     }
   }
 
   // Validate trading preferences
   if (preferences.trading) {
-    if (preferences.trading.riskPerTrade !== undefined && 
-        (preferences.trading.riskPerTrade < 0 || preferences.trading.riskPerTrade > 100)) {
-      errors.push('Risk per trade must be between 0 and 100');
+    if (
+      preferences.trading.riskPerTrade !== undefined &&
+      (preferences.trading.riskPerTrade < 0 ||
+        preferences.trading.riskPerTrade > 100)
+    ) {
+      errors.push("Risk per trade must be between 0 and 100");
     }
-    if (preferences.trading.defaultLotSize !== undefined && 
-        (preferences.trading.defaultLotSize <= 0 || preferences.trading.defaultLotSize > 100)) {
-      errors.push('Default lot size must be between 0 and 100');
+    if (
+      preferences.trading.defaultLotSize !== undefined &&
+      (preferences.trading.defaultLotSize <= 0 ||
+        preferences.trading.defaultLotSize > 100)
+    ) {
+      errors.push("Default lot size must be between 0 and 100");
     }
-    if (preferences.trading.slippageTolerance !== undefined && 
-        (preferences.trading.slippageTolerance < 0 || preferences.trading.slippageTolerance > 100)) {
-      errors.push('Slippage tolerance must be between 0 and 100');
+    if (
+      preferences.trading.slippageTolerance !== undefined &&
+      (preferences.trading.slippageTolerance < 0 ||
+        preferences.trading.slippageTolerance > 100)
+    ) {
+      errors.push("Slippage tolerance must be between 0 and 100");
     }
   }
 
@@ -303,7 +346,7 @@ export function useDisplayPreferences() {
   const { preferences, updatePreferences } = useUserPreferences();
   return {
     preferences: preferences.display,
-    updatePreferences: (updates: Partial<DisplayPreferences>) => 
+    updatePreferences: (updates: Partial<DisplayPreferences>) =>
       updatePreferences({ display: { ...preferences.display, ...updates } }),
   };
 }
@@ -312,8 +355,10 @@ export function useNotificationPreferences() {
   const { preferences, updatePreferences } = useUserPreferences();
   return {
     preferences: preferences.notifications,
-    updatePreferences: (updates: Partial<NotificationPreferences>) => 
-      updatePreferences({ notifications: { ...preferences.notifications, ...updates } }),
+    updatePreferences: (updates: Partial<NotificationPreferences>) =>
+      updatePreferences({
+        notifications: { ...preferences.notifications, ...updates },
+      }),
   };
 }
 
@@ -321,7 +366,7 @@ export function useTradingPreferences() {
   const { preferences, updatePreferences } = useUserPreferences();
   return {
     preferences: preferences.trading,
-    updatePreferences: (updates: Partial<TradingPreferences>) => 
+    updatePreferences: (updates: Partial<TradingPreferences>) =>
       updatePreferences({ trading: { ...preferences.trading, ...updates } }),
   };
 }
@@ -330,7 +375,9 @@ export function useDashboardPreferences() {
   const { preferences, updatePreferences } = useUserPreferences();
   return {
     preferences: preferences.dashboard,
-    updatePreferences: (updates: Partial<DashboardLayout>) => 
-      updatePreferences({ dashboard: { ...preferences.dashboard, ...updates } }),
+    updatePreferences: (updates: Partial<DashboardLayout>) =>
+      updatePreferences({
+        dashboard: { ...preferences.dashboard, ...updates },
+      }),
   };
 }

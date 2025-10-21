@@ -1,35 +1,38 @@
-import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
-import dynamic from 'next/dynamic';
-import '../styles/globals.css';
-import { DefaultSkipLinks } from '../components/accessibility/SkipLink';
-import { setupInteractionTracking } from '@/lib/accessibility/keyboard-navigation';
+import type { Metadata } from "next";
+import { Inter } from "next/font/google";
+import dynamic from "next/dynamic";
+import "../styles/globals.css";
+import { DefaultSkipLinks } from "../components/accessibility/SkipLink";
+import { InteractionTracker } from "../components/client/InteractionTracker";
 
 const ClientProvider = dynamic(
-  () => import('../components/providers/ClientProvider').then((mod) => mod.ClientProvider),
-  { ssr: false }
+  () =>
+    import("../components/providers/ClientProvider").then(
+      (mod) => mod.ClientProvider,
+    ),
+  { ssr: false },
 );
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: 'NexusTrade - AI-Powered Trading Platform',
-  description: 'Empower your trading with institutional-grade technology',
+  title: "NexusTrade - AI-Powered Trading Platform",
+  description: "Empower your trading with institutional-grade technology",
   keywords: [
-    'trading',
-    'forex',
-    'cryptocurrency',
-    'automated trading',
-    'AI',
-    'machine learning',
+    "trading",
+    "forex",
+    "cryptocurrency",
+    "automated trading",
+    "AI",
+    "machine learning",
   ],
-  icons: '/favicon.ico',
+  icons: "/favicon.ico",
 };
 
 export const viewport = {
-  width: 'device-width',
+  width: "device-width",
   initialScale: 1,
-  themeColor: '#000000',
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
@@ -37,18 +40,12 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Set up interaction tracking for keyboard navigation
-  if (typeof window !== 'undefined') {
-    setupInteractionTracking();
-  }
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <DefaultSkipLinks />
-        <ClientProvider>
-          {children}
-        </ClientProvider>
+        <InteractionTracker />
+        <ClientProvider>{children}</ClientProvider>
       </body>
     </html>
   );
