@@ -46,7 +46,7 @@ interface BacktestResult {
     maxDrawdown?: number;
     winRate?: number;
     totalTrades?: number;
-    profitableTrades?: number;
+    winningTrades?: number;
     losingTrades?: number;
     averageWin?: number;
     averageLoss?: number;
@@ -306,7 +306,7 @@ export default function BacktestDetailPage({
                   <div className="flex justify-between items-center py-2 border-b border-neutral-100">
                     <span className="text-neutral-600">Profitable Trades</span>
                     <span className="font-semibold text-green-600">
-                      {results.profitableTrades || 0}
+                      {results.winningTrades || 0}
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2 border-b border-neutral-100">
