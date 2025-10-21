@@ -101,6 +101,81 @@ interface BacktestResult {
   metadata: any;
 }
 
+/**
+ * Convert symbol to TwelveData API format
+ * TwelveData uses different formats for forex and commodities
+ */
+function convertSymbolToTwelveDataFormat(symbol: string): string {
+  // Remove any spaces
+  symbol = symbol.replace(/\s/g, "");
+
+  // Forex pairs - add slash (EUR/USD format)
+  const forexPairs = [
+    "EURUSD",
+    "GBPUSD",
+    "USDJPY",
+    "USDCHF",
+    "AUDUSD",
+    "USDCAD",
+    "NZDUSD",
+    "EURGBP",
+    "EURJPY",
+    "GBPJPY",
+    "EURCHF",
+    "EURAUD",
+    "EURCAD",
+    "EURNZD",
+    "GBPCHF",
+    "GBPAUD",
+    "GBPCAD",
+    "GBPNZD",
+    "AUDJPY",
+    "AUDNZD",
+    "NZDJPY",
+    "AUDCAD",
+    "CADJPY",
+    "CHFJPY",
+  ];
+
+  if (forexPairs.includes(symbol.toUpperCase())) {
+    // Insert slash after 3 characters (EUR/USD)
+    return `${symbol.substring(0, 3)}/${symbol.substring(3)}`;
+  }
+
+  // Gold and Silver - use XAU/USD format
+  if (symbol.toUpperCase() === "XAUUSD") {
+    return "XAU/USD";
+  }
+  if (symbol.toUpperCase() === "XAGUSD") {
+    return "XAG/USD";
+  }
+
+  // Oil - WTI and Brent
+  if (symbol.toUpperCase() === "USOIL" || symbol.toUpperCase() === "WTIUSD") {
+    return "WTI/USD";
+  }
+  if (symbol.toUpperCase() === "UKOIL" || symbol.toUpperCase() === "BRENTUSD") {
+    return "BRENT/USD";
+  }
+
+  // Natural Gas
+  if (
+    symbol.toUpperCase() === "NATGAS" ||
+    symbol.toUpperCase() === "NATURALGAS"
+  ) {
+    return "NG/USD";
+  }
+
+  // Crypto - already in correct format usually
+  const cryptoPairs = ["BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "BCHUSD"];
+  if (cryptoPairs.includes(symbol.toUpperCase())) {
+    return `${symbol.substring(0, 3)}/${symbol.substring(3)}`;
+  }
+
+  // Default: return as-is
+  return symbol;
+}
+
 // Initialize TwelveData client
 // Lazy initialization function for TwelveData client
 function getTwelveDataClient() {
@@ -208,8 +283,11 @@ export class HistoricalDataFetcher {
         return [];
       }
 
+      // Convert symbol to TwelveData format
+      const twelveDataSymbol = convertSymbolToTwelveDataFormat(symbol);
+
       console.log(
-        `📡 Fetching from TwelveData: ${symbol} ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`,
+        `📡 Fetching from TwelveData: ${symbol} (${twelveDataSymbol}) ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`,
       );
       console.log(
         `🔑 Using API key: ${process.env.TWELVEDATA_API_KEY?.substring(0, 8)}...`,
@@ -222,7 +300,7 @@ export class HistoricalDataFetcher {
       }
 
       const response = await client.timeSeries({
-        symbol,
+        symbol: twelveDataSymbol,
         interval,
         start_date: cacheKey.startDate,
         end_date: cacheKey.endDate,
