@@ -45,6 +45,9 @@ model User {
   ipWhitelist            IPWhitelist[]
   twoFactorBackupCodes   TwoFactorBackupCode[]
   tradeConfirmations     TradeConfirmation[]
+  parameterOptimizations ParameterOptimization[]
+  supervisorDecisions    SupervisorDecision[]
+  anomalyLogs            AnomalyLog[]
 
   @@index([email])
   @@index([createdAt])
@@ -196,6 +199,8 @@ model Strategy {
   backtests Backtest[]
   versions StrategyVersion[]
   assignments StrategyAssignment[]
+  parameterOptimizations ParameterOptimization[]
+  parameterPerformances ParameterPerformance[]
 
   @@index([userId])
   @@index([status])
@@ -455,4 +460,191 @@ model ActivityLog {
   @@index([userId])
   @@index([eventType])
   @@index([timestamp])
+}
+
+// ============================================================================
+// ADAPTIVE SUPERVISOR SYSTEM
+// ============================================================================
+
+// Parameter Optimization Tracking
+model ParameterOptimization {
+  id                  String    @id @default(cuid())
+  userId              String
+  strategyId          String
+  executorId          String?
+  
+  currentParams       Json
+  proposedParams      Json
+  changedParams       String[]
+  
+  analysisData        Json
+  llmPrompt           String    @db.Text
+  llmResponse         String    @db.Text
+  reasoning           String    @db.Text
+  
+  confidenceScore     Float
+  confidenceBreakdown Json
+  
+  expectedImprovement Json
+  actualImprovement   Json?
+  
+  status              String    // PROPOSED, APPROVED, TESTING, ACTIVE, REJECTED, ROLLED_BACK
+  approvedBy          String?
+  approvedAt          DateTime?
+  
+  testExecutorId      String?
+  testStartedAt       DateTime?
+  testTradesCount     Int       @default(0)
+  testMetrics         Json?
+  
+  rolloutCompletedAt  DateTime?
+  affectedExecutors   String[]
+  
+  wasSuccessful       Boolean?
+  performanceChange   Float?
+  rollbackReason      String?
+  evaluatedAt         DateTime?
+  
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([strategyId])
+  @@index([status])
+  @@index([confidenceScore])
+  @@index([createdAt])
+}
+
+// LLM Decision Tracking
+model SupervisorDecision {
+  id               String    @id @default(cuid())
+  userId           String
+  executorId       String?
+  strategyId       String?
+  
+  eventType        String
+  eventData        Json
+  marketConditions Json
+  
+  llmProvider      String
+  llmModel         String
+  llmPrompt        String    @db.Text
+  llmResponse      String    @db.Text
+  llmReasoning     String    @db.Text
+  
+  decision         String
+  confidence       Float
+  actionTaken      String?
+  
+  wasCorrect       Boolean?
+  userOverride     Boolean   @default(false)
+  userFeedback     String?   @db.Text
+  outcomeMetrics   Json?
+  
+  createdAt        DateTime  @default(now())
+  executedAt       DateTime?
+  evaluatedAt      DateTime?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([strategyId])
+  @@index([decision])
+  @@index([confidence])
+  @@index([createdAt])
+}
+
+// Parameter Performance Metrics
+model ParameterPerformance {
+  id               String    @id @default(cuid())
+  strategyId       String
+  executorId       String
+  
+  parameters       Json
+  parameterHash    String
+  
+  tradesCount      Int
+  winRate          Float
+  profitFactor     Float
+  avgProfit        Float
+  avgLoss          Float
+  maxDrawdown      Float
+  sharpeRatio      Float?
+  
+  marketConditions String
+  
+  startDate        DateTime
+  endDate          DateTime
+  createdAt        DateTime  @default(now())
+  
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  
+  @@index([strategyId])
+  @@index([parameterHash])
+  @@index([winRate])
+  @@index([profitFactor])
+}
+
+// LLM Usage and Cost Tracking
+model LLMUsageLog {
+  id                String    @id @default(cuid())
+  model             String    // x-ai/grok-4-fast, z-ai/glm-4.6, openai/gpt-oss-120b
+  promptTokens      Int
+  completionTokens  Int
+  totalTokens       Int
+  duration          Int       // milliseconds
+  success           Boolean
+  error             String?   @db.Text
+  timestamp         DateTime  @default(now())
+  
+  @@index([model])
+  @@index([timestamp])
+  @@index([success])
+}
+
+// Parameter Snapshots for Rollback
+model ParameterSnapshot {
+  id          String    @id @default(cuid())
+  strategyId  String
+  executorId  String
+  parameters  Json
+  reason      String
+  createdAt   DateTime  @default(now())
+  
+  @@index([strategyId, executorId])
+  @@index([createdAt])
+}
+
+// Anomaly Detection Logs
+model AnomalyLog {
+  id           String    @id @default(cuid())
+  userId       String
+  executorId   String
+  strategyId   String?
+  
+  type         String    // RAPID_LOSS, EXCESSIVE_TRADING, etc
+  severity     String    // LOW, MEDIUM, HIGH, CRITICAL
+  description  String    @db.Text
+  metrics      Json
+  
+  llmAnalysis    String?   @db.Text
+  llmSuggestion  String?   @db.Text
+  
+  resolved       Boolean   @default(false)
+  resolvedAt     DateTime?
+  resolution     String?   @db.Text
+  
+  createdAt      DateTime  @default(now())
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([executorId])
+  @@index([type])
+  @@index([severity])
+  @@index([resolved])
+  @@index([createdAt])
 }
