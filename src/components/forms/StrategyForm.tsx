@@ -539,22 +539,22 @@ export function StrategyForm({
       }
     }
 
-    // Set risk management from AI parameters
+    // Set risk management from AI parameters (with optional chaining for safety)
     if (data.parameters) {
       setRiskManagement({
-        lotSize: data.parameters.riskPerTrade || 0.01,
-        maxPositions: data.parameters.maxPositions || 1,
-        maxDailyLoss: data.parameters.maxDailyLoss || 100,
+        lotSize: data.parameters?.riskPerTrade || 0.01,
+        maxPositions: data.parameters?.maxPositions || 1,
+        maxDailyLoss: data.parameters?.maxDailyLoss || 100,
       });
 
       setExitRules({
         takeProfit: {
           type: "pips",
-          value: (data.parameters.takeProfit || 0.004) * 10000,
+          value: (data.parameters?.takeProfit || 0.004) * 10000,
         },
         stopLoss: {
           type: "pips",
-          value: (data.parameters.stopLoss || 0.002) * 10000,
+          value: (data.parameters?.stopLoss || 0.002) * 10000,
         },
         trailing: { enabled: false, distance: 10 },
       });

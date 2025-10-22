@@ -28,11 +28,11 @@ export function AIPreviewCard({ strategy, onReview, onUseAsIs }: AIPreviewCardPr
   const entryConditionsCount = strategy.rules?.[0]?.conditions?.length || 0;
   const firstCondition = strategy.rules?.[0]?.conditions?.[0];
   
-  // Calculate pips from parameters
-  const takeProfitPips = Math.round((strategy.parameters.takeProfit || 0.004) * 10000);
-  const stopLossPips = Math.round((strategy.parameters.stopLoss || 0.002) * 10000);
-  const lotSize = strategy.parameters.riskPerTrade || 0.01;
-  const maxLoss = strategy.parameters.maxDailyLoss || 100;
+  // Calculate pips from parameters (with optional chaining for safety)
+  const takeProfitPips = Math.round((strategy.parameters?.takeProfit || 0.004) * 10000);
+  const stopLossPips = Math.round((strategy.parameters?.stopLoss || 0.002) * 10000);
+  const lotSize = strategy.parameters?.riskPerTrade || 0.01;
+  const maxLoss = strategy.parameters?.maxDailyLoss || 100;
 
   return (
     <Card className="border-2 border-purple-300 bg-gradient-to-br from-purple-50 via-white to-purple-50 shadow-lg">
