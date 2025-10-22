@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
+import { adaptTradesFromDB, filterClosedTrades } from '@/lib/analytics/adapters';
+import {
+  calculateTradeAnalytics,
+  calculateBacktestAnalytics,
+  calculateStrategyPerformance,
+} from '@/lib/analytics/analytics-service';
+import { BacktestResults, isBacktestResults } from '@/types/backtest';
 
 export const dynamic = 'force-dynamic';
 
@@ -38,225 +45,124 @@ export async function GET(request: NextRequest) {
         break;
     }
 
-    // Fetch real trades from database
-    const trades = await prisma.trade.findMany({
+    // Fetch real trades from database (use openTime for filtering)
+    const dbTrades = await prisma.trade.findMany({
       where: {
         userId: session.user.id,
-        createdAt: {
+        openTime: {
           gte: startDate,
         },
+        closeTime: {
+          not: null, // Only closed trades for analytics
+        },
       },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { openTime: 'asc' },
     });
 
-    // Fetch real backtests from database
+    // Fetch completed backtests from database
     const backtests = await prisma.backtest.findMany({
       where: {
         userId: session.user.id,
         createdAt: {
           gte: startDate,
         },
+        status: 'completed',
+      },
+      include: {
+        strategy: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: { createdAt: 'asc' },
     });
 
-    // Calculate combined metrics from both trades and backtests
-    const totalTrades = trades.length + backtests.length;
-    const winningTrades = (
-      trades.filter(t => (t.profit || 0) > 0).length +
-      backtests.filter(b => {
-        const results = b.results as any;
-        return (results?.returnPercentage || 0) > 0;
-      }).length
-    );
-    const losingTrades = (
-      trades.filter(t => (t.profit || 0) <= 0).length +
-      backtests.filter(b => {
-        const results = b.results as any;
-        return (results?.returnPercentage || 0) <= 0;
-      }).length
-    );
+    // Convert DB trades to Analytics trades
+    const analyticsTrades = adaptTradesFromDB(dbTrades);
+    const closedTrades = filterClosedTrades(analyticsTrades);
+
+    // Calculate analytics from trades
+    const tradeAnalytics = calculateTradeAnalytics(closedTrades, 10000);
     
-    // Combine profits from both trades and backtests
-    const tradeProfits = trades.reduce((sum, t) => sum + (t.profit || 0), 0);
-    const backtestReturns = backtests.reduce((sum, b) => {
-      const results = b.results as any;
-      return sum + (results?.totalReturn || 0);
-    }, 0);
-    const totalProfit = tradeProfits + backtestReturns;
-    const winRate = totalTrades > 0 ? (winningTrades / totalTrades) * 100 : 0;
-
-    // Calculate profit factor
-    const tradeWins = trades
-      .filter(t => (t.profit || 0) > 0)
-      .reduce((sum, t) => sum + (t.profit || 0), 0);
-    const backtestWins = backtests
-      .filter(b => {
-        const results = b.results as any;
-        return (results?.returnPercentage || 0) > 0;
-      })
-      .reduce((sum, b) => {
-        const results = b.results as any;
-        return sum + (Math.abs(results?.totalReturn || 0));
-      }, 0);
+    // Calculate analytics from backtests
+    const backtestAnalytics = calculateBacktestAnalytics(backtests);
     
-    const tradeLosses = Math.abs(
-      trades
-        .filter(t => (t.profit || 0) < 0)
-        .reduce((sum, t) => sum + (t.profit || 0), 0)
-    );
-    const backtestLosses = backtests
-      .filter(b => {
-        const results = b.results as any;
-        return (results?.returnPercentage || 0) < 0;
-      })
-      .reduce((sum, b) => {
-        const results = b.results as any;
-        return sum + (Math.abs(results?.totalReturn || 0));
-      }, 0);
+    // Use trade analytics if we have real trades, otherwise use backtest analytics
+    const analytics = closedTrades.length > 0 ? tradeAnalytics : backtestAnalytics;
     
-    const totalWinAmount = tradeWins + backtestWins;
-    const totalLossAmount = tradeLosses + backtestLosses;
-    const profitFactor = totalLossAmount > 0 ? totalWinAmount / totalLossAmount : totalWinAmount > 0 ? Infinity : 0;
-
-    // Calculate average win/loss
-    const averageWin = winningTrades > 0 ? totalWinAmount / winningTrades : 0;
-    const averageLoss = losingTrades > 0 ? totalLossAmount / losingTrades : 0;
-
-    // Calculate drawdown (simplified)
-    let maxDrawdown = 0;
-    let runningBalance = 10000;
-    let peakBalance = 10000;
-
-    trades.forEach(trade => {
-      runningBalance += (trade.profit || 0);
-      if (runningBalance > peakBalance) {
-        peakBalance = runningBalance;
-      }
-      const drawdown = peakBalance - runningBalance;
-      if (drawdown > maxDrawdown) {
-        maxDrawdown = drawdown;
+    // Build strategy names map
+    const strategyNames = new Map<string, string>();
+    backtests.forEach(b => {
+      if (b.strategy) {
+        strategyNames.set(b.strategyId, b.strategy.name);
       }
     });
-
-    const maxDrawdownPercentage = (maxDrawdown / peakBalance) * 100;
-
-    // Calculate Sharpe ratio (simplified)
-    const returns = [];
-    for (let i = 1; i < trades.length; i++) {
-      const prevBalance = 10000 + trades.slice(0, i).reduce((sum, t) => sum + (t.profit || 0), 0);
-      const currBalance = 10000 + trades.slice(0, i + 1).reduce((sum, t) => sum + (t.profit || 0), 0);
-      returns.push((currBalance - prevBalance) / prevBalance);
-    }
-
-    const avgReturn = returns.length > 0 ? returns.reduce((sum, r) => sum + r, 0) / returns.length : 0;
-    const variance = returns.reduce((sum, r) => sum + Math.pow(r - avgReturn, 2), 0) / (returns.length || 1);
-    const sharpeRatio = variance > 0 ? (avgReturn / Math.sqrt(variance)) * Math.sqrt(252) : 0;
-
-    // Group actual data by month (trades + backtests)
-    const monthlyData: { month: string; profit: number; trades: number }[] = [];
-    const monthlyGroups = new Map<string, { profits: number[]; tradeCount: number }>();
-
-    // Add trades to monthly groups
-    trades.forEach(trade => {
-      const month = trade.createdAt.toISOString().slice(0, 7); // YYYY-MM
-      if (!monthlyGroups.has(month)) {
-        monthlyGroups.set(month, { profits: [], tradeCount: 0 });
-      }
-      monthlyGroups.get(month)!.profits.push(trade.profit || 0);
-      monthlyGroups.get(month)!.tradeCount += 1;
-    });
-
-    // Add backtests to monthly groups  
-    backtests.forEach(backtest => {
-      const month = backtest.createdAt.toISOString().slice(0, 7); // YYYY-MM
-      if (!monthlyGroups.has(month)) {
-        monthlyGroups.set(month, { profits: [], tradeCount: 0 });
-      }
-      const results = backtest.results as any;
-      monthlyGroups.get(month)!.profits.push(results?.totalReturn || 0);
-      monthlyGroups.get(month)!.tradeCount += 1;
-    });
-
-    monthlyGroups.forEach((data, month) => {
-      const monthName = new Date(month + '-01').toLocaleString('default', { month: 'short', year: 'numeric' });
-      monthlyData.push({
-        month: monthName,
-        profit: data.profits.reduce((sum, p) => sum + p, 0),
-        trades: data.tradeCount,
-      });
-    });
-
-    // Fetch real strategy performance from actual backtests
-    const strategyBacktests = await prisma.backtest.groupBy({
-      by: ['strategyId'],
-      where: {
-        userId: session.user.id,
-        createdAt: {
-          gte: startDate,
+    
+    // Fetch strategy names for trades
+    if (closedTrades.length > 0) {
+      const strategyIds = [...new Set(closedTrades.map(t => t.strategyId))];
+      const strategies = await prisma.strategy.findMany({
+        where: {
+          id: { in: strategyIds },
         },
-      },
-      _count: { id: true },
-    });
-
-    const strategyPerformance = await Promise.all(
-      strategyBacktests.map(async (sp) => {
-        const strategy = await prisma.strategy.findUnique({
-          where: { id: sp.strategyId },
-          select: { id: true, name: true },
-        });
-
-        const allBacktests = await prisma.backtest.findMany({
-          where: {
-            userId: session.user.id,
-            strategyId: sp.strategyId,
-            createdAt: { gte: startDate },
-          },
-          select: { results: true },
-        });
-
-        const winningBacktests = allBacktests.filter(b => {
-          const results = b.results as any;
-          return (results?.returnPercentage || 0) > 0;
-        }).length;
-
-        const totalReturn = allBacktests.reduce((sum, b) => {
-          const results = b.results as any;
-          return sum + (results?.totalReturn || 0);
-        }, 0);
-
-        const totalStratBacktests = sp._count.id;
-        const stratWinRate = totalStratBacktests > 0 ? (winningBacktests / totalStratBacktests) * 100 : 0;
-
-        return {
-          strategyId: sp.strategyId,
-          name: strategy?.name || 'Unknown Strategy',
-          profit: totalReturn,
-          winRate: stratWinRate,
-          trades: totalStratBacktests,
-        };
-      })
+        select: {
+          id: true,
+          name: true,
+        },
+      });
+      
+      strategies.forEach(s => {
+        strategyNames.set(s.id, s.name);
+      });
+    }
+    
+    // Calculate strategy performance from real trades
+    const strategyPerformance = calculateStrategyPerformance(
+      closedTrades,
+      strategyNames
     );
 
+    // Return analytics data
     return NextResponse.json({
-      totalTrades,
-      winningTrades,
-      losingTrades,
-      totalProfit: parseFloat(totalProfit.toFixed(2)),
-      winRate: parseFloat(winRate.toFixed(2)),
-      profitFactor: parseFloat(profitFactor.toFixed(2)),
-      maxDrawdown: parseFloat(maxDrawdownPercentage.toFixed(2)),
-      averageWin: parseFloat(averageWin.toFixed(2)),
-      averageLoss: parseFloat(averageLoss.toFixed(2)),
-      sharpeRatio: parseFloat(sharpeRatio.toFixed(2)),
-      monthlyData: monthlyData.length > 0 ? monthlyData : [{ month: 'No Data', profit: 0, trades: 0 }],
-      strategyPerformance,
+      totalTrades: analytics.totalTrades,
+      winningTrades: analytics.winningTrades,
+      losingTrades: analytics.losingTrades,
+      totalProfit: parseFloat(analytics.totalProfit.toFixed(2)),
+      winRate: parseFloat(analytics.winRate.toFixed(2)),
+      profitFactor: analytics.profitFactor === Infinity ? 9999 : parseFloat(analytics.profitFactor.toFixed(2)),
+      maxDrawdown: parseFloat(analytics.maxDrawdownPercent.toFixed(2)),
+      averageWin: parseFloat(analytics.averageWin.toFixed(2)),
+      averageLoss: parseFloat(analytics.averageLoss.toFixed(2)),
+      sharpeRatio: parseFloat(analytics.sharpeRatio.toFixed(2)),
+      monthlyData: analytics.monthlyData.length > 0 
+        ? analytics.monthlyData.map(m => ({
+            month: m.month,
+            profit: parseFloat(m.profit.toFixed(2)),
+            trades: m.trades,
+          }))
+        : [{ month: 'No Data', profit: 0, trades: 0 }],
+      strategyPerformance: strategyPerformance.map(sp => ({
+        strategyId: sp.strategyId,
+        name: sp.name,
+        profit: parseFloat(sp.profit.toFixed(2)),
+        winRate: parseFloat(sp.winRate.toFixed(2)),
+        trades: sp.trades,
+      })),
+      // Additional metadata for debugging
+      source: analytics.source,
+      hasRealTrades: closedTrades.length > 0,
+      hasBacktests: backtests.length > 0,
     });
 
   } catch (error) {
     console.error('Analytics API error:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch analytics data' },
+      { 
+        error: 'Failed to fetch analytics data',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

@@ -45,6 +45,10 @@ interface PerformanceData {
     winRate: number;
     trades: number;
   }[];
+  // Additional metadata from new API
+  source?: 'trades' | 'backtests' | 'combined';
+  hasRealTrades?: boolean;
+  hasBacktests?: boolean;
 }
 
 export default function AnalyticsPage() {
@@ -166,6 +170,27 @@ export default function AnalyticsPage() {
           </button>
         </div>
       </div>
+
+      {/* Data Source Info */}
+      {data && (data.hasRealTrades || data.hasBacktests) && (
+        <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+          <div className="flex items-start gap-3">
+            <Activity className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                Data Source: {data.hasRealTrades ? 'Real Trading' : 'Backtests'}
+              </h4>
+              <p className="text-xs text-blue-700 leading-relaxed">
+                {data.hasRealTrades ? (
+                  <>Analytics calculated from <strong>{data.totalTrades} real trades</strong>. These are actual trading results from your executed strategies.</>
+                ) : (
+                  <>Analytics calculated from <strong>{data.totalTrades} backtest executions</strong>. Run real trades to see live performance metrics.</>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Metric Selector */}
       <div className="flex gap-2 mb-6">
