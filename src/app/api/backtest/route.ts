@@ -527,7 +527,7 @@ export async function POST(request: NextRequest) {
         symbol: validatedData.symbol,
         interval: validatedData.interval,
         strategy: transformedStrategy,
-        preferredDataSource: validatedData.preferredDataSource,
+        preferredDataSource: validatedData.preferredDataSource || "twelvedata", // Force default to twelvedata
       });
 
       // Update backtest with results
