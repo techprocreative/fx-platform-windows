@@ -4,17 +4,29 @@
 import OpenAI from 'openai';
 import { prisma } from '@/lib/prisma';
 
-// Initialize OpenRouter client
-export const openrouter = new OpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY,
-  defaultHeaders: {
-    "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
-    "X-Title": "FX Trading Platform - Adaptive Supervisor",
-  },
-  // Vercel serverless timeout: 60s (Hobby), 300s (Pro)
-  timeout: 50000, // 50 seconds to stay within limits
-});
+// Lazy initialize OpenRouter client
+let openrouterInstance: OpenAI | null = null;
+
+function getOpenRouterClient(): OpenAI {
+  if (!openrouterInstance) {
+    if (!process.env.OPENROUTER_API_KEY) {
+      throw new Error('OPENROUTER_API_KEY is not configured');
+    }
+    
+    openrouterInstance = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENROUTER_API_KEY,
+      defaultHeaders: {
+        "HTTP-Referer": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
+        "X-Title": "FX Trading Platform - Adaptive Supervisor",
+      },
+      // Vercel serverless timeout: 60s (Hobby), 300s (Pro)
+      timeout: 50000, // 50 seconds to stay within limits
+    });
+  }
+  
+  return openrouterInstance;
+}
 
 // Model selection: Quality-First Strategy
 export const MODELS = {
@@ -98,6 +110,7 @@ export async function callLLM(
     try {
       console.log(`🤖 Calling ${model}...`);
       
+      const openrouter = getOpenRouterClient();
       const startTime = Date.now();
       const completion = await openrouter.chat.completions.create({
         model,
