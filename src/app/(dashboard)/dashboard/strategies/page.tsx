@@ -20,6 +20,7 @@ import { InlineError } from '@/components/ui/ErrorMessage';
 import { useConfirmDialog, confirmDelete } from '@/components/ui/ConfirmDialog';
 import { StrategyStatus } from '@/components/ui/StatusIndicator';
 import { Button } from '@/components/ui/Button';
+import { ActivateStrategyDialog } from '@/components/strategies/ActivateStrategyDialog';
 
 interface Strategy {
   id: string;
@@ -39,6 +40,8 @@ export default function StrategiesPage() {
   const [error, setError] = useState<Error | null>(null);
   const [filter, setFilter] = useState<'all' | 'active' | 'draft'>('all');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<Strategy | null>(null);
+  const [showActivateDialog, setShowActivateDialog] = useState(false);
   
   const { confirm, ConfirmDialog } = useConfirmDialog();
 
@@ -98,29 +101,38 @@ export default function StrategiesPage() {
   };
 
   const handleToggleStatus = async (id: string, currentStatus: string) => {
-    const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+    const strategy = strategies.find(s => s.id === id);
+    if (!strategy) return;
 
-    try {
-      const response = await fetch(`/api/strategy/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
+    // If active, allow direct deactivation
+    if (currentStatus === 'active') {
+      try {
+        const response = await fetch(`/api/strategy/${id}/activate`, {
+          method: 'DELETE',
+        });
 
-      if (!response.ok) {
-        throw new Error(`Failed to update strategy: ${response.statusText}`);
+        if (!response.ok) {
+          throw new Error(`Failed to deactivate strategy`);
+        }
+
+        const data = await response.json();
+        toast.success(data.message || 'Strategy deactivated successfully');
+        fetchStrategies(); // Refresh list
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error('Failed to deactivate strategy');
+        toast.error(err.message);
       }
-
-      setStrategies(
-        strategies.map((s) =>
-          s.id === id ? { ...s, status: newStatus as any } : s
-        )
-      );
-      toast.success(`Strategy ${newStatus} successfully`);
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to update strategy');
-      toast.error(err.message);
+    } else {
+      // If not active, open dialog to select executors
+      setSelectedStrategy(strategy);
+      setShowActivateDialog(true);
     }
+  };
+
+  const handleStrategyActivated = () => {
+    setShowActivateDialog(false);
+    setSelectedStrategy(null);
+    fetchStrategies(); // Refresh list
   };
 
   const filteredStrategies = strategies.filter((s) => {
@@ -304,6 +316,20 @@ export default function StrategiesPage() {
             </tbody>
           </table>
         </div>
+      )}
+      
+      {/* Activate Strategy Dialog */}
+      {selectedStrategy && (
+        <ActivateStrategyDialog
+          strategyId={selectedStrategy.id}
+          strategyName={selectedStrategy.name}
+          isOpen={showActivateDialog}
+          onClose={() => {
+            setShowActivateDialog(false);
+            setSelectedStrategy(null);
+          }}
+          onActivated={handleStrategyActivated}
+        />
       )}
       
       {/* Confirmation Dialog */}
