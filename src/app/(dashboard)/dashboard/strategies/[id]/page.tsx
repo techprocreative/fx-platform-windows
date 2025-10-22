@@ -182,6 +182,41 @@ export default function StrategyDetailPage({
         </div>
 
         <div className="flex gap-2">
+          {strategy.status === 'active' ? (
+            <button
+              onClick={handleDeactivate}
+              disabled={activating}
+              className="inline-flex items-center gap-2 px-4 py-2 text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50"
+            >
+              {activating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Deactivating...
+                </>
+              ) : (
+                <>
+                  <Pause className="h-4 w-4" />
+                  Deactivate
+                </>
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={() => setShowActivateDialog(true)}
+              disabled={activating}
+              className="inline-flex items-center gap-2 px-4 py-2 text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+            >
+              <Play className="h-4 w-4" />
+              Activate Strategy
+            </button>
+          )}
+          <Link
+            href={`/dashboard/executors`}
+            className="inline-flex items-center gap-2 px-4 py-2 text-neutral-700 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+          >
+            <Server className="h-4 w-4" />
+            View Executors
+          </Link>
           <Link
             href={`/dashboard/strategies/${strategy.id}/edit`}
             className="inline-flex items-center gap-2 px-4 py-2 text-neutral-700 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
@@ -189,11 +224,13 @@ export default function StrategyDetailPage({
             <Edit2 className="h-4 w-4" />
             Edit
           </Link>
-
-          <button className="inline-flex items-center gap-2 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-            <Play className="h-4 w-4" />
-            Activate
-          </button>
+          <Link
+            href={`/dashboard/backtest?strategyId=${strategy.id}`}
+            className="inline-flex items-center gap-2 px-4 py-2 text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            <BarChart3 className="h-4 w-4" />
+            Run Backtest
+          </Link>
         </div>
       </div>
 
