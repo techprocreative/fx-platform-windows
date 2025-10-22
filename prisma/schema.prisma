@@ -195,6 +195,7 @@ model Strategy {
   trades Trade[]
   backtests Backtest[]
   versions StrategyVersion[]
+  assignments StrategyAssignment[]
 
   @@index([userId])
   @@index([status])
@@ -216,6 +217,29 @@ model StrategyVersion {
   @@index([strategyId])
 }
 
+// Strategy Assignment to Executors
+model StrategyAssignment {
+  id              String    @id @default(cuid())
+  strategyId      String
+  executorId      String
+  status          String    @default("active") // active, paused, stopped
+  settings        Json?     // Override settings (lot size, risk, etc)
+  lastExecutedAt  DateTime?
+  tradesCount     Int       @default(0)
+  profitLoss      Float     @default(0)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  executor Executor @relation(fields: [executorId], references: [id], onDelete: Cascade)
+
+  @@unique([strategyId, executorId])
+  @@index([strategyId])
+  @@index([executorId])
+  @@index([status])
+  @@index([strategyId, status])
+}
+
 // Executor Management
 model Executor {
   id              String    @id @default(cuid())
@@ -235,6 +259,7 @@ model Executor {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   trades Trade[]
   commands Command[]
+  assignments StrategyAssignment[]
 
   @@index([userId])
   @@index([apiKey])

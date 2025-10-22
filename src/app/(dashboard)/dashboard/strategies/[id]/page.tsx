@@ -9,12 +9,15 @@ import {
   BarChart3,
   Plus,
   Activity,
+  Pause,
+  Server,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useApiRequest } from "@/hooks/useApiRequest";
+import { ActivateStrategyDialog } from "@/components/strategies/ActivateStrategyDialog";
 
 interface Strategy {
   id: string;
@@ -44,6 +47,8 @@ export default function StrategyDetailPage({
   >("overview");
   const [backtests, setBacktests] = useState<any[]>([]);
   const [backtestsLoading, setBacktestsLoading] = useState(false);
+  const [showActivateDialog, setShowActivateDialog] = useState(false);
+  const [activating, setActivating] = useState(false);
 
   useEffect(() => {
     execute(async () => {
@@ -93,6 +98,48 @@ export default function StrategyDetailPage({
     } finally {
       setBacktestsLoading(false);
     }
+  };
+
+  const handleDeactivate = async () => {
+    if (!confirm('Are you sure you want to deactivate this strategy? All executors will stop executing it.')) {
+      return;
+    }
+
+    setActivating(true);
+    try {
+      const response = await fetch(`/api/strategy/${strategy.id}/activate`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to deactivate strategy');
+      }
+
+      toast.success(data.message);
+      
+      // Refresh strategy data
+      execute(async () => {
+        const response = await fetch(`/api/strategy/${params.id}`);
+        if (!response.ok) throw new Error('Failed to refresh strategy');
+        return response.json();
+      });
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error('An error occurred');
+      toast.error(err.message);
+    } finally {
+      setActivating(false);
+    }
+  };
+
+  const handleStrategyActivated = () => {
+    // Refresh strategy data
+    execute(async () => {
+      const response = await fetch(`/api/strategy/${params.id}`);
+      if (!response.ok) throw new Error('Failed to refresh strategy');
+      return response.json();
+    });
   };
 
   if (loading) {
@@ -432,6 +479,15 @@ export default function StrategyDetailPage({
           )}
         </div>
       </div>
+
+      {/* Activate Strategy Dialog */}
+      <ActivateStrategyDialog
+        strategyId={strategy.id}
+        strategyName={strategy.name}
+        isOpen={showActivateDialog}
+        onClose={() => setShowActivateDialog(false)}
+        onActivated={handleStrategyActivated}
+      />
     </div>
   );
 }

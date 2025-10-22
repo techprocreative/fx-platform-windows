@@ -22,6 +22,11 @@ const commandSchema = z.object({
     'MODIFY_POSITION',
     'GET_STATUS',
     'RESTART',
+    'START_STRATEGY',     // NEW: Start executing a strategy
+    'STOP_STRATEGY',      // NEW: Stop executing a strategy
+    'PAUSE_STRATEGY',     // NEW: Pause strategy execution
+    'RESUME_STRATEGY',    // NEW: Resume strategy execution
+    'UPDATE_STRATEGY',    // NEW: Update strategy rules
   ]),
   parameters: z.record(z.any()).optional(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),
