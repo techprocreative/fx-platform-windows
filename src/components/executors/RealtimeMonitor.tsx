@@ -97,20 +97,20 @@ export function RealtimeMonitor({ executors, onRefresh }: Props) {
       {/* Emergency Stop Button & Connection Status */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          {/* Pusher Connection Status */}
+          {/* Real Executor Status */}
           <div className="flex items-center gap-2 text-sm">
             <div
               className={`w-2 h-2 rounded-full ${
-                isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+                totalOnline > 0 ? 'bg-green-500 animate-pulse' : 'bg-gray-400'
               }`}
             />
             <span className="text-neutral-600">
-              Real-time: {isConnected ? 'Connected' : 'Disconnected'}
+              Executors: <span className="font-semibold">{totalOnline} Online</span> / {executors.length} Total
             </span>
           </div>
           <span className="text-neutral-300">•</span>
           <span className="text-xs text-neutral-500">
-            Status: {connectionState}
+            Pusher: {isConnected ? '🟢 Ready' : '🔴 Disconnected'}
           </span>
         </div>
 
@@ -124,7 +124,7 @@ export function RealtimeMonitor({ executors, onRefresh }: Props) {
         </button>
       </div>
 
-      {/* Not Connected Warning */}
+      {/* Warnings */}
       {!isConnected && (
         <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-4 flex items-start gap-3">
           <AlertCircle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
@@ -136,6 +136,30 @@ export function RealtimeMonitor({ executors, onRefresh }: Props) {
               Pusher connection is not established. You'll see cached data with 30-second
               polling. Real-time command delivery may be delayed.
             </p>
+          </div>
+        </div>
+      )}
+      
+      {/* No Executors Online Warning */}
+      {totalOnline === 0 && executors.length > 0 && (
+        <div className="rounded-lg bg-orange-50 border border-orange-200 p-4 flex items-start gap-3">
+          <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <h4 className="text-sm font-semibold text-orange-900 mb-1">
+              No Executors Online
+            </h4>
+            <p className="text-sm text-orange-700 mb-2">
+              All executors are offline. You need to run the Windows executor application to start receiving commands.
+            </p>
+            <div className="text-xs text-orange-600 bg-orange-100 rounded p-2 space-y-1">
+              <p className="font-semibold">To get started:</p>
+              <ol className="list-decimal ml-4 space-y-0.5">
+                <li>Download and install the Windows Executor app</li>
+                <li>Configure your executor with API Key & Secret</li>
+                <li>Start the executor app on your Windows machine</li>
+                <li>App will send heartbeat every 60 seconds</li>
+              </ol>
+            </div>
           </div>
         </div>
       )}

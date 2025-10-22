@@ -42,19 +42,14 @@ const navItems = [
     icon: BarChart3,
   },
   {
-    label: 'Monitor',
-    href: '/dashboard/monitor',
-    icon: Activity,
+    label: 'Executors',
+    href: '/dashboard/executors',
+    icon: Server,
   },
   {
     label: 'Trades',
     href: '/dashboard/trades',
     icon: History,
-  },
-  {
-    label: 'Executors',
-    href: '/dashboard/executors',
-    icon: Server,
   },
   {
     label: 'Analytics',

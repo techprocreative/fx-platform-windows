@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect, useRouter } from 'next/navigation';
+import { redirect, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
@@ -50,9 +50,10 @@ interface ExecutorStats {
   };
 }
 
-export default function ExecutorsPage() {
+function ExecutorsPageContent() {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [executors, setExecutors] = useState<Executor[]>([]);
   const [stats, setStats] = useState<ExecutorStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +63,12 @@ export default function ExecutorsPage() {
   const [credentials, setCredentials] = useState({ apiKey: '', secretKey: '' });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'monitor'>('overview');
+  
+  // Handle tab from URL query parameter (e.g., ?tab=monitor)
+  const tabFromUrl = searchParams?.get('tab');
+  const [activeTab, setActiveTab] = useState<'overview' | 'monitor'>(
+    tabFromUrl === 'monitor' ? 'monitor' : 'overview'
+  );
   const [formData, setFormData] = useState({
     name: '',
     platform: 'MT5',
@@ -288,6 +294,30 @@ export default function ExecutorsPage() {
                 <p className="text-2xl font-bold text-neutral-900">
                   MT5: {stats.byPlatform.MT5} / MT4: {stats.byPlatform.MT4}
                 </p>
+              </div>
+            </div>
+          )}
+          
+          {/* Warning if all executors are offline */}
+          {stats && stats.total > 0 && stats.online === 0 && (
+            <div className="rounded-lg bg-orange-50 border border-orange-200 p-4 flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-orange-900 mb-1">
+                  All Executors Are Offline
+                </h4>
+                <p className="text-sm text-orange-700 mb-2">
+                  Your executors are configured but not running. They need to send heartbeat to show as "Online".
+                </p>
+                <div className="text-xs text-orange-600 space-y-1">
+                  <p className="font-semibold">Expected behavior:</p>
+                  <ul className="list-disc ml-4 space-y-0.5">
+                    <li>Windows executor app sends heartbeat every 60 seconds</li>
+                    <li>Status changes to "Online" when heartbeat received</li>
+                    <li>Status becomes "Offline" if no heartbeat for 5 minutes</li>
+                    <li>Without Windows app running, status will remain "Offline"</li>
+                  </ul>
+                </div>
               </div>
             </div>
           )}
@@ -523,5 +553,14 @@ export default function ExecutorsPage() {
         </div>
       )}
     </div>
+  );
+}
+
+// Wrap with Suspense for useSearchParams
+export default function ExecutorsPage() {
+  return (
+    <Suspense fallback={<LoadingState />}>
+      <ExecutorsPageContent />
+    </Suspense>
   );
 }
