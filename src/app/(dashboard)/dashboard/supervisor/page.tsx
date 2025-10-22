@@ -6,37 +6,56 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { 
   Brain, 
-  DollarSign, 
   TrendingUp, 
   ArrowLeft,
   RefreshCw,
-  Settings,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  AlertTriangle,
+  ArrowRight,
   Activity,
-  AlertTriangle
+  Calendar
 } from 'lucide-react';
 
-import { LLMCostDashboard } from '@/components/supervisor/LLMCostDashboard';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 
-interface OptimizationSummary {
+interface Optimization {
+  id: string;
+  status: string;
+  confidence: number;
+  currentParameters: any;
+  proposedParameters: any;
+  reasoning: string;
+  createdAt: string;
+  appliedAt: string | null;
+  evaluatedAt: string | null;
+  wasSuccessful: boolean | null;
+  affectedExecutors: string[];
+  strategy?: {
+    name: string;
+    symbol: string;
+  };
+}
+
+interface OptimizationStats {
   total: number;
-  approved: number;
-  pending: number;
-  rejected: number;
-  testing: number;
-  active: number;
   successful: number;
+  active: number;
+  pending: number;
   rolledBack: number;
 }
 
 export default function SupervisorPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [optimizationSummary, setOptimizationSummary] = useState<OptimizationSummary | null>(null);
+  const [optimizations, setOptimizations] = useState<Optimization[]>([]);
+  const [stats, setStats] = useState<OptimizationStats | null>(null);
+  const [selectedOptimization, setSelectedOptimization] = useState<Optimization | null>(null);
 
   useEffect(() => {
     checkAuth();
-    fetchOptimizationSummary();
+    fetchData();
   }, []);
 
   const checkAuth = async () => {
@@ -51,20 +70,84 @@ export default function SupervisorPage() {
     }
   };
 
-  const fetchOptimizationSummary = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
-      const response = await fetch('/api/supervisor/usage-stats?period=all');
       
-      if (response.ok) {
-        const data = await response.json();
-        setOptimizationSummary(data.optimizations);
+      // Fetch optimization stats
+      const statsResponse = await fetch('/api/supervisor/usage-stats?period=all');
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json();
+        setStats(statsData.optimizations);
+      }
+
+      // Fetch user's optimization history (we need to create this endpoint)
+      const optimizationsResponse = await fetch('/api/supervisor/optimizations');
+      if (optimizationsResponse.ok) {
+        const optimizationsData = await optimizationsResponse.json();
+        setOptimizations(optimizationsData.optimizations || []);
       }
     } catch (error) {
-      console.error('Failed to fetch optimization summary:', error);
+      console.error('Failed to fetch data:', error);
+      toast.error('Failed to load optimization history');
     } finally {
       setLoading(false);
     }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, { color: string; icon: any; label: string }> = {
+      APPROVED: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2, label: 'Applied' },
+      TESTING: { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400', icon: Activity, label: 'Testing' },
+      ACTIVE: { color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400', icon: CheckCircle2, label: 'Successful' },
+      PENDING_APPROVAL: { color: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400', icon: Clock, label: 'Pending' },
+      REJECTED: { color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400', icon: XCircle, label: 'Rejected' },
+      ROLLED_BACK: { color: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400', icon: AlertTriangle, label: 'Rolled Back' },
+    };
+
+    const badge = badges[status] || badges.REJECTED;
+    const Icon = badge.icon;
+
+    return (
+      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+        <Icon className="w-3 h-3" />
+        {badge.label}
+      </span>
+    );
+  };
+
+  const getParameterLabel = (param: string): string => {
+    const labels: Record<string, string> = {
+      stopLossPips: 'Stop Loss',
+      takeProfitPips: 'Take Profit',
+      lotSize: 'Lot Size',
+      riskPerTrade: 'Risk/Trade',
+      maxConcurrentTrades: 'Max Trades',
+      maxDailyTrades: 'Daily Trades',
+      maxDailyLoss: 'Daily Loss',
+    };
+    return labels[param] || param;
+  };
+
+  const getChangedParameters = (current: any, proposed: any) => {
+    const changes: Array<{ param: string; from: any; to: any; change: string }> = [];
+    
+    for (const [key, value] of Object.entries(proposed)) {
+      if (current[key] !== value) {
+        const changePercent = typeof value === 'number' && typeof current[key] === 'number'
+          ? ((Number(value) - Number(current[key])) / Number(current[key]) * 100).toFixed(1)
+          : null;
+        
+        changes.push({
+          param: key,
+          from: current[key],
+          to: value,
+          change: changePercent ? `${changePercent > 0 ? '+' : ''}${changePercent}%` : ''
+        });
+      }
+    }
+    
+    return changes;
   };
 
   return (
@@ -81,21 +164,21 @@ export default function SupervisorPage() {
             </Link>
             <div className="flex-1">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg">
+                <div className="p-3 bg-gradient-to-br from-purple-500 to-blue-600 rounded-lg">
                   <Brain className="w-8 h-8 text-white" />
                 </div>
                 <div>
                   <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-                    AI Supervisor Dashboard
+                    AI Optimization History
                   </h1>
                   <p className="text-gray-600 dark:text-gray-400 mt-1">
-                    Monitor LLM-powered parameter optimization and cost tracking
+                    View your strategy optimization results
                   </p>
                 </div>
               </div>
             </div>
             <button
-              onClick={fetchOptimizationSummary}
+              onClick={fetchData}
               className="p-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
               title="Refresh"
             >
@@ -113,176 +196,167 @@ export default function SupervisorPage() {
                 </div>
               ))}
             </div>
-          ) : optimizationSummary && (
+          ) : stats && (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Total Optimizations */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg transition-shadow">
-                <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400 mb-2">
-                  <Activity className="w-4 h-4" />
-                  <span className="text-sm font-medium">Total Optimizations</span>
-                </div>
-                <div className="text-3xl font-bold text-gray-900 dark:text-white">
-                  {optimizationSummary.total}
-                </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">Total Optimizations</div>
+                <div className="text-3xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
+              </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div className="text-sm text-green-600 dark:text-green-400 mb-1">Successful</div>
+                <div className="text-3xl font-bold text-green-600 dark:text-green-400">{stats.successful}</div>
                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  All time
+                  {stats.total > 0 ? `${((stats.successful / stats.total) * 100).toFixed(0)}% success rate` : 'No data'}
                 </div>
               </div>
-
-              {/* Successful */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg transition-shadow">
-                <div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-2">
-                  <TrendingUp className="w-4 h-4" />
-                  <span className="text-sm font-medium">Successful</span>
-                </div>
-                <div className="text-3xl font-bold text-green-600 dark:text-green-400">
-                  {optimizationSummary.successful}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  {optimizationSummary.total > 0 
-                    ? `${((optimizationSummary.successful / optimizationSummary.total) * 100).toFixed(1)}% success rate`
-                    : 'No data yet'}
-                </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div className="text-sm text-blue-600 dark:text-blue-400 mb-1">Active Now</div>
+                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">{stats.active}</div>
               </div>
-
-              {/* Active */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg transition-shadow">
-                <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-2">
-                  <Settings className="w-4 h-4 animate-spin-slow" />
-                  <span className="text-sm font-medium">Active Now</span>
-                </div>
-                <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
-                  {optimizationSummary.active}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Currently running
-                </div>
-              </div>
-
-              {/* Pending Approval */}
-              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 hover:shadow-lg transition-shadow">
-                <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400 mb-2">
-                  <AlertTriangle className="w-4 h-4" />
-                  <span className="text-sm font-medium">Pending Approval</span>
-                </div>
-                <div className="text-3xl font-bold text-amber-600 dark:text-amber-400">
-                  {optimizationSummary.pending}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Needs review
-                </div>
+              <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                <div className="text-sm text-red-600 dark:text-red-400 mb-1">Rolled Back</div>
+                <div className="text-3xl font-bold text-red-600 dark:text-red-400">{stats.rolledBack}</div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Info Cards */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Quality-First Strategy */}
-          <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <Brain className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Quality-First Strategy
-              </h3>
-            </div>
-            <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-              <div className="flex items-center justify-between">
-                <span>Critical Operations:</span>
-                <span className="font-medium">Grok 4 Fast ⚡</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Complex Reasoning:</span>
-                <span className="font-medium">GLM-4.6 🧠</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Non-Critical:</span>
-                <span className="font-medium">GPT-OSS-120B 💰</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span>Fallback:</span>
-                <span className="font-medium">DeepSeek 🏆</span>
-              </div>
-            </div>
+        {/* Optimization History */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="border-b border-gray-200 dark:border-gray-700 px-6 py-4">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              Recent Optimizations
+            </h2>
           </div>
 
-          {/* Safety Features */}
-          <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-800 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <AlertTriangle className="w-6 h-6 text-green-600 dark:text-green-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Safety Features
-              </h3>
+          {loading ? (
+            <div className="p-6">
+              <LoadingSpinner size="lg" />
             </div>
-            <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>Parameter validation (11 parameters)</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>Risk simulation on historical data</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>Auto-rollback on degradation</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400">✓</span>
-                <span>Circuit breaker (5 safety checks)</span>
-              </li>
-            </ul>
-          </div>
+          ) : optimizations.length === 0 ? (
+            <div className="p-12 text-center">
+              <Brain className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                No Optimizations Yet
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400 mb-6">
+                Start by activating a strategy and clicking "Optimize with AI"
+              </p>
+              <Link
+                href="/dashboard/strategies"
+                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Go to Strategies
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-200 dark:divide-gray-700">
+              {optimizations.map((opt) => {
+                const changes = getChangedParameters(opt.currentParameters, opt.proposedParameters);
+                
+                return (
+                  <div
+                    key={opt.id}
+                    className="p-6 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors cursor-pointer"
+                    onClick={() => setSelectedOptimization(opt)}
+                  >
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {opt.strategy?.name || 'Strategy Optimization'}
+                          </h3>
+                          {getStatusBadge(opt.status)}
+                          <span className={`px-2 py-1 rounded text-xs font-medium ${
+                            opt.confidence >= 0.95 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                              : opt.confidence >= 0.85
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400'
+                          }`}>
+                            {(opt.confidence * 100).toFixed(0)}% confidence
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
+                          <Calendar className="w-4 h-4" />
+                          {new Date(opt.createdAt).toLocaleString()}
+                          {opt.strategy?.symbol && (
+                            <>
+                              <span>•</span>
+                              <span>{opt.strategy.symbol}</span>
+                            </>
+                          )}
+                          {opt.affectedExecutors.length > 0 && (
+                            <>
+                              <span>•</span>
+                              <span>{opt.affectedExecutors.length} executor(s)</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
 
-          {/* Confidence Levels */}
-          <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-800 p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <TrendingUp className="w-6 h-6 text-purple-600 dark:text-purple-400" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                Confidence Levels
-              </h3>
+                    {/* Parameter Changes */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
+                      {changes.slice(0, 3).map((change, idx) => (
+                        <div key={idx} className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                            {getParameterLabel(change.param)}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                              {change.from}
+                            </span>
+                            <ArrowRight className="w-3 h-3 text-gray-400" />
+                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
+                              {change.to}
+                            </span>
+                            {change.change && (
+                              <span className={`text-xs font-medium ${
+                                change.change.startsWith('+') 
+                                  ? 'text-green-600 dark:text-green-400' 
+                                  : 'text-red-600 dark:text-red-400'
+                              }`}>
+                                {change.change}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                      {changes.length > 3 && (
+                        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg p-3 border border-gray-200 dark:border-gray-700 flex items-center justify-center">
+                          <span className="text-sm text-gray-600 dark:text-gray-400">
+                            +{changes.length - 3} more changes
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* AI Reasoning (truncated) */}
+                    <div className="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                      {opt.reasoning}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-start gap-2">
-                <span className="text-green-600 dark:text-green-400 font-bold">≥95%:</span>
-                <span className="text-gray-700 dark:text-gray-300">Auto-apply (very high confidence)</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-blue-600 dark:text-blue-400 font-bold">85-94%:</span>
-                <span className="text-gray-700 dark:text-gray-300">Request approval (good confidence)</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-amber-600 dark:text-amber-400 font-bold">70-84%:</span>
-                <span className="text-gray-700 dark:text-gray-300">Suggest only (moderate)</span>
-              </div>
-              <div className="flex items-start gap-2">
-                <span className="text-red-600 dark:text-red-400 font-bold">&lt;70%:</span>
-                <span className="text-gray-700 dark:text-gray-300">Reject (insufficient data)</span>
-              </div>
-            </div>
-          </div>
+          )}
         </div>
 
-        {/* Main Dashboard */}
-        <LLMCostDashboard />
-
-        {/* How to Use */}
+        {/* Info Box */}
         <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-            How to Use AI Supervisor
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-700 dark:text-gray-300">
-            <div>
-              <div className="font-semibold text-blue-600 dark:text-blue-400 mb-2">1. Activate Strategy</div>
-              <p>Go to your strategy page and activate it on executors with at least 20 trades for analysis.</p>
-            </div>
-            <div>
-              <div className="font-semibold text-blue-600 dark:text-blue-400 mb-2">2. Trigger Optimization</div>
-              <p>Click "Optimize with AI" button. LLM will analyze performance and suggest improvements.</p>
-            </div>
-            <div>
-              <div className="font-semibold text-blue-600 dark:text-blue-400 mb-2">3. Review & Approve</div>
-              <p>If confidence is 85-94%, review suggestions and approve. ≥95% auto-applies with safety checks.</p>
+          <div className="flex items-start gap-3">
+            <TrendingUp className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                About AI Optimization
+              </h3>
+              <p className="text-sm text-blue-800 dark:text-blue-200">
+                AI Supervisor analyzes your trading performance and suggests parameter improvements to maximize profitability. 
+                Changes are applied only after thorough validation and risk assessment. 
+                If performance degrades, parameters are automatically rolled back.
+              </p>
             </div>
           </div>
         </div>

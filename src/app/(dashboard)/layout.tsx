@@ -69,6 +69,15 @@ const navItems = [
   },
 ];
 
+// Admin-only navigation items
+const adminNavItems = [
+  {
+    label: 'Admin Panel',
+    href: '/dashboard/admin/supervisor',
+    icon: Settings,
+  },
+];
+
 export default function DashboardLayout({
   children,
 }: {
@@ -135,6 +144,35 @@ export default function DashboardLayout({
                 </Link>
               );
             })}
+
+            {/* Admin Section */}
+            <div className="pt-4 mt-4 border-t border-primary">
+              <div className="px-4 mb-2">
+                <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">
+                  Admin
+                </span>
+              </div>
+              {adminNavItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    className={`flex items-center gap-3 rounded-lg px-4 py-3 transition-colors ${
+                      active
+                        ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/30 dark:text-primary-400'
+                        : 'text-secondary hover:bg-secondary'
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </Link>
+                );
+              })}
+            </div>
           </nav>
 
           {/* Footer */}

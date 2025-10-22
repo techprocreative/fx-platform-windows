@@ -326,25 +326,61 @@ export default function StrategyDetailPage({
           )}
           
           {/* AI Optimization Button */}
-          <button
-            onClick={handleOptimize}
-            disabled={optimizing || strategy.status !== 'active'}
-            className="inline-flex items-center gap-2 px-4 py-2 text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            title={strategy.status !== 'active' ? 'Activate strategy first' : 'Optimize parameters with AI'}
-          >
-            {optimizing ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                Analyzing...
-              </>
-            ) : (
-              <>
-                <Brain className="h-4 w-4" />
-                <Sparkles className="h-3 w-3 absolute -top-1 -right-1 text-yellow-300" />
-                Optimize with AI
-              </>
+          <div className="relative group">
+            <button
+              onClick={handleOptimize}
+              disabled={optimizing || strategy.status !== 'active' || strategy._count.trades < 20}
+              className="inline-flex items-center gap-2 px-4 py-2 text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed relative"
+            >
+              {optimizing ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Brain className="h-4 w-4" />
+                  <Sparkles className="h-3 w-3 absolute -top-1 -right-1 text-yellow-300" />
+                  Optimize with AI
+                </>
+              )}
+            </button>
+            
+            {/* Tooltip */}
+            {(strategy.status !== 'active' || strategy._count.trades < 20) && !optimizing && (
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                <div className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                  {strategy.status !== 'active' ? (
+                    'Activate strategy first'
+                  ) : strategy._count.trades < 20 ? (
+                    <>
+                      Need {20 - strategy._count.trades} more trade{20 - strategy._count.trades !== 1 ? 's' : ''} ({strategy._count.trades}/20)
+                    </>
+                  ) : (
+                    'Ready to optimize'
+                  )}
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                    <div className="border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                  </div>
+                </div>
+              </div>
             )}
-          </button>
+            
+            {/* Progress Indicator */}
+            {strategy.status === 'active' && strategy._count.trades < 20 && (
+              <div className="absolute -bottom-6 left-0 right-0">
+                <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
+                  <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                    <div 
+                      className="bg-gradient-to-r from-purple-600 to-blue-600 h-full transition-all duration-500"
+                      style={{ width: `${(strategy._count.trades / 20) * 100}%` }}
+                    ></div>
+                  </div>
+                  <span className="font-medium tabular-nums">{strategy._count.trades}/20</span>
+                </div>
+              </div>
+            )}
+          </div>
           
           <Link
             href={`/dashboard/executors`}
