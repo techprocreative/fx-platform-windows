@@ -14,6 +14,7 @@ import {
   Target,
   Trash2,
   TrendingUp,
+  Zap, // Still used in template definitions (disabled but present)
 } from "lucide-react";
 import Link from "next/link";
 
