@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { redirect, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import toast from 'react-hot-toast';
 import {
   Server,
@@ -12,7 +13,15 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
+  Activity,
+  Send,
+  Eye,
+  AlertTriangle,
 } from 'lucide-react';
+
+import { LoadingState, TableLoadingState } from '@/components/ui/LoadingState';
+import { InlineError } from '@/components/ui/ErrorMessage';
+import { useConfirmDialog, confirmDelete } from '@/components/ui/ConfirmDialog';
 
 interface Executor {
   id: string;
@@ -21,16 +30,37 @@ interface Executor {
   status: string;
   lastHeartbeat: string | null;
   isConnected: boolean;
-  apiKey?: string;
+  brokerServer?: string | null;
+  accountNumber?: string | null;
+  createdAt: string;
+  _count?: {
+    trades: number;
+    commands: number;
+  };
+}
+
+interface ExecutorStats {
+  total: number;
+  online: number;
+  offline: number;
+  byPlatform: {
+    MT5: number;
+    MT4: number;
+  };
 }
 
 export default function ExecutorsPage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [executors, setExecutors] = useState<Executor[]>([]);
+  const [stats, setStats] = useState<ExecutorStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<Error | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
   const [credentials, setCredentials] = useState({ apiKey: '', secretKey: '' });
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     platform: 'MT5',
@@ -38,24 +68,35 @@ export default function ExecutorsPage() {
     accountNumber: '',
   });
 
+  const { confirm, ConfirmDialog } = useConfirmDialog();
+
   useEffect(() => {
     if (status === 'unauthenticated') {
       redirect('/login');
     }
     if (status === 'authenticated') {
       fetchExecutors();
+      
+      // Auto-refresh every 30 seconds
+      const interval = setInterval(fetchExecutors, 30000);
+      return () => clearInterval(interval);
     }
   }, [status]);
 
   const fetchExecutors = async () => {
     try {
-      const response = await fetch('/api/ws');
-      if (response.ok) {
-        const data = await response.json();
-        setExecutors(data.executors || []);
+      setError(null);
+      const response = await fetch('/api/executor');
+      if (!response.ok) {
+        throw new Error(`Failed to fetch executors: ${response.statusText}`);
       }
+      const data = await response.json();
+      setExecutors(data.executors || []);
+      setStats(data.stats || null);
     } catch (error) {
-      toast.error('Failed to load executors');
+      const err = error instanceof Error ? error : new Error('Failed to load executors');
+      setError(err);
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
@@ -63,54 +104,61 @@ export default function ExecutorsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setSubmitting(true);
 
     try {
-      const response = await fetch('/api/ws', {
+      const response = await fetch('/api/executor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setCredentials({
-          apiKey: data.executor.apiKey,
-          secretKey: data.executor.secretKey,
-        });
-        setShowCredentials(true);
-        setShowModal(false);
-        toast.success('Executor registered successfully');
-        fetchExecutors();
-        setFormData({ name: '', platform: 'MT5', brokerServer: '', accountNumber: '' });
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to register executor');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create executor');
       }
+
+      setCredentials({
+        apiKey: data.executor.apiKey,
+        secretKey: data.executor.secretKey,
+      });
+      setShowCredentials(true);
+      setShowModal(false);
+      toast.success('Executor created successfully!');
+      fetchExecutors();
+      setFormData({ name: '', platform: 'MT5', brokerServer: '', accountNumber: '' });
     } catch (error) {
-      toast.error('An error occurred');
+      const err = error instanceof Error ? error : new Error('An error occurred');
+      toast.error(err.message);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   };
 
-  const handleDelete = async (executorId: string) => {
-    if (!confirm('Are you sure you want to delete this executor?')) return;
+  const handleDelete = async (executor: Executor) => {
+    const confirmed = await confirm(confirmDelete(executor.name));
+    if (!confirmed) return;
 
+    setDeletingId(executor.id);
     try {
-      const response = await fetch(`/api/ws?executorId=${executorId}`, {
+      const response = await fetch(`/api/executor/${executor.id}`, {
         method: 'DELETE',
       });
 
-      if (response.ok) {
-        toast.success('Executor deleted');
-        fetchExecutors();
-      } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to delete executor');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete executor');
       }
+
+      toast.success('Executor deleted successfully');
+      fetchExecutors();
     } catch (error) {
-      toast.error('An error occurred');
+      const err = error instanceof Error ? error : new Error('An error occurred');
+      toast.error(err.message);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -133,29 +181,78 @@ export default function ExecutorsPage() {
     return <span className="text-red-600 font-medium">Offline</span>;
   };
 
-  if (loading && executors.length === 0) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-neutral-600">Loading executors...</div>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-neutral-900">Executors</h1>
+            <p className="text-neutral-600 mt-1">Loading your executors...</p>
+          </div>
+        </div>
+        <div className="rounded-lg border border-neutral-200 bg-white">
+          <TableLoadingState />
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-neutral-900">Executors</h1>
+            <p className="text-neutral-600 mt-1">Manage your trading executors</p>
+          </div>
+        </div>
+        <InlineError error={error} retry={fetchExecutors} />
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-neutral-900">Executors</h1>
-          <p className="text-neutral-600 mt-1">Manage your Windows trading executors</p>
+          <p className="text-neutral-600 mt-1">
+            {stats ? `${stats.total} executor${stats.total !== 1 ? 's' : ''} • ${stats.online} online` : 'Manage your trading executors'}
+          </p>
         </div>
         <button
           onClick={() => setShowModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors font-medium"
+          className="inline-flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-3 text-white font-semibold hover:bg-primary-700 transition-colors"
         >
-          <Plus className="h-4 w-4" />
+          <Plus className="h-5 w-5" />
           Add Executor
         </button>
       </div>
+
+      {/* Statistics Cards */}
+      {stats && stats.total > 0 && (
+        <div className="grid gap-4 md:grid-cols-4">
+          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <p className="text-sm text-neutral-600 mb-1">Total Executors</p>
+            <p className="text-2xl font-bold text-neutral-900">{stats.total}</p>
+          </div>
+          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <p className="text-sm text-neutral-600 mb-1">Online</p>
+            <p className="text-2xl font-bold text-green-600">{stats.online}</p>
+          </div>
+          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <p className="text-sm text-neutral-600 mb-1">Offline</p>
+            <p className="text-2xl font-bold text-red-600">{stats.offline}</p>
+          </div>
+          <div className="rounded-lg border border-neutral-200 bg-white p-4">
+            <p className="text-sm text-neutral-600 mb-1">Platform</p>
+            <p className="text-2xl font-bold text-neutral-900">
+              MT5: {stats.byPlatform.MT5} / MT4: {stats.byPlatform.MT4}
+            </p>
+          </div>
+        </div>
+      )}
 
       {executors.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border border-neutral-200">
@@ -176,7 +273,7 @@ export default function ExecutorsPage() {
           {executors.map((executor) => (
             <div
               key={executor.id}
-              className="bg-white rounded-lg border border-neutral-200 p-6 hover:shadow-md transition-shadow"
+              className="bg-white rounded-lg border border-neutral-200 p-6 hover:border-primary-300 transition-all"
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
@@ -184,34 +281,68 @@ export default function ExecutorsPage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <h3 className="text-lg font-bold text-neutral-900">{executor.name}</h3>
-                      <span className="px-2 py-1 bg-neutral-100 text-neutral-700 text-xs rounded-md font-medium">
+                      <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs rounded-full font-medium">
                         {executor.platform}
                       </span>
                       {getStatusText(executor)}
                     </div>
-                    <div className="space-y-1 text-sm text-neutral-600">
-                      <p>Executor ID: {executor.id}</p>
+                    <div className="space-y-1 text-sm text-neutral-600 mb-3">
+                      {executor.brokerServer && (
+                        <p>Server: {executor.brokerServer}</p>
+                      )}
+                      {executor.accountNumber && (
+                        <p>Account: {executor.accountNumber}</p>
+                      )}
                       {executor.lastHeartbeat && (
                         <p className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
-                          Last seen: {new Date(executor.lastHeartbeat).toLocaleString()}
+                          Last heartbeat: {new Date(executor.lastHeartbeat).toLocaleString()}
                         </p>
                       )}
                     </div>
+                    {executor._count && (
+                      <div className="flex items-center gap-4 text-xs text-neutral-600">
+                        <span className="flex items-center gap-1">
+                          <Activity className="h-3 w-3" />
+                          {executor._count.trades} trades
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Send className="h-3 w-3" />
+                          {executor._count.commands} commands
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleDelete(executor.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete executor"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/dashboard/executors/${executor.id}`}
+                    className="p-2 text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
+                    title="View details"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Link>
+                  <button
+                    onClick={() => handleDelete(executor)}
+                    disabled={deletingId === executor.id}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Delete executor"
+                  >
+                    {deletingId === executor.id ? (
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog />
 
       {/* Add Executor Modal */}
       {showModal && (
@@ -274,16 +405,17 @@ export default function ExecutorsPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-medium"
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2 border border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={loading}
-                  className="flex-1 px-4 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors font-medium disabled:opacity-50"
+                  disabled={submitting}
+                  className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Creating...' : 'Create Executor'}
+                  {submitting ? 'Creating...' : 'Create Executor'}
                 </button>
               </div>
             </form>
@@ -337,7 +469,7 @@ export default function ExecutorsPage() {
             </div>
             <button
               onClick={() => setShowCredentials(false)}
-              className="w-full mt-6 px-4 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors font-medium"
+              className="w-full mt-6 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
             >
               I&apos;ve Saved the Credentials
             </button>
