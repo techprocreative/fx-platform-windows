@@ -24,13 +24,40 @@ X-API-Secret: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ---
 
-## 📡 API Endpoints
+## 📡 API Endpoints & Real-time Communication
 
 ### Base URL
 ```
 Production: https://your-domain.com/api
 Development: http://localhost:3000/api
 ```
+
+### Real-time Communication (Pusher)
+
+**Important for Vercel Deployment:**
+Since the platform is deployed on Vercel (serverless), **WebSocket connections cannot be maintained directly**. Therefore, we use **Pusher** for real-time bi-directional communication.
+
+**Architecture:**
+```
+Windows Executor App
+├── REST API Client (for heartbeat & responses)
+└── Pusher Client (for receiving commands in real-time)
+    └── Subscribe to: private-executor-{executorId}
+```
+
+**Pusher Configuration:**
+```
+App Key: Available in your executor dashboard
+Cluster: (shown during executor creation)
+Channel: private-executor-{your-executor-id}
+```
+
+**Why Pusher?**
+- ✅ Works with serverless environments (Vercel)
+- ✅ Instant command delivery (no polling needed)
+- ✅ Reliable message delivery
+- ✅ Built-in reconnection logic
+- ✅ Private channels for security
 
 ---
 
@@ -267,7 +294,153 @@ X-API-Secret: YOUR_API_SECRET
 
 ---
 
-## 5. Best Practices
+## 5. Real-time Command Reception (Pusher)
+
+### Setting Up Pusher Client
+
+**Python Example:**
+```python
+import pusher
+import json
+
+# Pusher configuration (from your executor credentials)
+PUSHER_KEY = "your-pusher-key"
+PUSHER_CLUSTER = "your-cluster"
+EXECUTOR_ID = "clxxx..."
+
+# Initialize Pusher client
+pusher_client = pusher.Pusher(
+    app_id='your-app-id',
+    key=PUSHER_KEY,
+    secret='your-secret',  # Not needed for subscribing
+    cluster=PUSHER_CLUSTER,
+    ssl=True
+)
+
+# Subscribe to executor's private channel
+channel_name = f'private-executor-{EXECUTOR_ID}'
+
+# Note: For private channels, you need authentication
+# See authentication section below
+```
+
+**C# Example (.NET):**
+```csharp
+using PusherClient;
+using System;
+
+// Pusher configuration
+var pusher = new Pusher("your-pusher-key", new PusherOptions
+{
+    Cluster = "your-cluster",
+    Encrypted = true
+});
+
+// Subscribe to channel
+var channel = pusher.Subscribe($"private-executor-{executorId}");
+
+// Bind to command event
+channel.Bind("command-received", (dynamic data) =>
+{
+    var commandId = data.id;
+    var command = data.command;
+    var parameters = data.parameters;
+    var priority = data.priority;
+    
+    // Execute command
+    ExecuteCommand(commandId, command, parameters);
+});
+
+// Connect
+await pusher.ConnectAsync();
+```
+
+### Command Reception Flow
+
+```
+Dashboard → API → Pusher → Executor App
+                     ↓
+              Command Received
+                     ↓
+              Execute Command
+                     ↓
+           Report Result (REST API)
+```
+
+### Handling Commands from Pusher
+
+```python
+def on_command_received(data):
+    """Handle command received via Pusher"""
+    command_id = data['id']
+    command = data['command']
+    parameters = data.get('parameters', {})
+    priority = data['priority']
+    
+    print(f"Received command: {command} (Priority: {priority})")
+    
+    try:
+        # Execute the command
+        if command == 'PAUSE':
+            result = pause_trading()
+        elif command == 'RESUME':
+            result = resume_trading()
+        elif command == 'STOP_ALL':
+            result = stop_all_trading()
+        elif command == 'CLOSE_ALL_POSITIONS':
+            result = close_all_positions()
+        elif command == 'EMERGENCY_STOP':
+            result = emergency_stop()
+        else:
+            result = {'success': False, 'message': 'Unknown command'}
+        
+        # Report success
+        report_command_result(command_id, 'executed', result)
+        
+    except Exception as e:
+        # Report failure
+        report_command_result(command_id, 'failed', {
+            'success': False,
+            'message': str(e)
+        })
+
+# Subscribe to channel and bind event
+channel = pusher_client.subscribe(channel_name)
+channel.bind('command-received', on_command_received)
+```
+
+### Pusher Authentication for Private Channels
+
+Since executor channels are private (for security), you need to authenticate the subscription:
+
+```python
+import requests
+
+def authenticate_pusher_subscription(socket_id, channel_name):
+    """Authenticate Pusher subscription via API"""
+    headers = {
+        "Content-Type": "application/x-www-form-urlencoded",
+        "X-API-Key": API_KEY,
+        "X-API-Secret": API_SECRET,
+    }
+    
+    data = {
+        "socket_id": socket_id,
+        "channel_name": channel_name,
+    }
+    
+    response = requests.post(
+        f"{BASE_URL}/pusher/auth",
+        data=data,
+        headers=headers
+    )
+    
+    return response.json()
+```
+
+---
+
+## 6. Best Practices
 
 ### ✅ Heartbeat Implementation
 ```python

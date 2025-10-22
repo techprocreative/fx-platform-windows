@@ -22,6 +22,7 @@ import {
 import { LoadingState, TableLoadingState } from '@/components/ui/LoadingState';
 import { InlineError } from '@/components/ui/ErrorMessage';
 import { useConfirmDialog, confirmDelete } from '@/components/ui/ConfirmDialog';
+import { RealtimeMonitor } from '@/components/executors/RealtimeMonitor';
 
 interface Executor {
   id: string;
@@ -61,6 +62,7 @@ export default function ExecutorsPage() {
   const [credentials, setCredentials] = useState({ apiKey: '', secretKey: '' });
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'monitor'>('overview');
   const [formData, setFormData] = useState({
     name: '',
     platform: 'MT5',
@@ -230,29 +232,65 @@ export default function ExecutorsPage() {
         </button>
       </div>
 
-      {/* Statistics Cards */}
-      {stats && stats.total > 0 && (
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border border-neutral-200 bg-white p-4">
-            <p className="text-sm text-neutral-600 mb-1">Total Executors</p>
-            <p className="text-2xl font-bold text-neutral-900">{stats.total}</p>
-          </div>
-          <div className="rounded-lg border border-neutral-200 bg-white p-4">
-            <p className="text-sm text-neutral-600 mb-1">Online</p>
-            <p className="text-2xl font-bold text-green-600">{stats.online}</p>
-          </div>
-          <div className="rounded-lg border border-neutral-200 bg-white p-4">
-            <p className="text-sm text-neutral-600 mb-1">Offline</p>
-            <p className="text-2xl font-bold text-red-600">{stats.offline}</p>
-          </div>
-          <div className="rounded-lg border border-neutral-200 bg-white p-4">
-            <p className="text-sm text-neutral-600 mb-1">Platform</p>
-            <p className="text-2xl font-bold text-neutral-900">
-              MT5: {stats.byPlatform.MT5} / MT4: {stats.byPlatform.MT4}
-            </p>
-          </div>
-        </div>
-      )}
+      {/* Tabs */}
+      <div className="border-b border-neutral-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'overview'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            }`}
+          >
+            Overview & Management
+          </button>
+          <button
+            onClick={() => setActiveTab('monitor')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+              activeTab === 'monitor'
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-neutral-500 hover:text-neutral-700 hover:border-neutral-300'
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              Real-time Monitor
+              {stats && stats.online > 0 && (
+                <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-green-500 rounded-full">
+                  {stats.online}
+                </span>
+              )}
+            </span>
+          </button>
+        </nav>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'overview' && (
+        <div className="space-y-6">
+          {/* Statistics Cards */}
+          {stats && stats.total > 0 && (
+            <div className="grid gap-4 md:grid-cols-4">
+              <div className="rounded-lg border border-neutral-200 bg-white p-4">
+                <p className="text-sm text-neutral-600 mb-1">Total Executors</p>
+                <p className="text-2xl font-bold text-neutral-900">{stats.total}</p>
+              </div>
+              <div className="rounded-lg border border-neutral-200 bg-white p-4">
+                <p className="text-sm text-neutral-600 mb-1">Online</p>
+                <p className="text-2xl font-bold text-green-600">{stats.online}</p>
+              </div>
+              <div className="rounded-lg border border-neutral-200 bg-white p-4">
+                <p className="text-sm text-neutral-600 mb-1">Offline</p>
+                <p className="text-2xl font-bold text-red-600">{stats.offline}</p>
+              </div>
+              <div className="rounded-lg border border-neutral-200 bg-white p-4">
+                <p className="text-sm text-neutral-600 mb-1">Platform</p>
+                <p className="text-2xl font-bold text-neutral-900">
+                  MT5: {stats.byPlatform.MT5} / MT4: {stats.byPlatform.MT4}
+                </p>
+              </div>
+            </div>
+          )}
 
       {executors.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border border-neutral-200">
@@ -339,6 +377,14 @@ export default function ExecutorsPage() {
             </div>
           ))}
         </div>
+      )}
+
+        </div>
+      )}
+
+      {/* Real-time Monitor Tab */}
+      {activeTab === 'monitor' && (
+        <RealtimeMonitor executors={executors} onRefresh={fetchExecutors} />
       )}
 
       {/* Confirmation Dialog */}

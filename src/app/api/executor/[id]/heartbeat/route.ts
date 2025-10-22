@@ -4,6 +4,7 @@ import { z } from 'zod';
 
 import { prisma } from '../../../../../lib/prisma';
 import { AppError, handleApiError } from '@/lib/errors';
+import { broadcastStatusUpdate } from '@/lib/pusher/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,6 +84,13 @@ export async function POST(
         ...(status && { status }),
         updatedAt: new Date(),
       },
+    });
+
+    // Broadcast status update to all listeners via Pusher
+    await broadcastStatusUpdate({
+      executorId: params.id,
+      status: status || updatedExecutor.status,
+      timestamp: new Date().toISOString(),
     });
 
     // Store metadata if provided (could be used for monitoring)

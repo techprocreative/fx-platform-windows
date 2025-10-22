@@ -6,6 +6,7 @@ import { authOptions } from '../../../../../lib/auth';
 import { prisma } from '../../../../../lib/prisma';
 import { AppError, handleApiError } from '@/lib/errors';
 import { applyRateLimit } from '@/lib/middleware/rate-limit-middleware';
+import { triggerExecutorCommand, notifyUserExecution } from '@/lib/pusher/server';
 
 export const dynamic = 'force-dynamic';
 
@@ -92,6 +93,14 @@ export async function POST(
       },
     });
 
+    // Trigger Pusher event to notify executor in real-time
+    await triggerExecutorCommand(params.id, {
+      id: createdCommand.id,
+      command,
+      parameters: parameters || {},
+      priority,
+    });
+
     // Log activity
     await prisma.activityLog.create({
       data: {
@@ -116,8 +125,8 @@ export async function POST(
           isOnline,
         },
         message: isOnline
-          ? 'Command sent successfully'
-          : '⚠️ Warning: Executor is offline. Command will be queued.',
+          ? 'Command sent successfully via real-time channel'
+          : '⚠️ Warning: Executor is offline. Command queued and will be delivered when executor reconnects.',
       },
       { status: 201 }
     );
@@ -227,6 +236,21 @@ export async function PATCH(
         result: result || null,
         executedAt: status === 'executed' ? new Date() : null,
       },
+      include: {
+        user: {
+          select: { id: true },
+        },
+      },
+    });
+
+    // Notify user about execution result via Pusher
+    await notifyUserExecution(updatedCommand.userId, {
+      commandId: commandId,
+      executorId: params.id,
+      command: command.command,
+      success: status === 'executed',
+      result: result || null,
+      timestamp: new Date().toISOString(),
     });
 
     return NextResponse.json({
