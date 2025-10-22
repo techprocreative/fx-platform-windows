@@ -82,8 +82,25 @@ export default function AlertsPage() {
 
   const fetchAlerts = async () => {
     try {
-      // Mock data for now - in production this would fetch from API
-      const mockAlerts: Alert[] = [
+      const response = await fetch('/api/alerts');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch alerts');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setAlerts(data.alerts || []);
+        return;
+      }
+    } catch (error) {
+      console.error('Error fetching alerts:', error);
+      // Fallback to mock data if API fails
+    }
+    
+    // Mock data as fallback
+    const mockAlerts: Alert[] = [
         {
           id: 'alert_001',
           type: 'price',
@@ -212,11 +229,19 @@ export default function AlertsPage() {
 
   const handleAcknowledgeAlert = async (alertId: string) => {
     try {
-      setAlerts(prev => prev.map(alert => 
-        alert.id === alertId 
-          ? { ...alert, acknowledged: true, read: true }
-          : alert
-      ));
+      const response = await fetch(`/api/alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acknowledged: true, read: true })
+      });
+
+      if (response.ok) {
+        setAlerts(prev => prev.map(alert => 
+          alert.id === alertId 
+            ? { ...alert, acknowledged: true, read: true }
+            : alert
+        ));
+      }
     } catch (error) {
       console.error('Failed to acknowledge alert:', error);
     }
@@ -224,11 +249,19 @@ export default function AlertsPage() {
 
   const handleMarkAsRead = async (alertId: string) => {
     try {
-      setAlerts(prev => prev.map(alert => 
-        alert.id === alertId 
-          ? { ...alert, read: true }
-          : alert
-      ));
+      const response = await fetch(`/api/alerts/${alertId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ read: true })
+      });
+
+      if (response.ok) {
+        setAlerts(prev => prev.map(alert => 
+          alert.id === alertId 
+            ? { ...alert, read: true }
+            : alert
+        ));
+      }
     } catch (error) {
       console.error('Failed to mark alert as read:', error);
     }

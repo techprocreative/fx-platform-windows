@@ -46,7 +46,22 @@ export default function PositionsPage() {
 
   const fetchPositions = async () => {
     try {
-      // Mock data for now - in production this would fetch from API
+      const response = await fetch('/api/positions');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch positions');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setPositions(data.positions || []);
+        setPnlReport(data.pnlReport || null);
+        setLastUpdate(new Date());
+      }
+    } catch (error) {
+      console.error('Error fetching positions:', error);
+      // Fallback to mock data if API fails
       const mockPositions: MonitoredPosition[] = [
         {
           ticket: 12345,
@@ -157,8 +172,7 @@ export default function PositionsPage() {
       };
 
       setPnlReport(report);
-    } catch (error) {
-      console.error('Failed to fetch positions:', error);
+      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);

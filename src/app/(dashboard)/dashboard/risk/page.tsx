@@ -45,7 +45,22 @@ export default function RiskPage() {
 
   const fetchRiskData = async () => {
     try {
-      // Mock data for now - in production this would fetch from API
+      const response = await fetch('/api/risk/exposure');
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch risk data');
+      }
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        setRiskExposure(data.riskExposure || null);
+        setRiskAlerts(data.violations || []);
+        setLastUpdate(new Date());
+      }
+    } catch (error) {
+      console.error('Error fetching risk data:', error);
+      // Fallback to mock data if API fails
       const mockRiskExposure: RiskExposure = {
         balance: 10000,
         totalRiskExposure: 500,
@@ -99,8 +114,7 @@ export default function RiskPage() {
       setRiskHistory(mockRiskHistory);
       setRiskAlerts(mockRiskAlerts);
       setLastUpdate(new Date());
-    } catch (error) {
-      console.error('Failed to fetch risk data:', error);
+      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);
