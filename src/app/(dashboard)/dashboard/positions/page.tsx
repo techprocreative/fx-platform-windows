@@ -172,7 +172,6 @@ export default function PositionsPage() {
       };
 
       setPnlReport(report);
-      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);

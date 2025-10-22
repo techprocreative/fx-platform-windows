@@ -114,7 +114,6 @@ export default function RiskPage() {
       setRiskHistory(mockRiskHistory);
       setRiskAlerts(mockRiskAlerts);
       setLastUpdate(new Date());
-      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);

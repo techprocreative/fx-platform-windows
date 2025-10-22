@@ -97,10 +97,7 @@ export default function AlertsPage() {
     } catch (error) {
       console.error('Error fetching alerts:', error);
       // Fallback to mock data if API fails
-    }
-    
-    // Mock data as fallback
-    const mockAlerts: Alert[] = [
+      const mockAlerts: Alert[] = [
         {
           id: 'alert_001',
           type: 'price',
@@ -164,8 +161,6 @@ export default function AlertsPage() {
       ];
 
       setAlerts(mockAlerts);
-    } catch (error) {
-      console.error('Failed to fetch alerts:', error);
     } finally {
       setLoading(false);
     }
