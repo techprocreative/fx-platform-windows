@@ -72,14 +72,28 @@ export async function POST(request: NextRequest) {
     // Generate strategy (but don't save to database yet)
     const strategyData = await ai.generateStrategy(prompt);
     
+    // Extract rules and parameters from the nested structure
+    // OpenRouter returns rules as: { rules: [], parameters: {} }
+    const rulesData = strategyData.rules as any;
+    const extractedRules = rulesData?.rules || [];
+    const extractedParameters = rulesData?.parameters || {
+      riskPerTrade: 0.01,
+      maxPositions: 1,
+      stopLoss: 0.002,
+      takeProfit: 0.004,
+      maxDailyLoss: 100,
+    };
+    
     // Debug logging
     console.log('📤 API Response - Sending to client:', {
       symbol: strategyData.symbol,
       timeframe: strategyData.timeframe,
       name: strategyData.name,
+      rulesCount: extractedRules.length,
+      hasParameters: !!extractedParameters,
     });
 
-    // Return the generated data for preview/editing
+    // Return the generated data for preview/editing with proper structure
     return NextResponse.json({
       success: true,
       strategy: {
@@ -87,7 +101,8 @@ export async function POST(request: NextRequest) {
         description: strategyData.description || '',
         symbol: strategyData.symbol,
         timeframe: strategyData.timeframe,
-        rules: strategyData.rules || [],
+        rules: extractedRules, // Plain array of rules
+        parameters: extractedParameters, // Top-level parameters object
         prompt,
         model: 'x-ai/grok-4-fast',
       },
