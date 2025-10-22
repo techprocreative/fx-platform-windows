@@ -72,8 +72,6 @@ function ExecutorsPageContent() {
   const [formData, setFormData] = useState({
     name: '',
     platform: 'MT5',
-    brokerServer: '',
-    accountNumber: '',
   });
 
   const { confirm, ConfirmDialog } = useConfirmDialog();
@@ -135,7 +133,7 @@ function ExecutorsPageContent() {
       setShowModal(false);
       toast.success('Executor created successfully!');
       fetchExecutors();
-      setFormData({ name: '', platform: 'MT5', brokerServer: '', accountNumber: '' });
+      setFormData({ name: '', platform: 'MT5' });
     } catch (error) {
       const err = error instanceof Error ? error : new Error('An error occurred');
       toast.error(err.message);
@@ -438,6 +436,9 @@ function ExecutorsPageContent() {
                   placeholder="My MT5 Executor"
                   required
                 />
+                <p className="text-xs text-neutral-500 mt-1">
+                  Identifier untuk executor ini (e.g., "Laptop Trading", "VPS Singapore")
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-neutral-700 mb-1">
@@ -452,31 +453,33 @@ function ExecutorsPageContent() {
                   <option value="MT5">MetaTrader 5</option>
                   <option value="MT4">MetaTrader 4</option>
                 </select>
+                <p className="text-xs text-neutral-500 mt-1">
+                  Platform trading yang akan digunakan
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Broker Server (optional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.brokerServer}
-                  onChange={(e) => setFormData({ ...formData, brokerServer: e.target.value })}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:border-transparent"
-                  placeholder="broker.server.com"
-                />
+              
+              {/* Info box */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex gap-3">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                      Setelah membuat executor:
+                    </h4>
+                    <ul className="text-xs text-blue-800 space-y-1">
+                      <li>• Anda akan menerima API Key & Secret</li>
+                      <li>• Configure Windows Executor App dengan credentials tersebut</li>
+                      <li>• Windows app akan connect ke broker Anda</li>
+                      <li>• Broker & account info akan otomatis ditampilkan setelah connect</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-1">
-                  Account Number (optional)
-                </label>
-                <input
-                  type="text"
-                  value={formData.accountNumber}
-                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value })}
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-neutral-900 focus:border-transparent"
-                  placeholder="12345678"
-                />
-              </div>
+
               <div className="flex gap-3 mt-6">
                 <button
                   type="button"

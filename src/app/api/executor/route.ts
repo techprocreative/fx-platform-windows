@@ -15,8 +15,10 @@ export const dynamic = 'force-dynamic';
 const executorCreateSchema = z.object({
   name: z.string().min(3).max(100),
   platform: z.enum(['MT5', 'MT4']),
-  brokerServer: z.string().optional(),
-  accountNumber: z.string().optional(),
+  // Note: brokerServer and accountNumber are optional and should be populated
+  // automatically by the Windows executor app via heartbeat, not by user input
+  brokerServer: z.string().optional().nullable(),
+  accountNumber: z.string().optional().nullable(),
 });
 
 // Validation schema for executor update
