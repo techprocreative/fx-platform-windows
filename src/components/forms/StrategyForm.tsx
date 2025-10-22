@@ -5,16 +5,15 @@ import { useRouter } from "next/navigation";
 import toast from "react-hot-toast";
 import {
   AlertCircle,
-  BookOpen,
   ChevronLeft,
+  Edit2,
   HelpCircle,
   Info,
   Plus,
-  Shield,
+  Sparkles,
   Target,
   Trash2,
   TrendingUp,
-  Zap,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -32,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { AIStrategyGenerator } from "@/components/forms/AIStrategyGenerator";
 import { AIPreviewCard } from "@/components/forms/AIPreviewCard";
 
-type StrategyMode = "simple" | "advanced" | "ai";
+type StrategyMode = "ai" | "manual";
 
 type ConditionOperator =
   | "greater_than"
@@ -326,12 +325,10 @@ export function StrategyForm({
   // Note: onSubmit is intentionally not serialized as it's a client-side callback function
   const router = useRouter();
   const [mode, setMode] = useState<StrategyMode>(
-    initialData?.mode ?? initialMode,
+    initialData?.mode ?? (initialMode === "simple" || initialMode === "advanced" ? "manual" : initialMode),
   );
-  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(
-    initialData?.selectedTemplateId ?? null,
-  );
-  const [showTemplates, setShowTemplates] = useState(mode === "simple");
+  const [selectedTemplate, setSelectedTemplate] = useState<string | null>(null); // Templates removed
+  const [showTemplates, setShowTemplates] = useState(false); // Templates removed
   const [formData, setFormData] = useState<StrategyFormData>(
     initialData?.formData ?? DEFAULT_FORM_DATA,
   );
@@ -698,48 +695,34 @@ export function StrategyForm({
         </div>
 
         {showModeToggle && (
-          <div className="rounded-lg border border-neutral-200 bg-white p-1">
+          <div className="rounded-lg border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-white p-1">
             <div className="flex items-center gap-1">
-              <Button
-                type="button"
-                variant={mode === "simple" ? "primary" : "secondary"}
-                size="sm"
-                className="shadow-none"
-                onClick={() => {
-                  setMode("simple");
-                  setShowTemplates(true);
-                  if (!selectedTemplate) {
-                    setEntryConditions([]);
-                  }
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <BookOpen className="h-4 w-4" />
-                  Simple
-                </div>
-              </Button>
-              <Button
-                type="button"
-                variant={mode === "advanced" ? "primary" : "secondary"}
-                size="sm"
-                className="shadow-none"
-                onClick={() => setMode("advanced")}
-              >
-                <div className="flex items-center gap-2">
-                  <Shield className="h-4 w-4" />
-                  Advanced
-                </div>
-              </Button>
               <Button
                 type="button"
                 variant={mode === "ai" ? "primary" : "secondary"}
                 size="sm"
-                className="shadow-none"
+                className={cn(
+                  "flex-1 shadow-none",
+                  mode === "ai" && "bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800"
+                )}
                 onClick={() => setMode("ai")}
               >
                 <div className="flex items-center gap-2">
-                  <Zap className="h-4 w-4" />
-                  AI
+                  <Sparkles className="h-4 w-4" />
+                  <span className="font-semibold">AI Generate</span>
+                  <span className="ml-1 rounded-full bg-white/20 px-2 py-0.5 text-xs">Recommended</span>
+                </div>
+              </Button>
+              <Button
+                type="button"
+                variant={mode === "manual" ? "primary" : "secondary"}
+                size="sm"
+                className="flex-1 shadow-none"
+                onClick={() => setMode("manual")}
+              >
+                <div className="flex items-center gap-2">
+                  <Edit2 className="h-4 w-4" />
+                  <span>Manual</span>
                 </div>
               </Button>
             </div>
@@ -770,7 +753,8 @@ export function StrategyForm({
         </Card>
       )}
 
-      {mode === "simple" && showTemplates && (
+      {/* Templates section removed - simplified to AI/Manual only */}
+      {false && (
         <Card>
           <CardHeader>
             <CardTitle>Choose a Template</CardTitle>
@@ -859,6 +843,9 @@ export function StrategyForm({
         />
       )}
 
+      {/* Manual form sections - only show in manual mode */}
+      {mode === "manual" && (
+        <>
       <Card
         id="basic-information-section"
         className={highlightFields ? "ai-highlighted-section" : ""}
@@ -1283,6 +1270,8 @@ export function StrategyForm({
           </div>
         </CardContent>
       </Card>
+        </>
+      )}
     </form>
   );
 }
