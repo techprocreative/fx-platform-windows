@@ -457,17 +457,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Limit backtest period to prevent excessive API calls
-    const maxDays = 365;
+    // Limit backtest period to prevent excessive API calls and ensure data accuracy
+    const maxDays = 90; // Reduced from 365 to ensure different results
     const daysDiff =
       (endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
     if (daysDiff > maxDays) {
       releaseBacktestLock(lockId);
       throw new AppError(
         400,
-        `Backtest period cannot exceed ${maxDays} days`,
+        `Backtest period cannot exceed ${maxDays} days. For accurate results with different date ranges, use shorter periods (30-90 days). Longer periods may return identical data due to API limitations.`,
         "INVALID_DATE_RANGE",
       );
+    }
+    
+    // Add warning for periods over 60 days
+    if (daysDiff > 60) {
+      console.warn(`⚠️ WARNING: Long backtest period (${Math.round(daysDiff)} days) detected. Results may be less accurate due to API data limitations.`);
     }
 
     // Create backtest record with lock information
