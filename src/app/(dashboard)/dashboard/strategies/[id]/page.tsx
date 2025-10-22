@@ -11,6 +11,8 @@ import {
   Activity,
   Pause,
   Server,
+  Brain,
+  Sparkles,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -18,6 +20,7 @@ import toast from "react-hot-toast";
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useApiRequest } from "@/hooks/useApiRequest";
 import { ActivateStrategyDialog } from "@/components/strategies/ActivateStrategyDialog";
+import { OptimizationSuggestionModal } from "@/components/supervisor/OptimizationSuggestionModal";
 
 interface Strategy {
   id: string;
@@ -49,6 +52,12 @@ export default function StrategyDetailPage({
   const [backtestsLoading, setBacktestsLoading] = useState(false);
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [activating, setActivating] = useState(false);
+  
+  // Optimization state
+  const [optimizing, setOptimizing] = useState(false);
+  const [showOptimizationModal, setShowOptimizationModal] = useState(false);
+  const [optimizationData, setOptimizationData] = useState<any>(null);
+  const [executorIds, setExecutorIds] = useState<string[]>([]);
 
   useEffect(() => {
     execute(async () => {
@@ -142,6 +151,111 @@ export default function StrategyDetailPage({
     });
   };
 
+  // Fetch active executors for this strategy
+  useEffect(() => {
+    if (strategy) {
+      fetchActiveExecutors();
+    }
+  }, [strategy]);
+
+  const fetchActiveExecutors = async () => {
+    try {
+      const response = await fetch('/api/executor');
+      if (response.ok) {
+        const data = await response.json();
+        const onlineExecutors = (data.executors || [])
+          .filter((e: any) => e.isConnected)
+          .map((e: any) => e.id);
+        setExecutorIds(onlineExecutors);
+      }
+    } catch (error) {
+      console.error('Failed to fetch executors:', error);
+    }
+  };
+
+  const handleOptimize = async () => {
+    if (executorIds.length === 0) {
+      toast.error('No online executors available. Please connect an executor first.');
+      return;
+    }
+
+    if (strategy._count.trades < 20) {
+      const confirmed = confirm(
+        `This strategy only has ${strategy._count.trades} trades. ` +
+        'AI optimization requires at least 20 trades for reliable analysis. ' +
+        'Continue anyway?'
+      );
+      if (!confirmed) return;
+    }
+
+    setOptimizing(true);
+    try {
+      const response = await fetch('/api/supervisor/optimize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          strategyId: strategy.id,
+          executorIds: executorIds,
+          forceOptimize: strategy._count.trades < 20
+        })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Optimization failed');
+      }
+
+      if (result.status === 'APPROVED') {
+        toast.success('Optimization approved and applied automatically!');
+        // Refresh strategy data
+        handleStrategyActivated();
+      } else if (result.status === 'REQUIRES_APPROVAL') {
+        // Show modal for user approval
+        setOptimizationData({
+          optimizationId: result.optimizationId,
+          strategyName: strategy.name,
+          suggestions: result.suggestions,
+          overallConfidence: result.confidence,
+          reasoning: result.suggestions?.[0]?.reasoning || 'AI analysis complete'
+        });
+        setShowOptimizationModal(true);
+      } else if (result.status === 'REJECTED') {
+        toast.error(result.error || 'Optimization rejected by AI (low confidence)');
+      }
+    } catch (error: any) {
+      console.error('Optimization error:', error);
+      toast.error(error.message || 'Failed to optimize strategy');
+    } finally {
+      setOptimizing(false);
+    }
+  };
+
+  const handleApproveOptimization = async (optimizationId: string) => {
+    const response = await fetch(`/api/supervisor/optimize/${optimizationId}/apply`, {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to apply optimization');
+    }
+
+    // Refresh strategy data
+    handleStrategyActivated();
+  };
+
+  const handleRejectOptimization = async (optimizationId: string) => {
+    const response = await fetch(`/api/supervisor/optimize/${optimizationId}/reject`, {
+      method: 'POST'
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to reject optimization');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-96 items-center justify-center">
@@ -210,6 +324,28 @@ export default function StrategyDetailPage({
               Activate Strategy
             </button>
           )}
+          
+          {/* AI Optimization Button */}
+          <button
+            onClick={handleOptimize}
+            disabled={optimizing || strategy.status !== 'active'}
+            className="inline-flex items-center gap-2 px-4 py-2 text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            title={strategy.status !== 'active' ? 'Activate strategy first' : 'Optimize parameters with AI'}
+          >
+            {optimizing ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Analyzing...
+              </>
+            ) : (
+              <>
+                <Brain className="h-4 w-4" />
+                <Sparkles className="h-3 w-3 absolute -top-1 -right-1 text-yellow-300" />
+                Optimize with AI
+              </>
+            )}
+          </button>
+          
           <Link
             href={`/dashboard/executors`}
             className="inline-flex items-center gap-2 px-4 py-2 text-neutral-700 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
@@ -525,6 +661,24 @@ export default function StrategyDetailPage({
         onClose={() => setShowActivateDialog(false)}
         onActivated={handleStrategyActivated}
       />
+
+      {/* Optimization Suggestion Modal */}
+      {optimizationData && (
+        <OptimizationSuggestionModal
+          isOpen={showOptimizationModal}
+          onClose={() => {
+            setShowOptimizationModal(false);
+            setOptimizationData(null);
+          }}
+          optimizationId={optimizationData.optimizationId}
+          strategyName={optimizationData.strategyName}
+          suggestions={optimizationData.suggestions}
+          overallConfidence={optimizationData.overallConfidence}
+          reasoning={optimizationData.reasoning}
+          onApprove={handleApproveOptimization}
+          onReject={handleRejectOptimization}
+        />
+      )}
     </div>
   );
 }

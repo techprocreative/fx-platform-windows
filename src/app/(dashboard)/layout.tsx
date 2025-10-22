@@ -17,6 +17,7 @@ import {
   Server,
   Activity,
   History,
+  Brain,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -45,6 +46,11 @@ const navItems = [
     label: 'Executors',
     href: '/dashboard/executors',
     icon: Server,
+  },
+  {
+    label: 'AI Supervisor',
+    href: '/dashboard/supervisor',
+    icon: Brain,
   },
   {
     label: 'Trades',
