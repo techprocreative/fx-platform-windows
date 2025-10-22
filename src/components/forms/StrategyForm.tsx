@@ -562,8 +562,20 @@ export function StrategyForm({
   const handleAIGenerate = (data: {
     name: string;
     description: string;
+    symbol?: string;
+    timeframe?: string;
     rules: any;
+    parameters?: any;
   }) => {
+    // Debug log to verify received data
+    console.log('📝 StrategyForm received AI data:', {
+      name: data.name,
+      symbol: data.symbol,
+      timeframe: data.timeframe,
+      hasRules: !!data.rules,
+      hasParameters: !!data.parameters
+    });
+    
     // Store generated data and show preview
     setAIGeneratedData(data);
     setShowAIPreview(true);
@@ -573,11 +585,18 @@ export function StrategyForm({
   const handleReviewStrategy = () => {
     if (!aiGeneratedData) return;
 
+    // Debug log
+    console.log('🔍 Review Strategy - Data:', {
+      symbol: aiGeneratedData.symbol,
+      timeframe: aiGeneratedData.timeframe,
+      name: aiGeneratedData.name
+    });
+
     // Populate fields with AI data
     populateFieldsFromAI(aiGeneratedData);
 
-    // Switch to advanced mode
-    setMode("advanced");
+    // Switch to manual mode (not advanced - we removed that)
+    setMode("manual");
 
     // Hide preview
     setShowAIPreview(false);
@@ -603,6 +622,15 @@ export function StrategyForm({
     if (!aiGeneratedData) return;
 
     try {
+      // Debug log
+      console.log('✨ Use As-Is - Creating strategy with data:', {
+        name: aiGeneratedData.name,
+        symbol: aiGeneratedData.symbol || formData.symbol,
+        timeframe: aiGeneratedData.timeframe || formData.timeframe,
+        hasRules: !!aiGeneratedData.rules,
+        hasParameters: !!aiGeneratedData.parameters
+      });
+
       // Show loading toast
       toast.loading("Creating strategy...");
 
@@ -617,9 +645,8 @@ export function StrategyForm({
           }),
         ) || [];
 
-      // Extract parameters from rules structure if available
-      const rulesData = aiGeneratedData.rules as any;
-      const params = rulesData?.parameters || {};
+      // Extract parameters - check both aiGeneratedData.parameters and nested rules.parameters
+      const params = aiGeneratedData.parameters || (aiGeneratedData.rules as any)?.parameters || {};
 
       // Prepare exit rules
       const exitRulesFromAI = {

@@ -72,12 +72,19 @@ export class OpenRouterAI {
   async generateStrategy(prompt: string): Promise<Partial<Strategy>> {
     const systemPrompt = `You are an expert forex trading strategy generator. Generate realistic trading strategies in JSON format only.
 
+CRITICAL: READ USER PROMPT CAREFULLY!
+- Extract SYMBOL (e.g., XAUUSD, EURUSD) from user's text
+- Extract TIMEFRAME (e.g., 15M = M15, 1H = H1) from user's text
+- If user mentions "gold" = XAUUSD
+- If user mentions "15 minute" or "15M" = M15
+- Pay close attention to what the user actually requested!
+
 Your response must be a valid JSON object with the following structure:
 {
   "name": "Strategy Name",
   "description": "Brief description of the strategy",
-  "symbol": "SYMBOL_FROM_USER_REQUEST",
-  "timeframe": "M1|M5|M15|M30|H1|H4|D1",
+  "symbol": "SYMBOL_EXTRACTED_FROM_USER_REQUEST",
+  "timeframe": "TIMEFRAME_EXTRACTED_FROM_USER_REQUEST",
   "rules": [
     {
       "name": "Rule name",
@@ -195,18 +202,23 @@ CRITICAL REQUIREMENTS:
       const promptLower = prompt.toLowerCase();
       let finalSymbol = null;
 
-        // Commodities
-        if (promptLower.includes('xauusd') || promptLower.includes('gold') || promptLower.includes('xau')) {
+        // IMPORTANT: Check most specific matches FIRST
+        // Commodities (check these FIRST - high priority)
+        if (promptLower.match(/\bxauusd\b/)) {
           finalSymbol = 'XAUUSD';
-        } else if (promptLower.includes('xagusd') || promptLower.includes('silver') || promptLower.includes('xag')) {
+        } else if (promptLower.match(/\bgold\b/)) {
+          finalSymbol = 'XAUUSD';
+        } else if (promptLower.match(/\bxau\b/)) {
+          finalSymbol = 'XAUUSD';
+        } else if (promptLower.match(/\bxagusd\b/) || promptLower.match(/\bsilver\b/) || promptLower.match(/\bxag\b/)) {
           finalSymbol = 'XAGUSD';
-        } else if (promptLower.includes('usoil') || promptLower.includes('wti') || promptLower.includes('crude oil')) {
+        } else if (promptLower.match(/\busoil\b/) || promptLower.match(/\bwti\b/) || promptLower.includes('crude oil')) {
           finalSymbol = 'USOIL';
-        } else if (promptLower.includes('ukoil') || promptLower.includes('brent')) {
+        } else if (promptLower.match(/\bukoil\b/) || promptLower.match(/\bbrent\b/)) {
           finalSymbol = 'UKOIL';
         }
-        // Major Forex Pairs
-        else if (promptLower.includes('eurusd') || promptLower.includes('euro')) {
+        // Major Forex Pairs (more specific matches)
+        else if (promptLower.match(/\beurusd\b/) || promptLower.match(/\beur\s*\/\s*usd\b/) || (promptLower.includes('euro') && promptLower.includes('dollar'))) {
           finalSymbol = 'EURUSD';
         } else if (promptLower.includes('gbpusd') || promptLower.includes('pound') || promptLower.includes('cable') || promptLower.includes('sterling')) {
           finalSymbol = 'GBPUSD';

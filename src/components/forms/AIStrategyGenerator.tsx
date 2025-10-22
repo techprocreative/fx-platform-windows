@@ -14,7 +14,14 @@ import {
 } from "@/components/ui/Card";
 
 interface AIStrategyGeneratorProps {
-  onGenerate: (data: { name: string; description: string; rules: any }) => void;
+  onGenerate: (data: { 
+    name: string; 
+    description: string; 
+    symbol?: string; 
+    timeframe?: string;
+    rules: any;
+    parameters?: any;
+  }) => void;
 }
 
 export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
@@ -88,10 +95,23 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
 
       // Convert AI-generated data to form format
       const strategy = data.strategy;
+      
+      // Debug log to verify what we received from API
+      console.log('✅ AI Strategy Received:', {
+        name: strategy.name,
+        symbol: strategy.symbol,
+        timeframe: strategy.timeframe,
+        rulesCount: strategy.rules?.length || 0,
+        hasParameters: !!strategy.parameters
+      });
+      
       onGenerate({
         name: strategy.name,
         description: strategy.description,
+        symbol: strategy.symbol,         // IMPORTANT: Pass symbol!
+        timeframe: strategy.timeframe,   // IMPORTANT: Pass timeframe!
         rules: strategy.rules,
+        parameters: strategy.parameters, // IMPORTANT: Pass parameters!
       });
 
       toast.success("Strategy generated! Review and customize it below.");
