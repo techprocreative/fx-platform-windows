@@ -441,9 +441,160 @@ export class HistoricalDataFetcher {
       return cachedData;
     }
 
-    // Yahoo Finance temporarily disabled due to compilation issues
-    console.log("Yahoo Finance temporarily disabled - using TwelveData only");
-    return [];
+    try {
+      // Check if Yahoo Finance API keys are available
+      const apiKey = process.env.YAHOO_FINANCE_API_KEY;
+      const apiHost = process.env.YAHOO_FINANCE_RAPIDAPI_HOST;
+
+      if (!apiKey || !apiHost) {
+        console.error("❌ Yahoo Finance API keys not configured");
+        console.error("   YAHOO_FINANCE_API_KEY:", apiKey ? "✅ Set" : "❌ Not set");
+        console.error("   YAHOO_FINANCE_RAPIDAPI_HOST:", apiHost ? "✅ Set" : "❌ Not set");
+        return [];
+      }
+
+      console.log(`📡 Fetching from Yahoo Finance: ${symbol} ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`);
+      console.log(`🔑 Using API key: ${apiKey.substring(0, 8)}...`);
+      console.log(`🔑 Using API host: ${apiHost}`);
+
+      // Convert symbol to Yahoo Finance format
+      let yahooSymbol = symbol;
+      if (symbol.toUpperCase() === "XAUUSD") {
+        yahooSymbol = "GC=F"; // Gold futures
+      } else if (symbol.toUpperCase() === "XAGUSD") {
+        yahooSymbol = "SI=F"; // Silver futures
+      } else if (symbol.includes("USD")) {
+        // Convert forex pairs: EURUSD -> EURUSD=X
+        yahooSymbol = `${symbol}=X`;
+      }
+
+      // Convert interval to Yahoo Finance format
+      const yahooInterval = this.convertIntervalToYahoo(interval);
+
+      // Calculate timestamps for Yahoo Finance API
+      const startTimestamp = Math.floor(startDate.getTime() / 1000);
+      const endTimestamp = Math.floor(endDate.getTime() / 1000);
+
+      console.log(`🔍 YAHOO FINANCE DEBUG - API Request:`);
+      console.log(`   Symbol: ${yahooSymbol}`);
+      console.log(`   Interval: ${yahooInterval}`);
+      console.log(`   Start Timestamp: ${startTimestamp}`);
+      console.log(`   End Timestamp: ${endTimestamp}`);
+
+      // Fetch data from Yahoo Finance via RapidAPI
+      const url = `https://${apiHost}/market/v2/get-chart`;
+      const params = new URLSearchParams({
+        symbol: yahooSymbol,
+        interval: yahooInterval,
+        period1: startTimestamp.toString(),
+        period2: endTimestamp.toString(),
+      });
+
+      const response = await fetch(`${url}?${params}`, {
+        method: 'GET',
+        headers: {
+          'X-RapidAPI-Key': apiKey,
+          'X-RapidAPI-Host': apiHost,
+        },
+      });
+
+      if (!response.ok) {
+        console.error(`❌ Yahoo Finance API error: ${response.status} - ${response.statusText}`);
+        return [];
+      }
+
+      const data = await response.json();
+
+      console.log(`🔍 YAHOO FINANCE DEBUG - API Response:`);
+      console.log(`   Response status: ${data.chart?.error ? 'error' : 'ok'}`);
+      console.log(`   Chart result count: ${data.chart?.result?.length || 0}`);
+
+      if (!data.chart?.result || data.chart.result.length === 0) {
+        console.error("❌ Yahoo Finance response missing chart data:", data);
+        return [];
+      }
+
+      const chart = data.chart.result[0];
+      const timestamps = chart.timestamp || [];
+      const quotes = chart.indicators?.quote?.[0] || {};
+      const closes = quotes.close || [];
+      const opens = quotes.open || [];
+      const highs = quotes.high || [];
+      const lows = quotes.low || [];
+      const volumes = quotes.volume || [];
+
+      if (timestamps.length === 0 || closes.length === 0) {
+        console.error("❌ Yahoo Finance response has no data points");
+        return [];
+      }
+
+      const marketData: EnhancedMarketData[] = timestamps.map((timestamp: number, index: number) => ({
+        timestamp: new Date(timestamp * 1000),
+        open: opens[index] || closes[index] || 0,
+        high: highs[index] || closes[index] || 0,
+        low: lows[index] || closes[index] || 0,
+        close: closes[index] || 0,
+        volume: volumes[index] || 0,
+        symbol,
+        interval,
+        currency: "USD",
+        exchange: "YAHOO",
+      }));
+
+      // DEBUG: Log processed data
+      console.log(`🔍 YAHOO FINANCE DEBUG - Processed data:`);
+      if (marketData.length > 0) {
+        const actualStart = marketData[0].timestamp;
+        const actualEnd = marketData[marketData.length - 1].timestamp;
+        console.log(`   First data point: ${actualStart.toISOString()} - Close: ${marketData[0].close}`);
+        console.log(`   Last data point: ${actualEnd.toISOString()} - Close: ${marketData[marketData.length - 1].close}`);
+        console.log(`   Data range: ${actualEnd.getTime() - actualStart.getTime()} ms`);
+        console.log(`   Data points: ${marketData.length}`);
+
+        // Validate that API response matches requested date range
+        const requestedStart = new Date(cacheKey.startDate);
+        const requestedEnd = new Date(cacheKey.endDate);
+        const startDiff = Math.abs(actualStart.getTime() - requestedStart.getTime());
+        const endDiff = Math.abs(actualEnd.getTime() - requestedEnd.getTime());
+        const toleranceMs = 24 * 60 * 60 * 1000; // 1 day tolerance
+
+        if (startDiff > toleranceMs || endDiff > toleranceMs) {
+          console.warn(`⚠️ YAHOO FINANCE WARNING - Date range mismatch:`);
+          console.warn(`   Requested: ${requestedStart.toISOString()} to ${requestedEnd.toISOString()}`);
+          console.warn(`   Received: ${actualStart.toISOString()} to ${actualEnd.toISOString()}`);
+          console.warn(`   Start difference: ${startDiff / (1000 * 60 * 60)} hours`);
+          console.warn(`   End difference: ${endDiff / (1000 * 60 * 60)} hours`);
+          
+          // If date range is significantly different, don't cache the data
+          if (startDiff > toleranceMs * 7 || endDiff > toleranceMs * 7) {
+            console.error(`❌ YAHOO FINANCE ERROR - Date range too different, not caching`);
+            return marketData; // Return data but don't cache
+          }
+        }
+      }
+
+      // Cache the fetched data
+      if (marketData.length > 0) {
+        console.log(`🔍 YAHOO FINANCE DEBUG - Caching data with key:`, cacheKey);
+        await marketDataCache.set(cacheKey, marketData, "yahoo");
+      }
+
+      return marketData;
+    } catch (error) {
+      console.error("❌ Yahoo Finance fetch error:", error);
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+        symbol,
+        interval,
+        startDate: cacheKey.startDate,
+        endDate: cacheKey.endDate,
+        apiKeyExists: !!process.env.YAHOO_FINANCE_API_KEY,
+        apiKeyLength: process.env.YAHOO_FINANCE_API_KEY?.length || 0,
+        apiHostExists: !!process.env.YAHOO_FINANCE_RAPIDAPI_HOST,
+      });
+      return [];
+    }
   }
 
   private static convertIntervalToYahoo(interval: string): string {
