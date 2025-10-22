@@ -179,6 +179,28 @@ export class MarketDataCache {
       const ttl = this.getTTL(key.interval);
       const now = Date.now();
 
+      // FIX: Validate data range before caching
+      if (data.length > 0) {
+        const actualStart = data[0].timestamp.toISOString().split('T')[0];
+        const actualEnd = data[data.length - 1].timestamp.toISOString().split('T')[0];
+        
+        console.log(`🔍 CACHE DEBUG - Validating data range before caching:`);
+        console.log(`   Requested: ${key.startDate} to ${key.endDate}`);
+        console.log(`   Actual: ${actualStart} to ${actualEnd}`);
+        
+        // Only cache if data range matches requested range (with some tolerance)
+        const startDiff = Math.abs(new Date(key.startDate).getTime() - new Date(actualStart).getTime());
+        const endDiff = Math.abs(new Date(key.endDate).getTime() - new Date(actualEnd).getTime());
+        const toleranceMs = 7 * 24 * 60 * 60 * 1000; // 7 days tolerance
+        
+        if (startDiff > toleranceMs || endDiff > toleranceMs) {
+          console.warn(`⚠️ CACHE WARNING - Data range mismatch, not caching`);
+          console.warn(`   Start difference: ${startDiff / (1000 * 60 * 60)} hours`);
+          console.warn(`   End difference: ${endDiff / (1000 * 60 * 60)} hours`);
+          return; // Don't cache if range is too different
+        }
+      }
+
       const cacheData: CachedMarketData = {
         data,
         timestamp: now,
@@ -217,17 +239,26 @@ export class MarketDataCache {
   // Retrieve market data from cache
   async get(key: CacheKey): Promise<EnhancedMarketData[] | null> {
     if (!this.isRedisAvailable) {
-      console.log('Cache not available, returning null');
+      console.log('🔍 CACHE DEBUG - Cache not available, returning null');
       return null;
     }
 
     try {
       const cacheKey = this.generateCacheKey(key);
+      
+      // DEBUG: Log cache key details
+      console.log(`🔍 CACHE DEBUG - Looking for cache:`);
+      console.log(`   Symbol: ${key.symbol}`);
+      console.log(`   Interval: ${key.interval}`);
+      console.log(`   Start Date: ${key.startDate}`);
+      console.log(`   End Date: ${key.endDate}`);
+      console.log(`   Source: ${key.source}`);
+      console.log(`   Generated Cache Key: ${cacheKey}`);
 
       const cached = await this.redis.get(cacheKey);
 
       if (!cached) {
-        console.log(`💨 Cache miss for ${key.symbol} ${key.interval}`);
+        console.log(`💨 Cache miss for ${key.symbol} ${key.interval} ${key.startDate} to ${key.endDate}`);
         return null;
       }
 
@@ -244,6 +275,7 @@ export class MarketDataCache {
       const data = this.decompressData(parsed.compressed);
 
       console.log(`🎯 Cache hit: ${cacheData.metadata.totalPoints} data points for ${key.symbol} ${key.interval}`);
+      console.log(`🔍 CACHE DEBUG - Cached data range: ${cacheData.metadata.dateRange.start} to ${cacheData.metadata.dateRange.end}`);
 
       // Update cache stats
       await this.updateCacheStats('get', key.interval, data.length);
@@ -370,6 +402,25 @@ export class MarketDataCache {
     }
 
     console.log('✅ Preloading completed');
+  }
+}
+
+// Clear cache for specific symbol and interval (for debugging)
+export async function clearSymbolCache(symbol: string, interval?: string): Promise<void> {
+  if (!marketDataCache.isAvailable()) {
+    console.log('Cache not available, cannot clear');
+    return;
+  }
+
+  try {
+    // This is a simplified approach - in production you might want to scan all keys
+    console.log(`🗑️ Clearing cache for ${symbol}${interval ? ` ${interval}` : ' all intervals'}`);
+    
+    // For now, we'll clear all cache and let it rebuild
+    await marketDataCache.clear();
+    console.log('✅ Cache cleared successfully');
+  } catch (error) {
+    console.error('❌ Error clearing cache:', error);
   }
 }
 

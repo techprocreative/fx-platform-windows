@@ -299,16 +299,57 @@ export class HistoricalDataFetcher {
         return [];
       }
 
-      const response = await client.timeSeries({
+      // DEBUG: Log API request parameters
+      console.log(`🔍 TWELVEDATA DEBUG - API Request:`);
+      console.log(`   Symbol: ${twelveDataSymbol}`);
+      console.log(`   Interval: ${interval}`);
+      console.log(`   Start Date: ${cacheKey.startDate}`);
+      console.log(`   End Date: ${cacheKey.endDate}`);
+
+      // FIX: Remove outputsize to let TwelveData respect date range
+      // Calculate approximate data points needed based on date range and interval
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+      let estimatedDataPoints = 0;
+      
+      switch (interval) {
+        case "1min": estimatedDataPoints = daysDiff * 24 * 60; break;
+        case "5min": estimatedDataPoints = daysDiff * 24 * 12; break;
+        case "15min": estimatedDataPoints = daysDiff * 24 * 4; break;
+        case "30min": estimatedDataPoints = daysDiff * 24 * 2; break;
+        case "1h": estimatedDataPoints = daysDiff * 24; break;
+        case "4h": estimatedDataPoints = daysDiff * 6; break;
+        case "1d": estimatedDataPoints = daysDiff; break;
+        default: estimatedDataPoints = daysDiff * 24;
+      }
+
+      // Cap at reasonable limit but prioritize date range
+      const outputSize = Math.min(estimatedDataPoints, 5000);
+      console.log(`   Estimated Data Points: ${estimatedDataPoints}`);
+      console.log(`   Output Size: ${outputSize}`);
+
+      const apiParams: any = {
         symbol: twelveDataSymbol,
         interval,
         start_date: cacheKey.startDate,
         end_date: cacheKey.endDate,
-        outputsize: 5000,
-      });
+      };
 
+      // Only add outputsize if we have reasonable estimate
+      if (outputSize > 0 && outputSize < 5000) {
+        apiParams.outputsize = outputSize.toString();
+      }
+
+      const response = await client.timeSeries(apiParams);
+
+      // DEBUG: Log API response
+      console.log(`🔍 TWELVEDATA DEBUG - API Response:`);
+      console.log(`   Response status: ${response.status}`);
+      console.log(`   Values count: ${response.values?.length || 0}`);
+      console.log(`   Response keys:`, Object.keys(response));
+      
       if (!response.values) {
         console.error("❌ TwelveData response missing values:", response);
+        console.error("❌ Full response object:", JSON.stringify(response, null, 2));
         return [];
       }
 
@@ -325,8 +366,41 @@ export class HistoricalDataFetcher {
         exchange: chart.exchange || "FX",
       }));
 
+      // DEBUG: Log processed data
+      console.log(`🔍 TWELVEDATA DEBUG - Processed data:`);
+      if (data.length > 0) {
+        const actualStart = data[0].timestamp;
+        const actualEnd = data[data.length - 1].timestamp;
+        console.log(`   First data point: ${actualStart.toISOString()} - Close: ${data[0].close}`);
+        console.log(`   Last data point: ${actualEnd.toISOString()} - Close: ${data[data.length - 1].close}`);
+        console.log(`   Data range: ${actualEnd.getTime() - actualStart.getTime()} ms`);
+        console.log(`   Data points: ${data.length}`);
+
+        // FIX: Validate that API response matches requested date range
+        const requestedStart = new Date(cacheKey.startDate);
+        const requestedEnd = new Date(cacheKey.endDate);
+        const startDiff = Math.abs(actualStart.getTime() - requestedStart.getTime());
+        const endDiff = Math.abs(actualEnd.getTime() - requestedEnd.getTime());
+        const toleranceMs = 24 * 60 * 60 * 1000; // 1 day tolerance
+
+        if (startDiff > toleranceMs || endDiff > toleranceMs) {
+          console.warn(`⚠️ TWELVEDATA WARNING - Date range mismatch:`);
+          console.warn(`   Requested: ${requestedStart.toISOString()} to ${requestedEnd.toISOString()}`);
+          console.warn(`   Received: ${actualStart.toISOString()} to ${actualEnd.toISOString()}`);
+          console.warn(`   Start difference: ${startDiff / (1000 * 60 * 60)} hours`);
+          console.warn(`   End difference: ${endDiff / (1000 * 60 * 60)} hours`);
+          
+          // If date range is significantly different, don't cache the data
+          if (startDiff > toleranceMs * 7 || endDiff > toleranceMs * 7) {
+            console.error(`❌ TWELVEDATA ERROR - Date range too different, not caching`);
+            return data; // Return data but don't cache
+          }
+        }
+      }
+
       // Cache the fetched data
       if (data.length > 0) {
+        console.log(`🔍 TWELVEDATA DEBUG - Caching data with key:`, cacheKey);
         await marketDataCache.set(cacheKey, data, "twelvedata");
       }
 
@@ -445,11 +519,22 @@ export class BacktestEngine {
     // Store symbol and get pip configuration
     this.symbol = symbol;
     this.pipConfig = getPipConfig(symbol);
+    
+    // DEBUG: Log date range details
+    console.log(`🔍 BACKTEST DEBUG - Loading data:`);
+    console.log(`   Symbol: ${symbol}`);
+    console.log(`   Interval: ${interval}`);
+    console.log(`   Requested Start Date: ${startDate.toISOString()}`);
+    console.log(`   Requested End Date: ${endDate.toISOString()}`);
+    console.log(`   Days Difference: ${(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)}`);
+    console.log(`   Preferred Source: ${preferredSource}`);
     console.log(
       `🔧 Using pip configuration for ${symbol}: multiplier=${this.pipConfig.pipMultiplier}, minPips=${this.pipConfig.minPips}, maxPips=${this.pipConfig.maxPips}`,
     );
     // Try preferred source first, then fallback to the other
     let data: EnhancedMarketData[] = [];
+
+    console.log(`🔍 BACKTEST DEBUG - Attempting to fetch data from ${preferredSource} first...`);
 
     if (preferredSource === "twelvedata") {
       data = await HistoricalDataFetcher.fetchFromTwelveData(
@@ -458,13 +543,16 @@ export class BacktestEngine {
         startDate,
         endDate,
       );
+      console.log(`🔍 BACKTEST DEBUG - TwelveData returned ${data.length} data points`);
       if (data.length === 0) {
+        console.log(`🔍 BACKTEST DEBUG - TwelveData failed, trying Yahoo Finance...`);
         data = await HistoricalDataFetcher.fetchFromYahooFinance(
           symbol,
           interval,
           startDate,
           endDate,
         );
+        console.log(`🔍 BACKTEST DEBUG - Yahoo Finance returned ${data.length} data points`);
       }
     } else if (preferredSource === "yahoo") {
       data = await HistoricalDataFetcher.fetchFromYahooFinance(
@@ -473,21 +561,37 @@ export class BacktestEngine {
         startDate,
         endDate,
       );
+      console.log(`🔍 BACKTEST DEBUG - Yahoo Finance returned ${data.length} data points`);
       if (data.length === 0) {
+        console.log(`🔍 BACKTEST DEBUG - Yahoo Finance failed, trying TwelveData...`);
         data = await HistoricalDataFetcher.fetchFromTwelveData(
           symbol,
           interval,
           startDate,
           endDate,
         );
+        console.log(`🔍 BACKTEST DEBUG - TwelveData returned ${data.length} data points`);
       }
     }
 
     // No fallback to sample data - throw error if no data available
     if (data.length === 0) {
+      console.error(`❌ BACKTEST DEBUG - No data available for ${symbol} from any source`);
       throw new Error(
         `Failed to fetch real market data for ${symbol} from both TwelveData and Yahoo Finance APIs. Please check your API keys and internet connection.`,
       );
+    }
+
+    // DEBUG: Log actual data range received
+    if (data.length > 0) {
+      const actualStartDate = data[0].timestamp;
+      const actualEndDate = data[data.length - 1].timestamp;
+      console.log(`🔍 BACKTEST DEBUG - Actual data range:`);
+      console.log(`   Actual Start Date: ${actualStartDate.toISOString()}`);
+      console.log(`   Actual End Date: ${actualEndDate.toISOString()}`);
+      console.log(`   Actual Days: ${(actualEndDate.getTime() - actualStartDate.getTime()) / (1000 * 60 * 60 * 24)}`);
+      console.log(`   First 3 data points:`, data.slice(0, 3).map(d => ({ time: d.timestamp.toISOString(), close: d.close })));
+      console.log(`   Last 3 data points:`, data.slice(-3).map(d => ({ time: d.timestamp.toISOString(), close: d.close })));
     }
 
     console.log(
