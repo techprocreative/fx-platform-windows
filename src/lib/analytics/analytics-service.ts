@@ -25,6 +25,12 @@ export interface StrategyPerformance {
   averageProfit: number;
 }
 
+export interface EquityPoint {
+  timestamp: string;
+  equity: number;
+  date: string;
+}
+
 export interface AnalyticsData {
   // Overall metrics
   totalTrades: number;
@@ -47,6 +53,9 @@ export interface AnalyticsData {
   // Breakdown
   monthlyData: MonthlyPerformance[];
   strategyPerformance: StrategyPerformance[];
+  
+  // Equity curve for charts
+  equityCurve: EquityPoint[];
   
   // Source tracking
   source: 'trades' | 'backtests' | 'combined';
@@ -92,6 +101,9 @@ export function calculateTradeAnalytics(
   // Monthly breakdown
   const monthlyData = calculateMonthlyPerformance(closedTrades);
   
+  // Equity curve
+  const equityCurve = calculateEquityCurve(closedTrades, initialBalance);
+  
   // Strategy performance - will be empty here, calculated separately
   const strategyPerformance: StrategyPerformance[] = [];
   
@@ -110,6 +122,7 @@ export function calculateTradeAnalytics(
     sharpeRatio,
     monthlyData,
     strategyPerformance,
+    equityCurve,
     source: 'trades',
   };
 }
@@ -160,6 +173,16 @@ export function calculateBacktestAnalytics(
   // For backtests, monthly data would be the backtest execution dates
   const monthlyData: MonthlyPerformance[] = [];
   
+  // Equity curve for backtests (simplified - just show final results)
+  const equityCurve: EquityPoint[] = backtests.map(backtest => {
+    const results = backtest.results as BacktestResults | null;
+    return {
+      timestamp: backtest.createdAt.toISOString(),
+      equity: results?.finalBalance || 0,
+      date: backtest.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    };
+  });
+  
   return {
     totalTrades,
     winningTrades: winningBacktests,
@@ -175,6 +198,7 @@ export function calculateBacktestAnalytics(
     sharpeRatio: 0, // Would need to calculate from backtest equity curves
     monthlyData,
     strategyPerformance: [],
+    equityCurve,
     source: 'backtests',
   };
 }
@@ -372,6 +396,55 @@ function calculateBasicStrategyStats(trades: AnalyticsTrade[]) {
 }
 
 /**
+ * Calculate equity curve from trades
+ */
+function calculateEquityCurve(
+  trades: AnalyticsTrade[],
+  initialBalance: number
+): EquityPoint[] {
+  if (trades.length === 0) {
+    return [{
+      timestamp: new Date().toISOString(),
+      equity: initialBalance,
+      date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    }];
+  }
+  
+  const equityCurve: EquityPoint[] = [];
+  let balance = initialBalance;
+  
+  // Add initial point
+  equityCurve.push({
+    timestamp: trades[0].entryTime.toISOString(),
+    equity: initialBalance,
+    date: trades[0].entryTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  });
+  
+  // Sort trades by exit time
+  const sortedTrades = [...trades]
+    .filter(t => t.exitTime)
+    .sort((a, b) => {
+      if (!a.exitTime || !b.exitTime) return 0;
+      return a.exitTime.getTime() - b.exitTime.getTime();
+    });
+  
+  // Calculate equity after each trade
+  sortedTrades.forEach(trade => {
+    balance += trade.profit;
+    
+    if (trade.exitTime) {
+      equityCurve.push({
+        timestamp: trade.exitTime.toISOString(),
+        equity: balance,
+        date: trade.exitTime.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+      });
+    }
+  });
+  
+  return equityCurve;
+}
+
+/**
  * Create empty analytics data
  */
 function createEmptyAnalytics(source: 'trades' | 'backtests' | 'combined'): AnalyticsData {
@@ -390,6 +463,7 @@ function createEmptyAnalytics(source: 'trades' | 'backtests' | 'combined'): Anal
     sharpeRatio: 0,
     monthlyData: [],
     strategyPerformance: [],
+    equityCurve: [],
     source,
   };
 }

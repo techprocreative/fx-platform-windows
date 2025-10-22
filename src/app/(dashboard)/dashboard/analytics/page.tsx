@@ -5,6 +5,9 @@ import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { EquityCurveChart } from '@/components/analytics/EquityCurveChart';
+import { ProfitDistributionChart } from '@/components/analytics/ProfitDistributionChart';
+import { MonthlyPerformanceChart } from '@/components/analytics/MonthlyPerformanceChart';
 import {
   BarChart3,
   TrendingUp,
@@ -44,6 +47,11 @@ interface PerformanceData {
     profit: number;
     winRate: number;
     trades: number;
+  }[];
+  equityCurve: {
+    timestamp: string;
+    equity: number;
+    date: string;
   }[];
   // Additional metadata from new API
   source?: 'trades' | 'backtests' | 'combined';
@@ -267,28 +275,21 @@ export default function AnalyticsPage() {
             <LineChart className="h-5 w-5" />
             Equity Curve
           </h2>
-          <div className="h-64 bg-neutral-50 rounded-lg flex items-center justify-center">
-            <div className="text-center">
-              <LineChart className="h-12 w-12 text-neutral-400 mx-auto mb-2" />
-              <p className="text-neutral-500">Interactive equity chart</p>
-              <p className="text-sm text-neutral-400">Shows account balance over time</p>
-            </div>
-          </div>
+          <EquityCurveChart 
+            data={data.equityCurve || []} 
+            initialBalance={10000}
+          />
         </div>
 
         {/* Profit Distribution */}
         <div className="bg-white rounded-lg border border-neutral-200 p-6">
           <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
             <PieChart className="h-5 w-5" />
-            Profit Distribution
+            Profit Distribution by Strategy
           </h2>
-          <div className="h-64 bg-neutral-50 rounded-lg flex items-center justify-center">
-            <div className="text-center">
-              <PieChart className="h-12 w-12 text-neutral-400 mx-auto mb-2" />
-              <p className="text-neutral-500">Profit by symbol</p>
-              <p className="text-sm text-neutral-400">Breakdown of profitability</p>
-            </div>
-          </div>
+          <ProfitDistributionChart 
+            data={data.strategyPerformance || []}
+          />
         </div>
       </div>
 
@@ -351,45 +352,19 @@ export default function AnalyticsPage() {
         )}
       </div>
 
+      {/* Monthly Performance Chart - Full Width */}
+      <div className="bg-white rounded-lg border border-neutral-200 p-6">
+        <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+          <BarChart3 className="h-5 w-5" />
+          Monthly Performance
+        </h2>
+        <MonthlyPerformanceChart 
+          data={data.monthlyData.filter(m => m.month !== 'No Data')} 
+        />
+      </div>
+
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Monthly Performance */}
-        <div className="bg-white rounded-lg border border-neutral-200 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-4">Monthly Performance</h2>
-          {data.monthlyData.length > 0 ? (
-            <div className="space-y-3">
-              {data.monthlyData.map((month) => (
-                <div key={month.month} className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium text-neutral-900 w-16">
-                      {month.month}
-                    </span>
-                    <div className="flex-1 bg-neutral-100 rounded-full h-2">
-                      <div
-                        className={`h-2 rounded-full ${
-                          month.profit >= 0 ? 'bg-green-500' : 'bg-red-500'
-                        }`}
-                        style={{
-                          width: `${Math.min(Math.abs(month.profit) * 2, 100)}%`
-                        }}
-                      />
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`text-sm font-medium ${
-                      month.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      ${month.profit.toFixed(2)}
-                    </p>
-                    <p className="text-xs text-neutral-500">{month.trades} trades</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <p className="text-neutral-500 text-center py-4">No monthly data available</p>
-          )}
-        </div>
 
         {/* Strategy Performance */}
         <div className="bg-white rounded-lg border border-neutral-200 p-6">

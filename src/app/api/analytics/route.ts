@@ -150,6 +150,12 @@ export async function GET(request: NextRequest) {
         winRate: parseFloat(sp.winRate.toFixed(2)),
         trades: sp.trades,
       })),
+      // Equity curve for charts
+      equityCurve: analytics.equityCurve.map(point => ({
+        timestamp: point.timestamp,
+        equity: parseFloat(point.equity.toFixed(2)),
+        date: point.date,
+      })),
       // Additional metadata for debugging
       source: analytics.source,
       hasRealTrades: closedTrades.length > 0,
