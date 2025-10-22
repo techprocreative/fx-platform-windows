@@ -334,7 +334,6 @@ const BacktestRequestSchema = z.object({
   startDate: z.string().datetime(),
   endDate: z.string().datetime(),
   initialBalance: z.number().min(100).max(1000000),
-  preferredDataSource: z.enum(["twelvedata", "yahoo"]).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -487,7 +486,7 @@ export async function POST(request: NextRequest) {
         settings: {
           symbol: validatedData.symbol,
           interval: validatedData.interval,
-          preferredDataSource: validatedData.preferredDataSource,
+          dataSource: "yahoo_finance",
           lockId: lockId, // Store lock ID for tracking
         },
       },
@@ -523,7 +522,7 @@ export async function POST(request: NextRequest) {
         },
       };
 
-      // Run backtest
+      // Run backtest with Yahoo Finance
       const { runBacktest } = await import("../../../lib/backtest/engine");
       const result = await runBacktest(validatedData.strategyId, {
         startDate,
@@ -532,7 +531,6 @@ export async function POST(request: NextRequest) {
         symbol: validatedData.symbol,
         interval: validatedData.interval,
         strategy: transformedStrategy,
-        preferredDataSource: validatedData.preferredDataSource || "twelvedata", // Force default to twelvedata
       });
 
       // Update backtest with results

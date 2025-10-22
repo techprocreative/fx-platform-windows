@@ -11,7 +11,7 @@ export interface CacheKey {
   interval: string;
   startDate: string;
   endDate: string;
-  source: 'twelvedata' | 'yahoo';
+  source: 'yahoo';
 }
 
 export interface CachedMarketData {
@@ -101,7 +101,7 @@ export class MarketDataCache {
         interval,
         startDate,
         endDate,
-        source: source as 'twelvedata' | 'yahoo',
+        source: 'yahoo',
       };
     } catch {
       return null;
@@ -179,7 +179,7 @@ export class MarketDataCache {
       const ttl = this.getTTL(key.interval);
       const now = Date.now();
 
-      // FIX: Validate data range before caching
+      // STRICT VALIDATION: Validate data range before caching (1 day tolerance)
       if (data.length > 0) {
         const actualStart = data[0].timestamp.toISOString().split('T')[0];
         const actualEnd = data[data.length - 1].timestamp.toISOString().split('T')[0];
@@ -188,15 +188,16 @@ export class MarketDataCache {
         console.log(`   Requested: ${key.startDate} to ${key.endDate}`);
         console.log(`   Actual: ${actualStart} to ${actualEnd}`);
         
-        // Only cache if data range matches requested range (with some tolerance)
+        // STRICT: Only cache if data range matches requested range within 1 day tolerance
         const startDiff = Math.abs(new Date(key.startDate).getTime() - new Date(actualStart).getTime());
         const endDiff = Math.abs(new Date(key.endDate).getTime() - new Date(actualEnd).getTime());
-        const toleranceMs = 7 * 24 * 60 * 60 * 1000; // 7 days tolerance
+        const STRICT_TOLERANCE_MS = 24 * 60 * 60 * 1000; // 1 day tolerance (strict)
         
-        if (startDiff > toleranceMs || endDiff > toleranceMs) {
-          console.warn(`⚠️ CACHE WARNING - Data range mismatch, not caching`);
-          console.warn(`   Start difference: ${startDiff / (1000 * 60 * 60)} hours`);
-          console.warn(`   End difference: ${endDiff / (1000 * 60 * 60)} hours`);
+        if (startDiff > STRICT_TOLERANCE_MS || endDiff > STRICT_TOLERANCE_MS) {
+          console.warn(`⚠️ CACHE WARNING - Data range mismatch exceeds tolerance, not caching`);
+          console.warn(`   Start difference: ${(startDiff / (1000 * 60 * 60)).toFixed(1)} hours`);
+          console.warn(`   End difference: ${(endDiff / (1000 * 60 * 60)).toFixed(1)} hours`);
+          console.warn(`   Tolerance: ${(STRICT_TOLERANCE_MS / (1000 * 60 * 60)).toFixed(1)} hours`);
           return; // Don't cache if range is too different
         }
       }

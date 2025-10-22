@@ -5,6 +5,7 @@ import { runBacktest } from "@/lib/backtest/engine";
 export async function POST(request: NextRequest) {
   try {
     console.log('🧪 DEBUG BACKTEST - Starting test without authentication');
+    console.log('📡 Using Yahoo Finance as the only data source');
     
     const body = await request.json();
     const {
@@ -13,7 +14,6 @@ export async function POST(request: NextRequest) {
       startDate,
       endDate,
       initialBalance = 10000,
-      preferredDataSource = 'twelvedata'
     } = body;
 
     // Validate required fields
@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     console.log(`   End Date: ${end.toISOString()}`);
     console.log(`   Days: ${daysDiff}`);
     console.log(`   Initial Balance: ${initialBalance}`);
-    console.log(`   Data Source: ${preferredDataSource}`);
+    console.log(`   Data Source: Yahoo Finance (only)`);
 
     // Create simple test strategy
     const testStrategy = {
@@ -92,7 +92,6 @@ export async function POST(request: NextRequest) {
       symbol,
       interval,
       strategy: testStrategy,
-      preferredDataSource,
     });
 
     console.log(`✅ DEBUG BACKTEST - Completed successfully:`);
@@ -129,7 +128,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    message: "Debug backtest endpoint. Use POST to run backtest without authentication.",
+    message: "Debug backtest endpoint. Use POST to run backtest without authentication. Uses Yahoo Finance only.",
     usage: {
       method: "POST",
       body: {
@@ -138,8 +137,8 @@ export async function GET() {
         startDate: "2024-09-01T00:00:00.000Z", // required
         endDate: "2024-10-01T00:00:00.000Z", // required
         initialBalance: 10000, // optional
-        preferredDataSource: "twelvedata" // optional
       }
-    }
+    },
+    dataSource: "Yahoo Finance (only)"
   });
 }

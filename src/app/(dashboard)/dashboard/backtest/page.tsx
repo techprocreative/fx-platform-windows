@@ -98,8 +98,9 @@ export default function BacktestPage() {
       .split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
     initialBalance: 10000,
-    preferredDataSource: "twelvedata",
   });
+
+  const [dateRangeWarning, setDateRangeWarning] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -193,6 +194,55 @@ export default function BacktestPage() {
     return map[timeframe.toUpperCase()] || "1h";
   };
 
+  // Validate date range for interval (Yahoo Finance limitation)
+  // Based on actual testing: 15min/30min limited to 60 days, but 1h can go up to 365+ days
+  const validateDateRange = (startDate: string, endDate: string, interval: string): string | null => {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const today = new Date();
+    
+    // Calculate days difference
+    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    const daysFromToday = Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Check if end date is in the future
+    if (end > today) {
+      return "End date cannot be in the future";
+    }
+    
+    // Check if start date is after end date
+    if (start >= end) {
+      return "Start date must be before end date";
+    }
+    
+    // Yahoo Finance limitations - ONLY 15min and 30min have 60-day limit
+    // 1h interval works up to 365+ days (tested and verified)
+    const limitedIntradayIntervals = ['1min', '5min', '15min', '30min'];
+    if (limitedIntradayIntervals.includes(interval)) {
+      if (daysFromToday > 60) {
+        return `⚠️ Yahoo Finance limits ${interval} data to the last 60 days. Your start date is ${daysFromToday} days ago. Please use a more recent start date, switch to 1h interval, or use daily interval.`;
+      }
+      if (daysDiff > 60) {
+        return `⚠️ Date range (${daysDiff} days) exceeds Yahoo Finance limit for ${interval} data (max 60 days). Please reduce the date range, use 1h interval, or switch to daily interval.`;
+      }
+    }
+    
+    // Warning for very short ranges
+    if (daysDiff < 7) {
+      return `ℹ️ Short date range (${daysDiff} days) may not provide enough data for reliable backtest results.`;
+    }
+    
+    return null;
+  };
+
+  // Validate date range whenever interval or dates change
+  useEffect(() => {
+    if (formData.interval && formData.startDate && formData.endDate) {
+      const warning = validateDateRange(formData.startDate, formData.endDate, formData.interval);
+      setDateRangeWarning(warning);
+    }
+  }, [formData.interval, formData.startDate, formData.endDate]);
+
   const handleStrategyChange = (strategyId: string) => {
     const selectedStrategy = strategies.find((s) => s.id === strategyId);
     if (selectedStrategy) {
@@ -214,6 +264,14 @@ export default function BacktestPage() {
     if (!formData.symbol) {
       toast.error("Strategy symbol is not set");
       return;
+    }
+
+    // Check for blocking errors (not warnings)
+    if (dateRangeWarning && !dateRangeWarning.startsWith('ℹ️')) {
+      if (dateRangeWarning.includes('60 days') || dateRangeWarning.includes('future') || dateRangeWarning.includes('must be before')) {
+        toast.error("Please fix the date range error before running backtest");
+        return;
+      }
     }
 
     try {
@@ -463,26 +521,23 @@ export default function BacktestPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-neutral-700 mb-2">
-                Data Source
-              </label>
-              <select
-                value={formData.preferredDataSource}
-                onChange={(e) =>
-                  setFormData((prev) => ({
-                    ...prev,
-                    preferredDataSource: e.target.value,
-                  }))
-                }
-                className="w-full rounded-lg border border-neutral-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
-              >
-                <option value="twelvedata">TwelveData (Recommended)</option>
-                <option value="yahoo">Yahoo Finance</option>
-              </select>
-              <p className="text-xs text-neutral-500 mt-1">
-                TwelveData provides real-time market data with better date range support
-              </p>
+            {/* Info about data source */}
+            <div className="col-span-2 rounded-lg bg-blue-50 border border-blue-200 p-4">
+              <div className="flex items-start gap-3">
+                <Activity className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                    Data Source: Yahoo Finance
+                  </h4>
+                  <p className="text-xs text-blue-700 leading-relaxed">
+                    Backtests use Yahoo Finance API for market data. 
+                    <strong className="font-semibold"> Important:</strong> 15min and 30min intervals 
+                    are limited to the last <strong>60 days</strong>. 
+                    1h interval supports up to <strong>365 days</strong>. 
+                    Daily interval supports historical data beyond 365 days.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div>
@@ -512,9 +567,57 @@ export default function BacktestPage() {
                 onChange={(e) =>
                   setFormData((prev) => ({ ...prev, endDate: e.target.value }))
                 }
+                max={new Date().toISOString().split("T")[0]}
                 className="w-full rounded-lg border border-neutral-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               />
             </div>
+
+            {/* Date Range Warning */}
+            {dateRangeWarning && (
+              <div className={`col-span-2 rounded-lg border p-4 ${
+                dateRangeWarning.startsWith('⚠️') 
+                  ? 'bg-amber-50 border-amber-200' 
+                  : dateRangeWarning.startsWith('ℹ️')
+                  ? 'bg-blue-50 border-blue-200'
+                  : 'bg-red-50 border-red-200'
+              }`}>
+                <div className="flex items-start gap-3">
+                  <div className={`flex-shrink-0 mt-0.5 ${
+                    dateRangeWarning.startsWith('⚠️') 
+                      ? 'text-amber-600' 
+                      : dateRangeWarning.startsWith('ℹ️')
+                      ? 'text-blue-600'
+                      : 'text-red-600'
+                  }`}>
+                    {dateRangeWarning.startsWith('⚠️') ? '⚠️' : dateRangeWarning.startsWith('ℹ️') ? 'ℹ️' : '❌'}
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm leading-relaxed ${
+                      dateRangeWarning.startsWith('⚠️') 
+                        ? 'text-amber-800' 
+                        : dateRangeWarning.startsWith('ℹ️')
+                        ? 'text-blue-800'
+                        : 'text-red-800'
+                    }`}>
+                      {dateRangeWarning.replace(/^[⚠️ℹ️❌]\s*/, '')}
+                    </p>
+                    {dateRangeWarning.includes('60 days') && (
+                      <button
+                        onClick={() => {
+                          const newStartDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                            .toISOString()
+                            .split("T")[0];
+                          setFormData((prev) => ({ ...prev, startDate: newStartDate }));
+                        }}
+                        className="mt-2 text-xs font-semibold text-amber-700 hover:text-amber-800 underline"
+                      >
+                        Use last 30 days instead
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-3">

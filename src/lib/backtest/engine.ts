@@ -1,6 +1,6 @@
 import { BacktestResults, Strategy } from "../../types";
-import TwelveData from "twelvedata";
 import { marketDataCache, CacheKey } from "../cache/market-data-cache";
+import YahooFinance from 'yahoo-finance2';
 
 // Symbol-specific pip configuration for accurate calculations
 const SYMBOL_CONFIG = {
@@ -102,101 +102,64 @@ interface BacktestResult {
 }
 
 /**
- * Convert symbol to TwelveData API format
- * TwelveData uses different formats for forex and commodities
+ * Convert symbol to Yahoo Finance API format
+ * Yahoo Finance uses different formats for forex, commodities, and indices
  */
-function convertSymbolToTwelveDataFormat(symbol: string): string {
+function convertSymbolToYahooFormat(symbol: string): string {
   // Remove any spaces
-  symbol = symbol.replace(/\s/g, "");
+  symbol = symbol.replace(/\s/g, "").toUpperCase();
 
-  // Forex pairs - add slash (EUR/USD format)
+  // Commodities mapping
+  const commodityMap: Record<string, string> = {
+    "XAUUSD": "GC=F",      // Gold Futures
+    "XAGUSD": "SI=F",      // Silver Futures
+    "USOIL": "CL=F",       // WTI Crude Oil Futures
+    "UKOIL": "BZ=F",       // Brent Crude Oil Futures
+    "NATGAS": "NG=F",      // Natural Gas Futures
+    "COPPER": "HG=F",      // Copper Futures
+  };
+
+  // Check commodities first
+  if (commodityMap[symbol]) {
+    return commodityMap[symbol];
+  }
+
+  // Forex pairs - add =X suffix
   const forexPairs = [
-    "EURUSD",
-    "GBPUSD",
-    "USDJPY",
-    "USDCHF",
-    "AUDUSD",
-    "USDCAD",
-    "NZDUSD",
-    "EURGBP",
-    "EURJPY",
-    "GBPJPY",
-    "EURCHF",
-    "EURAUD",
-    "EURCAD",
-    "EURNZD",
-    "GBPCHF",
-    "GBPAUD",
-    "GBPCAD",
-    "GBPNZD",
-    "AUDJPY",
-    "AUDNZD",
-    "NZDJPY",
-    "AUDCAD",
-    "CADJPY",
-    "CHFJPY",
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
+    "EURGBP", "EURJPY", "GBPJPY", "EURCHF", "EURAUD", "EURCAD", "EURNZD",
+    "GBPCHF", "GBPAUD", "GBPCAD", "GBPNZD", "AUDJPY", "AUDNZD", "NZDJPY",
+    "AUDCAD", "CADJPY", "CHFJPY"
   ];
 
-  if (forexPairs.includes(symbol.toUpperCase())) {
-    // Insert slash after 3 characters (EUR/USD)
-    return `${symbol.substring(0, 3)}/${symbol.substring(3)}`;
+  if (forexPairs.includes(symbol)) {
+    return `${symbol}=X`;
   }
 
-  // Gold and Silver - use XAU/USD format
-  if (symbol.toUpperCase() === "XAUUSD") {
-    return "XAU/USD";
-  }
-  if (symbol.toUpperCase() === "XAGUSD") {
-    return "XAG/USD";
+  // Indices mapping
+  const indexMap: Record<string, string> = {
+    "US30": "^DJI",       // Dow Jones
+    "SPX500": "^GSPC",    // S&P 500
+    "NAS100": "^IXIC",    // NASDAQ
+    "UK100": "^FTSE",     // FTSE 100
+    "GER40": "^GDAXI",    // DAX
+    "JPN225": "^N225",    // Nikkei 225
+    "FRA40": "^FCHI",     // CAC 40
+  };
+
+  if (indexMap[symbol]) {
+    return indexMap[symbol];
   }
 
-  // Oil - WTI and Brent
-  if (symbol.toUpperCase() === "USOIL" || symbol.toUpperCase() === "WTIUSD") {
-    return "WTI/USD";
-  }
-  if (symbol.toUpperCase() === "UKOIL" || symbol.toUpperCase() === "BRENTUSD") {
-    return "BRENT/USD";
-  }
-
-  // Natural Gas
-  if (
-    symbol.toUpperCase() === "NATGAS" ||
-    symbol.toUpperCase() === "NATURALGAS"
-  ) {
-    return "NG/USD";
-  }
-
-  // Crypto - already in correct format usually
+  // Crypto - add -USD suffix
   const cryptoPairs = ["BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "BCHUSD"];
-  if (cryptoPairs.includes(symbol.toUpperCase())) {
-    return `${symbol.substring(0, 3)}/${symbol.substring(3)}`;
+  if (cryptoPairs.includes(symbol)) {
+    const base = symbol.substring(0, symbol.length - 3);
+    return `${base}-USD`;
   }
 
   // Default: return as-is
   return symbol;
-}
-
-// Initialize TwelveData client
-// Lazy initialization function for TwelveData client
-function getTwelveDataClient() {
-  const apiKey = process.env.TWELVEDATA_API_KEY;
-
-  if (!apiKey) {
-    console.error("❌ TWELVEDATA_API_KEY is not set in environment variables");
-    console.error(
-      "Available env keys:",
-      Object.keys(process.env)
-        .filter((k) => k.includes("TWELVE") || k.includes("DATA"))
-        .join(", "),
-    );
-    return null;
-  }
-
-  console.log(`✅ TwelveData API key found: ${apiKey.substring(0, 8)}...`);
-
-  return TwelveData({
-    key: apiKey,
-  });
 }
 
 // Market data interface for backtesting
@@ -248,185 +211,20 @@ interface EnhancedStrategy {
   parameters?: StrategyParameters;
 }
 
-// Historical data fetcher with multiple sources
+// Historical data fetcher with Yahoo Finance library (yahoo-finance2)
 export class HistoricalDataFetcher {
-  static async fetchFromTwelveData(
-    symbol: string,
-    interval: string,
-    startDate: Date,
-    endDate: Date,
-  ): Promise<EnhancedMarketData[]> {
-    // Check cache first
-    const cacheKey: CacheKey = {
-      symbol,
-      interval,
-      startDate: startDate.toISOString().split("T")[0],
-      endDate: endDate.toISOString().split("T")[0],
-      source: "twelvedata",
-    };
-
-    const cachedData = await marketDataCache.get(cacheKey);
-    if (cachedData) {
-      return cachedData;
-    }
-
-    try {
-      // Check if API key is available
-      if (!process.env.TWELVEDATA_API_KEY) {
-        console.error("❌ TwelveData API key not configured");
-        console.error(
-          "Available env vars:",
-          Object.keys(process.env).filter(
-            (k) => k.includes("TWELVE") || k.includes("API"),
-          ),
-        );
-        return [];
-      }
-
-      // Convert symbol to TwelveData format
-      const twelveDataSymbol = convertSymbolToTwelveDataFormat(symbol);
-
-      console.log(
-        `📡 Fetching from TwelveData: ${symbol} (${twelveDataSymbol}) ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`,
-      );
-      console.log(
-        `🔑 Using API key: ${process.env.TWELVEDATA_API_KEY?.substring(0, 8)}...`,
-      );
-
-      const client = getTwelveDataClient();
-      if (!client) {
-        console.error("❌ Failed to initialize TwelveData client");
-        return [];
-      }
-
-      // DEBUG: Log API request parameters
-      console.log(`🔍 TWELVEDATA DEBUG - API Request:`);
-      console.log(`   Symbol: ${twelveDataSymbol}`);
-      console.log(`   Interval: ${interval}`);
-      console.log(`   Start Date: ${cacheKey.startDate}`);
-      console.log(`   End Date: ${cacheKey.endDate}`);
-
-      // FIX: Remove outputsize to let TwelveData respect date range
-      // Calculate approximate data points needed based on date range and interval
-      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-      let estimatedDataPoints = 0;
-      
-      switch (interval) {
-        case "1min": estimatedDataPoints = daysDiff * 24 * 60; break;
-        case "5min": estimatedDataPoints = daysDiff * 24 * 12; break;
-        case "15min": estimatedDataPoints = daysDiff * 24 * 4; break;
-        case "30min": estimatedDataPoints = daysDiff * 24 * 2; break;
-        case "1h": estimatedDataPoints = daysDiff * 24; break;
-        case "4h": estimatedDataPoints = daysDiff * 6; break;
-        case "1d": estimatedDataPoints = daysDiff; break;
-        default: estimatedDataPoints = daysDiff * 24;
-      }
-
-      // Cap at reasonable limit but prioritize date range
-      const outputSize = Math.min(estimatedDataPoints, 5000);
-      console.log(`   Estimated Data Points: ${estimatedDataPoints}`);
-      console.log(`   Output Size: ${outputSize}`);
-
-      const apiParams: any = {
-        symbol: twelveDataSymbol,
-        interval,
-        start_date: cacheKey.startDate,
-        end_date: cacheKey.endDate,
-      };
-
-      // Only add outputsize if we have reasonable estimate
-      if (outputSize > 0 && outputSize < 5000) {
-        apiParams.outputsize = outputSize.toString();
-      }
-
-      const response = await client.timeSeries(apiParams);
-
-      // DEBUG: Log API response
-      console.log(`🔍 TWELVEDATA DEBUG - API Response:`);
-      console.log(`   Response status: ${response.status}`);
-      console.log(`   Values count: ${response.values?.length || 0}`);
-      console.log(`   Response keys:`, Object.keys(response));
-      
-      if (!response.values) {
-        console.error("❌ TwelveData response missing values:", response);
-        console.error("❌ Full response object:", JSON.stringify(response, null, 2));
-        return [];
-      }
-
-      const data = response.values.map((chart: any) => ({
-        timestamp: new Date(chart.datetime),
-        open: parseFloat(chart.open),
-        high: parseFloat(chart.high),
-        low: parseFloat(chart.low),
-        close: parseFloat(chart.close),
-        volume: parseInt(chart.volume || "0"),
-        symbol,
-        interval,
-        currency: chart.currency || "USD",
-        exchange: chart.exchange || "FX",
-      }));
-
-      // DEBUG: Log processed data
-      console.log(`🔍 TWELVEDATA DEBUG - Processed data:`);
-      if (data.length > 0) {
-        const actualStart = data[0].timestamp;
-        const actualEnd = data[data.length - 1].timestamp;
-        console.log(`   First data point: ${actualStart.toISOString()} - Close: ${data[0].close}`);
-        console.log(`   Last data point: ${actualEnd.toISOString()} - Close: ${data[data.length - 1].close}`);
-        console.log(`   Data range: ${actualEnd.getTime() - actualStart.getTime()} ms`);
-        console.log(`   Data points: ${data.length}`);
-
-        // FIX: Validate that API response matches requested date range
-        const requestedStart = new Date(cacheKey.startDate);
-        const requestedEnd = new Date(cacheKey.endDate);
-        const startDiff = Math.abs(actualStart.getTime() - requestedStart.getTime());
-        const endDiff = Math.abs(actualEnd.getTime() - requestedEnd.getTime());
-        const toleranceMs = 24 * 60 * 60 * 1000; // 1 day tolerance
-
-        if (startDiff > toleranceMs || endDiff > toleranceMs) {
-          console.warn(`⚠️ TWELVEDATA WARNING - Date range mismatch:`);
-          console.warn(`   Requested: ${requestedStart.toISOString()} to ${requestedEnd.toISOString()}`);
-          console.warn(`   Received: ${actualStart.toISOString()} to ${actualEnd.toISOString()}`);
-          console.warn(`   Start difference: ${startDiff / (1000 * 60 * 60)} hours`);
-          console.warn(`   End difference: ${endDiff / (1000 * 60 * 60)} hours`);
-          
-          // If date range is significantly different, don't cache the data
-          if (startDiff > toleranceMs * 7 || endDiff > toleranceMs * 7) {
-            console.error(`❌ TWELVEDATA ERROR - Date range too different, not caching`);
-            return data; // Return data but don't cache
-          }
-        }
-      }
-
-      // Cache the fetched data
-      if (data.length > 0) {
-        console.log(`🔍 TWELVEDATA DEBUG - Caching data with key:`, cacheKey);
-        await marketDataCache.set(cacheKey, data, "twelvedata");
-      }
-
-      return data;
-    } catch (error) {
-      console.error("❌ TwelveData fetch error:", error);
-      console.error("Error details:", {
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
-        symbol,
-        interval,
-        startDate: cacheKey.startDate,
-        endDate: cacheKey.endDate,
-        apiKeyExists: !!process.env.TWELVEDATA_API_KEY,
-        apiKeyLength: process.env.TWELVEDATA_API_KEY?.length || 0,
-      });
-      return [];
-    }
-  }
+  private static yahooFinance = new YahooFinance({ suppressNotices: ['ripHistorical'] });
 
   static async fetchFromYahooFinance(
     symbol: string,
     interval: string,
     startDate: Date,
     endDate: Date,
+    retryCount: number = 0
   ): Promise<EnhancedMarketData[]> {
+    const MAX_RETRIES = 3;
+    const STRICT_TOLERANCE_MS = 24 * 60 * 60 * 1000; // 1 day tolerance (strict)
+    
     // Check cache first
     const cacheKey: CacheKey = {
       symbol,
@@ -438,148 +236,154 @@ export class HistoricalDataFetcher {
 
     const cachedData = await marketDataCache.get(cacheKey);
     if (cachedData) {
+      console.log(`✅ Using cached data for ${symbol} ${interval}`);
       return cachedData;
     }
 
     try {
-      // Check if Yahoo Finance API keys are available
-      const apiKey = process.env.YAHOO_FINANCE_API_KEY;
-      const apiHost = process.env.YAHOO_FINANCE_RAPIDAPI_HOST;
+      console.log(`📡 Fetching from Yahoo Finance (yahoo-finance2 library): ${symbol} ${interval} ${cacheKey.startDate} to ${cacheKey.endDate} (attempt ${retryCount + 1}/${MAX_RETRIES + 1})`);
+      console.log(`🆓 Using FREE yahoo-finance2 library (no API key needed!)`);
 
-      if (!apiKey || !apiHost) {
-        console.error("❌ Yahoo Finance API keys not configured");
-        console.error("   YAHOO_FINANCE_API_KEY:", apiKey ? "✅ Set" : "❌ Not set");
-        console.error("   YAHOO_FINANCE_RAPIDAPI_HOST:", apiHost ? "✅ Set" : "❌ Not set");
-        return [];
-      }
-
-      console.log(`📡 Fetching from Yahoo Finance: ${symbol} ${interval} ${cacheKey.startDate} to ${cacheKey.endDate}`);
-      console.log(`🔑 Using API key: ${apiKey.substring(0, 8)}...`);
-      console.log(`🔑 Using API host: ${apiHost}`);
-
-      // Convert symbol to Yahoo Finance format
-      let yahooSymbol = symbol;
-      if (symbol.toUpperCase() === "XAUUSD") {
-        yahooSymbol = "GC=F"; // Gold futures
-      } else if (symbol.toUpperCase() === "XAGUSD") {
-        yahooSymbol = "SI=F"; // Silver futures
-      } else if (symbol.includes("USD")) {
-        // Convert forex pairs: EURUSD -> EURUSD=X
-        yahooSymbol = `${symbol}=X`;
-      }
+      // Convert symbol to Yahoo Finance format using improved mapper
+      const yahooSymbol = convertSymbolToYahooFormat(symbol);
 
       // Convert interval to Yahoo Finance format
       const yahooInterval = this.convertIntervalToYahoo(interval);
 
-      // Calculate timestamps for Yahoo Finance API
-      const startTimestamp = Math.floor(startDate.getTime() / 1000);
-      const endTimestamp = Math.floor(endDate.getTime() / 1000);
-
-      console.log(`🔍 YAHOO FINANCE DEBUG - API Request:`);
-      console.log(`   Symbol: ${yahooSymbol}`);
+      console.log(`🔍 YAHOO FINANCE DEBUG - Request:`);
+      console.log(`   Original Symbol: ${symbol}`);
+      console.log(`   Yahoo Symbol: ${yahooSymbol}`);
       console.log(`   Interval: ${yahooInterval}`);
-      console.log(`   Start Timestamp: ${startTimestamp}`);
-      console.log(`   End Timestamp: ${endTimestamp}`);
+      console.log(`   Start: ${startDate.toISOString()}`);
+      console.log(`   End: ${endDate.toISOString()}`);
 
-      // Fetch data from Yahoo Finance via RapidAPI
-      const url = `https://${apiHost}/market/v2/get-chart`;
-      const params = new URLSearchParams({
-        symbol: yahooSymbol,
-        interval: yahooInterval,
-        period1: startTimestamp.toString(),
-        period2: endTimestamp.toString(),
+      // Fetch data using yahoo-finance2 library
+      const result = await this.yahooFinance.chart(yahooSymbol, {
+        period1: startDate,
+        period2: endDate,
+        interval: yahooInterval as '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m' | '1h' | '1d' | '5d' | '1wk' | '1mo' | '3mo',
       });
 
-      const response = await fetch(`${url}?${params}`, {
-        method: 'GET',
-        headers: {
-          'X-RapidAPI-Key': apiKey,
-          'X-RapidAPI-Host': apiHost,
-        },
-      });
+      console.log(`🔍 YAHOO FINANCE DEBUG - Response:`);
+      console.log(`   Quotes count: ${result?.quotes?.length || 0}`);
 
-      if (!response.ok) {
-        console.error(`❌ Yahoo Finance API error: ${response.status} - ${response.statusText}`);
-        return [];
+      if (!result || !result.quotes || result.quotes.length === 0) {
+        console.error("❌ Yahoo Finance returned no data");
+        
+        // Retry on empty response
+        if (retryCount < MAX_RETRIES) {
+          const backoffMs = Math.pow(2, retryCount) * 1000; // Exponential backoff
+          console.log(`⏳ Retrying in ${backoffMs}ms...`);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          return this.fetchFromYahooFinance(symbol, interval, startDate, endDate, retryCount + 1);
+        }
+
+        throw new Error(`No data available for ${symbol} from Yahoo Finance. This could be due to: 1) Symbol not supported, 2) Date range exceeds limits (60 days for intraday), or 3) Market was closed during this period.`);
       }
 
-      const data = await response.json();
+      // Extract data from yahoo-finance2 response
+      const quotes = result.quotes;
+      const timestamps: number[] = [];
+      const closes: (number | null)[] = [];
+      const opens: (number | null)[] = [];
+      const highs: (number | null)[] = [];
+      const lows: (number | null)[] = [];
+      const volumes: (number | null)[] = [];
 
-      console.log(`🔍 YAHOO FINANCE DEBUG - API Response:`);
-      console.log(`   Response status: ${data.chart?.error ? 'error' : 'ok'}`);
-      console.log(`   Chart result count: ${data.chart?.result?.length || 0}`);
-
-      if (!data.chart?.result || data.chart.result.length === 0) {
-        console.error("❌ Yahoo Finance response missing chart data:", data);
-        return [];
+      // Extract data from quotes
+      for (const quote of quotes) {
+        timestamps.push(Math.floor(new Date(quote.date).getTime() / 1000)); // Convert to unix timestamp
+        closes.push(quote.close);
+        opens.push(quote.open);
+        highs.push(quote.high);
+        lows.push(quote.low);
+        volumes.push(quote.volume);
       }
-
-      const chart = data.chart.result[0];
-      const timestamps = chart.timestamp || [];
-      const quotes = chart.indicators?.quote?.[0] || {};
-      const closes = quotes.close || [];
-      const opens = quotes.open || [];
-      const highs = quotes.high || [];
-      const lows = quotes.low || [];
-      const volumes = quotes.volume || [];
 
       if (timestamps.length === 0 || closes.length === 0) {
         console.error("❌ Yahoo Finance response has no data points");
-        return [];
+        throw new Error("No data points available from Yahoo Finance");
       }
 
-      const marketData: EnhancedMarketData[] = timestamps.map((timestamp: number, index: number) => ({
-        timestamp: new Date(timestamp * 1000),
-        open: opens[index] || closes[index] || 0,
-        high: highs[index] || closes[index] || 0,
-        low: lows[index] || closes[index] || 0,
-        close: closes[index] || 0,
-        volume: volumes[index] || 0,
-        symbol,
-        interval,
-        currency: "USD",
-        exchange: "YAHOO",
-      }));
+      // Map to market data with filtering for null/undefined values
+      let marketData: EnhancedMarketData[] = timestamps
+        .map((timestamp: number, index: number) => ({
+          timestamp: new Date(timestamp * 1000),
+          open: opens[index] || closes[index] || 0,
+          high: highs[index] || closes[index] || 0,
+          low: lows[index] || closes[index] || 0,
+          close: closes[index] || 0,
+          volume: volumes[index] || 0,
+          symbol,
+          interval,
+          currency: "USD",
+          exchange: "YAHOO",
+        }))
+        .filter((d: EnhancedMarketData) => d.close > 0); // Filter out invalid data points
+
+      console.log(`🔍 YAHOO FINANCE DEBUG - Raw data points: ${marketData.length}`);
+
+      // FLEXIBLE DATE RANGE FILTERING - Yahoo Finance uses range-based queries (1mo, 5d, etc)
+      // So we allow data slightly outside requested range but within tolerance
+      const FILTER_TOLERANCE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days tolerance for filtering
+      const filterStartTime = startDate.getTime() - FILTER_TOLERANCE_MS;
+      const filterEndTime = endDate.getTime() + FILTER_TOLERANCE_MS;
+      
+      const filteredData = marketData.filter(d => {
+        const timestamp = d.timestamp.getTime();
+        return timestamp >= filterStartTime && timestamp <= filterEndTime;
+      });
+
+      console.log(`🔍 YAHOO FINANCE DEBUG - After flexible date filtering: ${filteredData.length} points`);
+      console.log(`   (Tolerance: ±7 days from requested range)`);
+
+      if (filteredData.length === 0) {
+        console.error("❌ No data points after filtering for requested date range");
+        console.error(`   Requested: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+        console.error(`   Filter tolerance: ±7 days`);
+        throw new Error("No data available for the requested date range");
+      }
+
+      // Use filtered data if available, otherwise use all data (Yahoo Finance returned what it has)
+      marketData = filteredData.length > 0 ? filteredData : marketData;
 
       // DEBUG: Log processed data
-      console.log(`🔍 YAHOO FINANCE DEBUG - Processed data:`);
-      if (marketData.length > 0) {
-        const actualStart = marketData[0].timestamp;
-        const actualEnd = marketData[marketData.length - 1].timestamp;
-        console.log(`   First data point: ${actualStart.toISOString()} - Close: ${marketData[0].close}`);
-        console.log(`   Last data point: ${actualEnd.toISOString()} - Close: ${marketData[marketData.length - 1].close}`);
-        console.log(`   Data range: ${actualEnd.getTime() - actualStart.getTime()} ms`);
-        console.log(`   Data points: ${marketData.length}`);
+      const actualStart = marketData[0].timestamp;
+      const actualEnd = marketData[marketData.length - 1].timestamp;
+      console.log(`🔍 YAHOO FINANCE DEBUG - Filtered data range:`);
+      console.log(`   First data point: ${actualStart.toISOString()} - Close: ${marketData[0].close}`);
+      console.log(`   Last data point: ${actualEnd.toISOString()} - Close: ${marketData[marketData.length - 1].close}`);
+      console.log(`   Actual Days: ${Math.ceil((actualEnd.getTime() - actualStart.getTime()) / (1000 * 60 * 60 * 24))}`);
+      console.log(`   Data points: ${marketData.length}`);
 
-        // Validate that API response matches requested date range
-        const requestedStart = new Date(cacheKey.startDate);
-        const requestedEnd = new Date(cacheKey.endDate);
-        const startDiff = Math.abs(actualStart.getTime() - requestedStart.getTime());
-        const endDiff = Math.abs(actualEnd.getTime() - requestedEnd.getTime());
-        const toleranceMs = 24 * 60 * 60 * 1000; // 1 day tolerance
+      // FLEXIBLE VALIDATION - Yahoo Finance uses range-based queries, so allow some tolerance
+      // Cache validation tolerance: 7 days (less strict than before)
+      const CACHE_TOLERANCE_MS = 7 * 24 * 60 * 60 * 1000; // 7 days for caching
+      const requestedStart = new Date(cacheKey.startDate);
+      const requestedEnd = new Date(cacheKey.endDate);
+      const startDiff = Math.abs(actualStart.getTime() - requestedStart.getTime());
+      const endDiff = Math.abs(actualEnd.getTime() - requestedEnd.getTime());
 
-        if (startDiff > toleranceMs || endDiff > toleranceMs) {
-          console.warn(`⚠️ YAHOO FINANCE WARNING - Date range mismatch:`);
-          console.warn(`   Requested: ${requestedStart.toISOString()} to ${requestedEnd.toISOString()}`);
-          console.warn(`   Received: ${actualStart.toISOString()} to ${actualEnd.toISOString()}`);
-          console.warn(`   Start difference: ${startDiff / (1000 * 60 * 60)} hours`);
-          console.warn(`   End difference: ${endDiff / (1000 * 60 * 60)} hours`);
-          
-          // If date range is significantly different, don't cache the data
-          if (startDiff > toleranceMs * 7 || endDiff > toleranceMs * 7) {
-            console.error(`❌ YAHOO FINANCE ERROR - Date range too different, not caching`);
-            return marketData; // Return data but don't cache
-          }
-        }
+      if (startDiff > CACHE_TOLERANCE_MS || endDiff > CACHE_TOLERANCE_MS) {
+        console.warn(`⚠️ YAHOO FINANCE WARNING - Date range mismatch:`);
+        console.warn(`   Requested: ${requestedStart.toISOString()} to ${requestedEnd.toISOString()}`);
+        console.warn(`   Received: ${actualStart.toISOString()} to ${actualEnd.toISOString()}`);
+        console.warn(`   Start difference: ${(startDiff / (1000 * 60 * 60 * 24)).toFixed(1)} days`);
+        console.warn(`   End difference: ${(endDiff / (1000 * 60 * 60 * 24)).toFixed(1)} days`);
+        console.warn(`   Cache tolerance: ${(CACHE_TOLERANCE_MS / (1000 * 60 * 60 * 24)).toFixed(0)} days`);
+        console.warn(`   ⚠️ Data range differs from requested - returning data but not caching`);
+        
+        // Return data but don't cache if range is too different
+        return marketData;
       }
 
-      // Cache the fetched data
-      if (marketData.length > 0) {
-        console.log(`🔍 YAHOO FINANCE DEBUG - Caching data with key:`, cacheKey);
-        await marketDataCache.set(cacheKey, marketData, "yahoo");
-      }
+      // Cache the fetched data only if it passes validation
+      console.log(`✅ Yahoo Finance data validated successfully`);
+      console.log(`🔍 Caching data with key:`, cacheKey);
+      await marketDataCache.set(cacheKey, marketData, "yahoo");
 
       return marketData;
+      
     } catch (error) {
       console.error("❌ Yahoo Finance fetch error:", error);
       console.error("Error details:", {
@@ -589,11 +393,11 @@ export class HistoricalDataFetcher {
         interval,
         startDate: cacheKey.startDate,
         endDate: cacheKey.endDate,
-        apiKeyExists: !!process.env.YAHOO_FINANCE_API_KEY,
-        apiKeyLength: process.env.YAHOO_FINANCE_API_KEY?.length || 0,
-        apiHostExists: !!process.env.YAHOO_FINANCE_RAPIDAPI_HOST,
+        retryCount,
       });
-      return [];
+      
+      // Re-throw the error to be handled by the caller
+      throw error;
     }
   }
 
@@ -609,18 +413,6 @@ export class HistoricalDataFetcher {
       "1w": "1wk",
     };
     return intervalMap[interval] || "1d";
-  }
-
-  // Sample data generation removed - only real market data allowed
-  static generateSampleData(
-    symbol: string,
-    interval: string,
-    startDate: Date,
-    endDate: Date,
-  ): EnhancedMarketData[] {
-    throw new Error(
-      `Sample data generation disabled. Real market data is required for ${symbol} ${interval} from ${startDate.toISOString()} to ${endDate.toISOString()}. Please ensure TwelveData and/or Yahoo Finance APIs are properly configured.`,
-    );
   }
 }
 
@@ -665,7 +457,6 @@ export class BacktestEngine {
     interval: string,
     startDate: Date,
     endDate: Date,
-    preferredSource: "twelvedata" | "yahoo" = "twelvedata",
   ): Promise<void> {
     // Store symbol and get pip configuration
     this.symbol = symbol;
@@ -678,58 +469,26 @@ export class BacktestEngine {
     console.log(`   Requested Start Date: ${startDate.toISOString()}`);
     console.log(`   Requested End Date: ${endDate.toISOString()}`);
     console.log(`   Days Difference: ${(endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)}`);
-    console.log(`   Preferred Source: ${preferredSource}`);
+    console.log(`   Data Source: Yahoo Finance (only)`);
     console.log(
       `🔧 Using pip configuration for ${symbol}: multiplier=${this.pipConfig.pipMultiplier}, minPips=${this.pipConfig.minPips}, maxPips=${this.pipConfig.maxPips}`,
     );
-    // Try preferred source first, then fallback to the other
-    let data: EnhancedMarketData[] = [];
+    
+    // Fetch data from Yahoo Finance only
+    console.log(`🔍 BACKTEST DEBUG - Fetching data from Yahoo Finance...`);
+    const data = await HistoricalDataFetcher.fetchFromYahooFinance(
+      symbol,
+      interval,
+      startDate,
+      endDate,
+    );
+    console.log(`🔍 BACKTEST DEBUG - Yahoo Finance returned ${data.length} data points`);
 
-    console.log(`🔍 BACKTEST DEBUG - Attempting to fetch data from ${preferredSource} first...`);
-
-    if (preferredSource === "twelvedata") {
-      data = await HistoricalDataFetcher.fetchFromTwelveData(
-        symbol,
-        interval,
-        startDate,
-        endDate,
-      );
-      console.log(`🔍 BACKTEST DEBUG - TwelveData returned ${data.length} data points`);
-      if (data.length === 0) {
-        console.log(`🔍 BACKTEST DEBUG - TwelveData failed, trying Yahoo Finance...`);
-        data = await HistoricalDataFetcher.fetchFromYahooFinance(
-          symbol,
-          interval,
-          startDate,
-          endDate,
-        );
-        console.log(`🔍 BACKTEST DEBUG - Yahoo Finance returned ${data.length} data points`);
-      }
-    } else if (preferredSource === "yahoo") {
-      data = await HistoricalDataFetcher.fetchFromYahooFinance(
-        symbol,
-        interval,
-        startDate,
-        endDate,
-      );
-      console.log(`🔍 BACKTEST DEBUG - Yahoo Finance returned ${data.length} data points`);
-      if (data.length === 0) {
-        console.log(`🔍 BACKTEST DEBUG - Yahoo Finance failed, trying TwelveData...`);
-        data = await HistoricalDataFetcher.fetchFromTwelveData(
-          symbol,
-          interval,
-          startDate,
-          endDate,
-        );
-        console.log(`🔍 BACKTEST DEBUG - TwelveData returned ${data.length} data points`);
-      }
-    }
-
-    // No fallback to sample data - throw error if no data available
+    // Throw error if no data available
     if (data.length === 0) {
-      console.error(`❌ BACKTEST DEBUG - No data available for ${symbol} from any source`);
+      console.error(`❌ BACKTEST DEBUG - No data available for ${symbol} from Yahoo Finance`);
       throw new Error(
-        `Failed to fetch real market data for ${symbol} from both TwelveData and Yahoo Finance APIs. Please check your API keys and internet connection.`,
+        `Failed to fetch real market data for ${symbol} from Yahoo Finance API. Please check your API keys, internet connection, and ensure the symbol is supported.`,
       );
     }
 
@@ -1241,7 +1000,7 @@ export class BacktestEngine {
       })),
       equityCurve: this.equityCurve,
       metadata: {
-        dataSource: "twelvedata_yahoo_finance",
+        dataSource: "yahoo_finance",
         totalDataPoints: this.data.length,
         executionTime: new Date(),
       },
@@ -1282,7 +1041,6 @@ export async function runBacktest(
     symbol: string;
     interval: string;
     strategy: EnhancedStrategy;
-    preferredDataSource?: "twelvedata" | "yahoo";
   },
 ): Promise<BacktestResult> {
   const engine = new BacktestEngine(params.initialBalance);
@@ -1302,7 +1060,6 @@ export async function runBacktest(
     params.interval,
     params.startDate,
     params.endDate,
-    params.preferredDataSource || "twelvedata",
   );
 
   return await engine.runBacktest(params.strategy);
