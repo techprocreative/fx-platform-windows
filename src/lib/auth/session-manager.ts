@@ -1,16 +1,19 @@
-import crypto from 'crypto';
-import { PrismaClient } from '@prisma/client';
-import { getEnvVar } from '../security/env-validator';
-import { createAuditLogFromRequest, AuditEventType } from '../security/audit-log';
+import crypto from "crypto";
+import { PrismaClient } from "@prisma/client";
+import { getEnvVar } from "../security/env-validator";
+import {
+  createAuditLogFromRequest,
+  AuditEventType,
+} from "../security/audit-log";
 
 const prisma = new PrismaClient();
 
 // Session configuration
 const SESSION_CONFIG = {
-  maxAge: getEnvVar('SESSION_MAX_AGE') * 1000, // Convert to milliseconds
-  secure: process.env.NODE_ENV === 'production',
+  maxAge: Number(getEnvVar("SESSION_MAX_AGE")) * 1000, // Convert to milliseconds
+  secure: process.env.NODE_ENV === "production",
   httpOnly: true,
-  sameSite: 'lax' as const,
+  sameSite: "lax" as const,
 };
 
 // Session store interface
@@ -31,19 +34,19 @@ export interface SessionData {
  */
 export async function createSession(
   sessionData: SessionData,
-  req?: any
+  req?: any,
 ): Promise<string> {
   try {
     // Generate a secure session token
     const sessionToken = generateSecureSessionToken();
-    
+
     // Calculate expiration date
     const expiresAt = new Date(Date.now() + SESSION_CONFIG.maxAge);
-    
+
     // Get client information
     const ipAddress = req ? getClientIP(req) : sessionData.ipAddress;
-    const userAgent = req ? req.headers['user-agent'] : sessionData.userAgent;
-    
+    const userAgent = req ? req.headers["user-agent"] : sessionData.userAgent;
+
     // Create session in database
     const session = await prisma.session.create({
       data: {
@@ -54,26 +57,29 @@ export async function createSession(
         userAgent,
       },
     });
-    
+
     // Log session creation
     if (req) {
-      await createAuditLogFromRequest({
-        userId: sessionData.userId,
-        eventType: AuditEventType.LOGIN,
-        resource: 'SESSION',
-        action: 'CREATE',
-        result: 'SUCCESS',
-        metadata: {
-          sessionId: session.id,
-          expiresAt: expiresAt.toISOString(),
+      await createAuditLogFromRequest(
+        {
+          userId: sessionData.userId,
+          eventType: AuditEventType.LOGIN,
+          resource: "SESSION",
+          action: "CREATE",
+          result: "SUCCESS",
+          metadata: {
+            sessionId: session.id,
+            expiresAt: expiresAt.toISOString(),
+          },
         },
-      }, req);
+        req,
+      );
     }
-    
+
     return sessionToken;
   } catch (error) {
-    console.error('Error creating session:', error);
-    throw new Error('Failed to create session');
+    console.error("Error creating session:", error);
+    throw new Error("Failed to create session");
   }
 }
 
@@ -85,7 +91,7 @@ export async function createSession(
  */
 export async function validateSession(
   sessionToken: string,
-  req?: any
+  req?: any,
 ): Promise<SessionData | null> {
   try {
     // Find session in database
@@ -93,26 +99,26 @@ export async function validateSession(
       where: { sessionToken },
       include: { user: true },
     });
-    
+
     if (!session) {
       return null;
     }
-    
+
     // Check if session has expired
     if (session.expires < new Date()) {
       await deleteSession(sessionToken);
       return null;
     }
-    
+
     // Check if user is locked
     if (session.user.locked) {
       await deleteSession(sessionToken);
       return null;
     }
-    
+
     // Update last activity
     await updateSessionActivity(sessionToken);
-    
+
     // Return session data
     return {
       userId: session.userId,
@@ -121,7 +127,7 @@ export async function validateSession(
       lastActivity: new Date(),
     };
   } catch (error) {
-    console.error('Error validating session:', error);
+    console.error("Error validating session:", error);
     return null;
   }
 }
@@ -134,36 +140,39 @@ export async function validateSession(
  */
 export async function deleteSession(
   sessionToken: string,
-  req?: any
+  req?: any,
 ): Promise<boolean> {
   try {
     // Get session before deletion for logging
     const session = await prisma.session.findUnique({
       where: { sessionToken },
     });
-    
+
     // Delete session from database
     await prisma.session.delete({
       where: { sessionToken },
     });
-    
+
     // Log session deletion
     if (session && req) {
-      await createAuditLogFromRequest({
-        userId: session.userId,
-        eventType: AuditEventType.LOGOUT,
-        resource: 'SESSION',
-        action: 'DELETE',
-        result: 'SUCCESS',
-        metadata: {
-          sessionId: session.id,
+      await createAuditLogFromRequest(
+        {
+          userId: session.userId,
+          eventType: AuditEventType.LOGOUT,
+          resource: "SESSION",
+          action: "DELETE",
+          result: "SUCCESS",
+          metadata: {
+            sessionId: session.id,
+          },
         },
-      }, req);
+        req,
+      );
     }
-    
+
     return true;
   } catch (error) {
-    console.error('Error deleting session:', error);
+    console.error("Error deleting session:", error);
     return false;
   }
 }
@@ -176,18 +185,18 @@ export async function deleteSession(
  */
 export async function deleteAllUserSessions(
   userId: string,
-  excludeSessionToken?: string
+  excludeSessionToken?: string,
 ): Promise<number> {
   try {
     const where: any = { userId };
     if (excludeSessionToken) {
       where.sessionToken = { not: excludeSessionToken };
     }
-    
+
     const result = await prisma.session.deleteMany({ where });
     return result.count;
   } catch (error) {
-    console.error('Error deleting all user sessions:', error);
+    console.error("Error deleting all user sessions:", error);
     return 0;
   }
 }
@@ -203,7 +212,7 @@ async function updateSessionActivity(sessionToken: string): Promise<boolean> {
     // In a real implementation, you might use raw SQL or add a lastActivity field
     return true;
   } catch (error) {
-    console.error('Error updating session activity:', error);
+    console.error("Error updating session activity:", error);
     return false;
   }
 }
@@ -220,10 +229,10 @@ export async function getUserSessions(userId: string): Promise<any[]> {
         userId,
         expires: { gt: new Date() },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
     });
   } catch (error) {
-    console.error('Error getting user sessions:', error);
+    console.error("Error getting user sessions:", error);
     return [];
   }
 }
@@ -234,7 +243,7 @@ export async function getUserSessions(userId: string): Promise<any[]> {
  * @returns Whether 2FA is verified
  */
 export async function isSessionTwoFactorVerified(
-  sessionToken: string
+  sessionToken: string,
 ): Promise<boolean> {
   try {
     // In a real implementation, you would store 2FA verification status
@@ -242,7 +251,7 @@ export async function isSessionTwoFactorVerified(
     // For now, we'll return true
     return true;
   } catch (error) {
-    console.error('Error checking 2FA verification:', error);
+    console.error("Error checking 2FA verification:", error);
     return false;
   }
 }
@@ -253,14 +262,14 @@ export async function isSessionTwoFactorVerified(
  * @returns Whether the update was successful
  */
 export async function markSessionTwoFactorVerified(
-  sessionToken: string
+  sessionToken: string,
 ): Promise<boolean> {
   try {
     // In a real implementation, you would store 2FA verification status
     // in the session or a separate table
     return true;
   } catch (error) {
-    console.error('Error marking 2FA verification:', error);
+    console.error("Error marking 2FA verification:", error);
     return false;
   }
 }
@@ -276,10 +285,10 @@ export async function cleanupExpiredSessions(): Promise<number> {
         expires: { lt: new Date() },
       },
     });
-    
+
     return result.count;
   } catch (error) {
-    console.error('Error cleaning up expired sessions:', error);
+    console.error("Error cleaning up expired sessions:", error);
     return 0;
   }
 }
@@ -294,18 +303,18 @@ export async function cleanupExpiredSessions(): Promise<number> {
 export async function checkSuspiciousActivity(
   userId: string,
   sessionToken: string,
-  req: any
+  req: any,
 ): Promise<boolean> {
   try {
     // Get current session
     const currentSession = await prisma.session.findUnique({
       where: { sessionToken },
     });
-    
+
     if (!currentSession) {
       return false;
     }
-    
+
     // Get other active sessions for the user
     const otherSessions = await prisma.session.findMany({
       where: {
@@ -314,34 +323,37 @@ export async function checkSuspiciousActivity(
         expires: { gt: new Date() },
       },
     });
-    
+
     // Check for multiple concurrent sessions from different IPs
     const currentIP = getClientIP(req);
     const differentIPSessions = otherSessions.filter(
-      session => session.ipAddress !== currentIP
+      (session) => session.ipAddress !== currentIP,
     );
-    
+
     if (differentIPSessions.length > 0) {
       // Log suspicious activity
-      await createAuditLogFromRequest({
-        userId,
-        eventType: AuditEventType.SUSPICIOUS_ACTIVITY,
-        resource: 'SESSION',
-        action: 'MULTIPLE_IPS',
-        result: 'DETECTED',
-        metadata: {
-          currentIP,
-          otherIPs: differentIPSessions.map(s => s.ipAddress),
-          sessionCount: otherSessions.length + 1,
+      await createAuditLogFromRequest(
+        {
+          userId,
+          eventType: AuditEventType.SUSPICIOUS_ACTIVITY,
+          resource: "SESSION",
+          action: "MULTIPLE_IPS",
+          result: "DETECTED",
+          metadata: {
+            currentIP,
+            otherIPs: differentIPSessions.map((s) => s.ipAddress),
+            sessionCount: otherSessions.length + 1,
+          },
         },
-      }, req);
-      
+        req,
+      );
+
       return true;
     }
-    
+
     return false;
   } catch (error) {
-    console.error('Error checking suspicious activity:', error);
+    console.error("Error checking suspicious activity:", error);
     return false;
   }
 }
@@ -351,7 +363,7 @@ export async function checkSuspiciousActivity(
  * @returns Secure session token
  */
 function generateSecureSessionToken(): string {
-  return crypto.randomBytes(32).toString('hex');
+  return crypto.randomBytes(32).toString("hex");
 }
 
 /**
@@ -362,24 +374,24 @@ function generateSecureSessionToken(): string {
 function getClientIP(req: any): string {
   try {
     // Check various headers for the real IP address
-    const forwarded = req.headers['x-forwarded-for'];
-    const realIP = req.headers['x-real-ip'];
+    const forwarded = req.headers["x-forwarded-for"];
+    const realIP = req.headers["x-real-ip"];
     const clientIP = req.connection?.remoteAddress || req.socket?.remoteAddress;
-    
+
     if (forwarded) {
       // X-Forwarded-For can contain multiple IPs, take the first one
-      return forwarded.split(',')[0].trim();
+      return forwarded.split(",")[0].trim();
     } else if (realIP) {
       return realIP;
     } else if (clientIP) {
       // Remove IPv6 prefix if present
-      return clientIP.replace(/^::ffff:/, '');
+      return clientIP.replace(/^::ffff:/, "");
     } else {
-      return 'unknown';
+      return "unknown";
     }
   } catch (error) {
-    console.error('Error getting client IP:', error);
-    return 'unknown';
+    console.error("Error getting client IP:", error);
+    return "unknown";
   }
 }
 
@@ -391,28 +403,29 @@ export function createSessionMiddleware() {
   return async (req: any, res: any, next: any) => {
     try {
       // Get session token from cookie or header
-      const sessionToken = req.cookies?.sessionToken || req.headers['x-session-token'];
-      
+      const sessionToken =
+        req.cookies?.sessionToken || req.headers["x-session-token"];
+
       if (sessionToken) {
         // Validate session
         const sessionData = await validateSession(sessionToken, req);
-        
+
         if (sessionData) {
           // Attach session data to request
           req.session = sessionData;
           req.sessionToken = sessionToken;
-          
+
           // Check for suspicious activity
           await checkSuspiciousActivity(sessionData.userId, sessionToken, req);
         } else {
           // Clear invalid session token
-          res.clearCookie('sessionToken');
+          res.clearCookie("sessionToken");
         }
       }
-      
+
       next();
     } catch (error) {
-      console.error('Session middleware error:', error);
+      console.error("Session middleware error:", error);
       next();
     }
   };

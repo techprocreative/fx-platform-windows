@@ -1,7 +1,7 @@
-import crypto from 'crypto';
-import { authenticator } from 'otplib';
-import QRCode from 'qrcode';
-import { getEnvVar } from '../security/env-validator';
+import crypto from "crypto";
+import { authenticator } from "otplib";
+import QRCode from "qrcode";
+import { getEnvVar } from "../security/env-validator";
 
 // TOTP configuration
 const TOTP_OPTIONS = {
@@ -14,24 +14,26 @@ const TOTP_OPTIONS = {
  * @param userId - User ID
  * @returns TOTP secret and QR code data URL
  */
-export async function generateTOTPSecret(userId: string): Promise<{ secret: string; qrCodeUrl: string }> {
+export async function generateTOTPSecret(
+  userId: string,
+): Promise<{ secret: string; qrCodeUrl: string }> {
   try {
     // Generate a secure random secret
     const secret = authenticator.generateSecret();
-    
+
     // Get issuer from environment
-    const issuer = getEnvVar('TOTP_ISSUER');
-    
+    const issuer = getEnvVar("TOTP_ISSUER");
+
     // Create TOTP URI for QR code generation
     const totpUri = authenticator.keyuri(userId, issuer, secret);
-    
+
     // Generate QR code
-    const qrCodeUrl = QRCode.toDataURL(totpUri);
-    
+    const qrCodeUrl = await QRCode.toDataURL(totpUri);
+
     return { secret, qrCodeUrl };
   } catch (error) {
-    console.error('Error generating TOTP secret:', error);
-    throw new Error('Failed to generate TOTP secret');
+    console.error("Error generating TOTP secret:", error);
+    throw new Error("Failed to generate TOTP secret");
   }
 }
 
@@ -49,7 +51,7 @@ export function verifyTOTPToken(token: string, secret: string): boolean {
       ...TOTP_OPTIONS,
     });
   } catch (error) {
-    console.error('Error verifying TOTP token:', error);
+    console.error("Error verifying TOTP token:", error);
     return false;
   }
 }
@@ -61,13 +63,13 @@ export function verifyTOTPToken(token: string, secret: string): boolean {
  */
 export function generateBackupCodes(count: number = 10): string[] {
   const codes: string[] = [];
-  
+
   for (let i = 0; i < count; i++) {
     // Generate 8-character alphanumeric code
-    const code = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const code = crypto.randomBytes(4).toString("hex").toUpperCase();
     codes.push(code);
   }
-  
+
   return codes;
 }
 
@@ -77,10 +79,10 @@ export function generateBackupCodes(count: number = 10): string[] {
  * @returns Array of hashed backup codes
  */
 export function hashBackupCodes(codes: string[]): string[] {
-  return codes.map(code => {
-    const hash = crypto.createHash('sha256');
+  return codes.map((code) => {
+    const hash = crypto.createHash("sha256");
     hash.update(code);
-    return hash.digest('hex');
+    return hash.digest("hex");
   });
 }
 
@@ -91,10 +93,10 @@ export function hashBackupCodes(codes: string[]): string[] {
  * @returns Whether the backup code is valid
  */
 export function verifyBackupCode(code: string, hashedCodes: string[]): boolean {
-  const hash = crypto.createHash('sha256');
+  const hash = crypto.createHash("sha256");
   hash.update(code.toUpperCase());
-  const hashedCode = hash.digest('hex');
-  
+  const hashedCode = hash.digest("hex");
+
   return hashedCodes.includes(hashedCode);
 }
 
@@ -104,8 +106,11 @@ export function verifyBackupCode(code: string, hashedCodes: string[]): boolean {
  * @returns 2FA session token
  */
 export function generate2FASessionToken(userId: string): string {
-  const data = `${userId}-${Date.now()}-${crypto.randomBytes(16).toString('hex')}`;
-  const hash = crypto.createHmac('sha256', getEnvVar('TOTP_SECRET')).update(data).digest('hex');
+  const data = `${userId}-${Date.now()}-${crypto.randomBytes(16).toString("hex")}`;
+  const hash = crypto
+    .createHmac("sha256", getEnvVar("TOTP_SECRET"))
+    .update(data)
+    .digest("hex");
   return `${data}-${hash}`;
 }
 
@@ -115,26 +120,35 @@ export function generate2FASessionToken(userId: string): string {
  * @param maxAge - Maximum age of the token in milliseconds (default: 5 minutes)
  * @returns Whether the token is valid
  */
-export function verify2FASessionToken(token: string, maxAge: number = 5 * 60 * 1000): boolean {
+export function verify2FASessionToken(
+  token: string,
+  maxAge: number = 5 * 60 * 1000,
+): boolean {
   try {
-    const parts = token.split('-');
+    const parts = token.split("-");
     if (parts.length < 3) return false;
-    
+
     const userId = parts[0];
     const timestamp = parseInt(parts[1]);
-    const randomPart = parts.slice(2, -1).join('-');
+    const randomPart = parts.slice(2, -1).join("-");
     const hash = parts[parts.length - 1];
-    
+
     // Check if token is expired
     if (Date.now() - timestamp > maxAge) return false;
-    
+
     // Verify hash
     const data = `${userId}-${timestamp}-${randomPart}`;
-    const expectedHash = crypto.createHmac('sha256', getEnvVar('TOTP_SECRET')).update(data).digest('hex');
-    
-    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(expectedHash, 'hex'));
+    const expectedHash = crypto
+      .createHmac("sha256", getEnvVar("TOTP_SECRET"))
+      .update(data)
+      .digest("hex");
+
+    return crypto.timingSafeEqual(
+      Buffer.from(hash, "hex"),
+      Buffer.from(expectedHash, "hex"),
+    );
   } catch (error) {
-    console.error('Error verifying 2FA session token:', error);
+    console.error("Error verifying 2FA session token:", error);
     return false;
   }
 }
@@ -145,26 +159,29 @@ export function verify2FASessionToken(token: string, maxAge: number = 5 * 60 * 1
  * @param userId - User ID
  * @returns Whether 2FA is required
  */
-export async function is2FARequired(operation: string, userId: string): Promise<boolean> {
+export async function is2FARequired(
+  operation: string,
+  userId: string,
+): Promise<boolean> {
   try {
     // In a real implementation, you would check the user's 2FA settings
     // For now, we'll require 2FA for all trading operations
-    
+
     const sensitiveOperations = [
-      'trade_open',
-      'trade_close',
-      'trade_modify',
-      'strategy_create',
-      'strategy_delete',
-      'api_key_create',
-      'api_key_delete',
-      'executor_create',
-      'executor_delete',
+      "trade_open",
+      "trade_close",
+      "trade_modify",
+      "strategy_create",
+      "strategy_delete",
+      "api_key_create",
+      "api_key_delete",
+      "executor_create",
+      "executor_delete",
     ];
-    
+
     return sensitiveOperations.includes(operation);
   } catch (error) {
-    console.error('Error checking 2FA requirement:', error);
+    console.error("Error checking 2FA requirement:", error);
     // Fail secure - require 2FA if we can't determine
     return true;
   }
@@ -176,14 +193,17 @@ export async function is2FARequired(operation: string, userId: string): Promise<
  * @param code - Verification code
  * @returns Whether the email was sent successfully
  */
-export async function send2FAEmail(email: string, code: string): Promise<boolean> {
+export async function send2FAEmail(
+  email: string,
+  code: string,
+): Promise<boolean> {
   try {
     // In a real implementation, you would use an email service like Resend
     // For now, we'll just log the code
     console.log(`2FA code for ${email}: ${code}`);
     return true;
   } catch (error) {
-    console.error('Error sending 2FA email:', error);
+    console.error("Error sending 2FA email:", error);
     return false;
   }
 }
@@ -194,14 +214,17 @@ export async function send2FAEmail(email: string, code: string): Promise<boolean
  * @param code - Verification code
  * @returns Whether the SMS was sent successfully
  */
-export async function send2FASMS(phoneNumber: string, code: string): Promise<boolean> {
+export async function send2FASMS(
+  phoneNumber: string,
+  code: string,
+): Promise<boolean> {
   try {
     // In a real implementation, you would use an SMS service like Twilio
     // For now, we'll just log the code
     console.log(`2FA code for ${phoneNumber}: ${code}`);
     return true;
   } catch (error) {
-    console.error('Error sending 2FA SMS:', error);
+    console.error("Error sending 2FA SMS:", error);
     return false;
   }
 }
@@ -227,16 +250,16 @@ export function generateVerificationCode(length: number = 6): string {
  */
 export async function log2FAAttempt(
   userId: string,
-  type: 'totp' | 'email' | 'sms' | 'backup_code',
+  type: "totp" | "email" | "sms" | "backup_code",
   success: boolean,
   ipAddress?: string,
-  userAgent?: string
+  userAgent?: string,
 ): Promise<void> {
   try {
     // In a real implementation, you would log this to the database
     console.log(`2FA attempt: ${userId}, ${type}, ${success}, ${ipAddress}`);
   } catch (error) {
-    console.error('Error logging 2FA attempt:', error);
+    console.error("Error logging 2FA attempt:", error);
   }
 }
 
@@ -250,14 +273,14 @@ export async function log2FAAttempt(
 export async function hasExceeded2FALimits(
   userId: string,
   windowMs: number = 15 * 60 * 1000,
-  maxAttempts: number = 5
+  maxAttempts: number = 5,
 ): Promise<boolean> {
   try {
     // In a real implementation, you would check the database for recent failed attempts
     // For now, we'll just return false
     return false;
   } catch (error) {
-    console.error('Error checking 2FA limits:', error);
+    console.error("Error checking 2FA limits:", error);
     // Fail secure - assume limit exceeded if we can't check
     return true;
   }

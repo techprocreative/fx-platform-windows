@@ -1,11 +1,11 @@
 /**
  * Analytics Type Adapters
- * 
+ *
  * Converts database models to analytics types
  */
 
-import { Trade as PrismaTrade } from '@prisma/client';
-import { Trade as AnalyticsTrade } from './types';
+import { Trade as PrismaTrade } from "@prisma/client";
+import { Trade as AnalyticsTrade } from "./types";
 
 /**
  * Convert Prisma Trade to Analytics Trade
@@ -17,15 +17,16 @@ export function adaptTradeFromDB(dbTrade: PrismaTrade): AnalyticsTrade {
     : undefined;
 
   // Calculate profit percentage
-  const profitPercent = dbTrade.openPrice > 0 && dbTrade.profit !== null
-    ? (dbTrade.profit / (dbTrade.openPrice * dbTrade.lots * 100000)) * 100  // Simplified forex calculation
-    : 0;
+  const profitPercent =
+    dbTrade.openPrice > 0 && dbTrade.profit !== null
+      ? (dbTrade.profit / (dbTrade.openPrice * dbTrade.lots * 100000)) * 100 // Simplified forex calculation
+      : 0;
 
   return {
     tradeId: dbTrade.id,
     strategyId: dbTrade.strategyId,
     symbol: dbTrade.symbol,
-    direction: dbTrade.type === 'BUY' ? 'LONG' : 'SHORT',
+    direction: dbTrade.type === "BUY" ? "BUY" : "SELL",
     entryTime: dbTrade.openTime,
     exitTime: dbTrade.closeTime || undefined,
     entryPrice: dbTrade.openPrice,
@@ -37,7 +38,7 @@ export function adaptTradeFromDB(dbTrade: PrismaTrade): AnalyticsTrade {
     swap: dbTrade.swap || 0,
     pips: dbTrade.pips || undefined,
     holdingTime,
-    status: dbTrade.closeTime ? 'CLOSED' : 'OPEN',
+    status: dbTrade.closeTime ? "CLOSED" : "OPEN",
     metadata: {
       ticket: dbTrade.ticket,
       executorId: dbTrade.executorId,
@@ -61,16 +62,18 @@ export function adaptTradesFromDB(dbTrades: PrismaTrade[]): AnalyticsTrade[] {
  * Filter only closed trades for analytics
  */
 export function filterClosedTrades(trades: AnalyticsTrade[]): AnalyticsTrade[] {
-  return trades.filter(trade => trade.status === 'CLOSED' && trade.exitTime);
+  return trades.filter((trade) => trade.status === "CLOSED" && trade.exitTime);
 }
 
 /**
  * Group trades by month (using close time)
  */
-export function groupTradesByMonth(trades: AnalyticsTrade[]): Map<string, AnalyticsTrade[]> {
+export function groupTradesByMonth(
+  trades: AnalyticsTrade[],
+): Map<string, AnalyticsTrade[]> {
   const grouped = new Map<string, AnalyticsTrade[]>();
-  
-  trades.forEach(trade => {
+
+  trades.forEach((trade) => {
     if (trade.exitTime) {
       const month = trade.exitTime.toISOString().slice(0, 7); // YYYY-MM
       if (!grouped.has(month)) {
@@ -79,39 +82,43 @@ export function groupTradesByMonth(trades: AnalyticsTrade[]): Map<string, Analyt
       grouped.get(month)!.push(trade);
     }
   });
-  
+
   return grouped;
 }
 
 /**
  * Group trades by strategy
  */
-export function groupTradesByStrategy(trades: AnalyticsTrade[]): Map<string, AnalyticsTrade[]> {
+export function groupTradesByStrategy(
+  trades: AnalyticsTrade[],
+): Map<string, AnalyticsTrade[]> {
   const grouped = new Map<string, AnalyticsTrade[]>();
-  
-  trades.forEach(trade => {
+
+  trades.forEach((trade) => {
     if (!grouped.has(trade.strategyId)) {
       grouped.set(trade.strategyId, []);
     }
     grouped.get(trade.strategyId)!.push(trade);
   });
-  
+
   return grouped;
 }
 
 /**
  * Group trades by symbol
  */
-export function groupTradesBySymbol(trades: AnalyticsTrade[]): Map<string, AnalyticsTrade[]> {
+export function groupTradesBySymbol(
+  trades: AnalyticsTrade[],
+): Map<string, AnalyticsTrade[]> {
   const grouped = new Map<string, AnalyticsTrade[]>();
-  
-  trades.forEach(trade => {
+
+  trades.forEach((trade) => {
     if (!grouped.has(trade.symbol)) {
       grouped.set(trade.symbol, []);
     }
     grouped.get(trade.symbol)!.push(trade);
   });
-  
+
   return grouped;
 }
 
@@ -121,7 +128,7 @@ export function groupTradesBySymbol(trades: AnalyticsTrade[]): Map<string, Analy
 export function calculateBasicStats(trades: AnalyticsTrade[]) {
   const closedTrades = filterClosedTrades(trades);
   const totalTrades = closedTrades.length;
-  
+
   if (totalTrades === 0) {
     return {
       totalTrades: 0,
@@ -132,14 +139,14 @@ export function calculateBasicStats(trades: AnalyticsTrade[]) {
       averageProfit: 0,
     };
   }
-  
-  const winningTrades = closedTrades.filter(t => t.profit > 0);
-  const losingTrades = closedTrades.filter(t => t.profit <= 0);
-  
+
+  const winningTrades = closedTrades.filter((t) => t.profit > 0);
+  const losingTrades = closedTrades.filter((t) => t.profit <= 0);
+
   const totalProfit = closedTrades.reduce((sum, t) => sum + t.profit, 0);
   const winRate = (winningTrades.length / totalTrades) * 100;
   const averageProfit = totalProfit / totalTrades;
-  
+
   return {
     totalTrades,
     winningTrades: winningTrades.length,

@@ -93,6 +93,8 @@ export default function ExecutorDetailPage({
       const interval = setInterval(fetchExecutorDetails, 10000);
       return () => clearInterval(interval);
     }
+    // Return undefined for loading state
+    return undefined;
   }, [status, router, params.id]);
 
   const fetchExecutorDetails = async () => {
