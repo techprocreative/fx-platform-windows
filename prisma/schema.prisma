@@ -200,6 +200,7 @@ model Strategy {
   score           Json?     // Strategy scoring data
   regimeSettings  Json?     // Market regime adaptation settings
   correlationFilter Json?   // Correlation-based filtering settings
+  latestScoreId   String?   @unique
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   trades Trade[]
@@ -216,6 +217,7 @@ model Strategy {
   @@index([status])
   @@index([symbol])
   @@index([userId, status])
+  @@index([latestScoreId])
 }
 
 model StrategyVersion {
