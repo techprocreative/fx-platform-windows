@@ -30,10 +30,13 @@ import {
 } from '../../utils';
 
 // Mock clipboard API
-Object.assign(navigator, {
-  clipboard: {
-    writeText: jest.fn().mockResolvedValue(undefined)
-  }
+Object.defineProperty(global, 'navigator', {
+  value: {
+    clipboard: {
+      writeText: jest.fn().mockResolvedValue(undefined)
+    }
+  },
+  writable: true
 });
 
 // Mock URL.createObjectURL and URL.revokeObjectURL
@@ -365,8 +368,20 @@ describe('Utility Functions', () => {
       download: '',
       click: jest.fn()
     }));
-    const originalCreateElement = document.createElement;
-    document.createElement = mockCreateElement as any;
+    
+    // Mock document object
+    const mockDocument = {
+      createElement: mockCreateElement,
+      body: {
+        appendChild: jest.fn(),
+        removeChild: jest.fn()
+      }
+    };
+    
+    Object.defineProperty(global, 'document', {
+      value: mockDocument,
+      writable: true
+    });
 
     it('should download file', () => {
       downloadFile('test content', 'test.txt');
@@ -374,7 +389,6 @@ describe('Utility Functions', () => {
       expect(global.URL.createObjectURL).toHaveBeenCalled();
     });
 
-    // Restore original createElement
-    document.createElement = originalCreateElement;
+    // Cleanup is handled by jest automatically
   });
 });

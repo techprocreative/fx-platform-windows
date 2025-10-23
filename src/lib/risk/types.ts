@@ -5,6 +5,8 @@
  * including interfaces for risk parameters, validation results, and trade parameters.
  */
 
+import { DynamicRiskParams, SessionFilter, CorrelationFilter, RegimeDetectionConfig } from "../../types";
+
 export interface RiskParameters {
   /** Maximum risk per trade as percentage of balance (e.g., 2%) */
   maxRiskPerTrade: number;
@@ -97,6 +99,18 @@ export interface TradeParams {
   userId: string;
   /** Strategy ID if trade is from a strategy */
   strategyId?: string;
+  /** Current ATR value for dynamic risk management */
+  currentATR?: number;
+  /** Dynamic risk parameters */
+  dynamicRisk?: DynamicRiskParams;
+  /** Session filter parameters */
+  sessionFilter?: SessionFilter;
+  /** Correlation filter parameters */
+  correlationFilter?: CorrelationFilter;
+  /** Regime detection parameters */
+  regimeDetection?: RegimeDetectionConfig;
+  /** Timeframe for the trade */
+  timeframe?: string;
 }
 
 export interface Position {

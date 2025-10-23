@@ -48,6 +48,8 @@ model User {
   parameterOptimizations ParameterOptimization[]
   supervisorDecisions    SupervisorDecision[]
   anomalyLogs            AnomalyLog[]
+  scorePreferences       UserScorePreferences?
+  regimeConfigs          RegimeDetectionConfig[]
 
   @@index([email])
   @@index([createdAt])
@@ -194,6 +196,14 @@ model Strategy {
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
 
+  // Add latest score reference
+  latestScoreId   String?   @unique
+  
+  // New fields for strategy improvement plan
+  score           Json?     // Strategy scoring data
+  regimeSettings  Json?     // Market regime adaptation settings
+  correlationFilter Json?   // Correlation-based filtering settings
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   trades Trade[]
   backtests Backtest[]
@@ -201,11 +211,16 @@ model Strategy {
   assignments StrategyAssignment[]
   parameterOptimizations ParameterOptimization[]
   parameterPerformances ParameterPerformance[]
+  scores StrategyScore[]
+  latestScore StrategyScore? @relation("LatestScore", fields: [latestScoreId], references: [id])
+  performanceHistory StrategyPerformance[]
+  regimeAdjustments RegimeStrategyAdjustment[]
 
   @@index([userId])
   @@index([status])
   @@index([symbol])
   @@index([userId, status])
+  @@index([latestScoreId])
 }
 
 model StrategyVersion {
@@ -647,4 +662,891 @@ model AnomalyLog {
   @@index([severity])
   @@index([resolved])
   @@index([createdAt])
+}
+
+// ============================================================================
+// STRATEGY PERFORMANCE SCORING SYSTEM
+// ============================================================================
+
+// Strategy Score History
+model StrategyScore {
+  id               String   @id @default(cuid())
+  strategyId       String
+  backtestId       String?  // Link to the backtest that generated this score
+  userId           String
+  
+  // Score components (0-100)
+  profitability    Float
+  consistency      Float
+  riskAdjusted     Float
+  drawdown         Float
+  overall          Float
+  
+  // Recommendations and warnings
+  recommendations   Json?    // Array of recommendation strings
+  warnings         Json?    // Array of warning strings
+  
+  // Scoring configuration used
+  scoringConfig    Json?    // Weights and settings used for scoring
+  
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  strategy         Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  metrics          StrategyMetrics?
+  history          StrategyScoreHistory[]
+  latestForStrategy Strategy? @relation("LatestScore")
+  
+  @@index([strategyId])
+  @@index([userId])
+  @@index([overall])
+  @@index([createdAt])
+  @@unique([strategyId, backtestId])
+}
+
+// Detailed Strategy Metrics
+model StrategyMetrics {
+  id               String   @id @default(cuid())
+  strategyScoreId  String   @unique
+  
+  // Performance Metrics
+  returnPercentage Float
+  profitFactor     Float
+  averageWin       Float
+  averageLoss      Float
+  expectancy       Float
+  
+  // Consistency Metrics
+  winRate          Float
+  winRateStability Float
+  consecutiveWins  Int
+  consecutiveLosses Int
+  
+  // Risk-Adjusted Metrics
+  sharpeRatio      Float
+  sortinoRatio     Float
+  calmarRatio      Float
+  
+  // Drawdown Metrics
+  maxDrawdown      Float
+  maxDrawdownPercent Float
+  drawdownDuration Int
+  recoveryFactor   Float
+  
+  // Trading Frequency Metrics
+  totalTrades      Int
+  tradesPerMonth   Float
+  averageTradeDuration Float
+  
+  // Advanced Risk Metrics
+  var95            Float
+  skewness         Float
+  kurtosis         Float
+  
+  // Market Regime Information
+  marketRegime      String?  // TRENDING_UP, TRENDING_DOWN, RANGING, VOLATILE
+  volatilityLevel   String?  // LOW, MEDIUM, HIGH
+  
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  strategyScore    StrategyScore @relation(fields: [strategyScoreId], references: [id], onDelete: Cascade)
+  
+  @@index([strategyScoreId])
+  @@index([returnPercentage])
+  @@index([winRate])
+  @@index([sharpeRatio])
+}
+
+// Strategy Score History (for tracking performance over time)
+model StrategyScoreHistory {
+  id               String   @id @default(cuid())
+  strategyScoreId  String
+  timestamp        DateTime @default(now())
+  
+  // Historical score values
+  profitability    Float
+  consistency      Float
+  riskAdjusted     Float
+  drawdown         Float
+  overall          Float
+  
+  // Key metrics at time of scoring
+  winRate          Float
+  returnPercentage Float
+  maxDrawdown      Float
+  sharpeRatio      Float
+  
+  // Market conditions
+  marketRegime      String?
+  volatilityLevel   String?
+  
+  // Relations
+  strategyScore    StrategyScore @relation(fields: [strategyScoreId], references: [id], onDelete: Cascade)
+  
+  @@index([strategyScoreId])
+  @@index([timestamp])
+  @@index([overall])
+}
+
+// Benchmark Data for Strategy Comparison
+model BenchmarkData {
+  id               String   @id @default(cuid())
+  symbol           String
+  timeframe        String
+  startDate        DateTime
+  endDate          DateTime
+  
+  // Benchmark performance metrics
+  buyAndHoldReturn Float
+  marketReturn     Float
+  volatility       Float
+  sharpeRatio      Float
+  
+  // Market conditions during period
+  marketRegime      String?
+  volatilityLevel   String?
+  
+  // Data source
+  dataSource       String   @default("yahoo_finance")
+  
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@unique([symbol, timeframe, startDate, endDate])
+  @@index([symbol])
+  @@index([timeframe])
+  @@index([startDate])
+  @@index([endDate])
+}
+
+// Scoring Configuration Templates
+model ScoringTemplate {
+  id               String   @id @default(cuid())
+  name             String
+  description      String?  @db.Text
+  
+  // Weight configuration
+  profitabilityWeight Float
+  consistencyWeight   Float
+  riskAdjustedWeight  Float
+  drawdownWeight      Float
+  
+  // Scoring settings
+  minimumTrades    Int      @default(20)
+  lookbackPeriod    Int      @default(365) // days
+  enableHistoricalTracking Boolean @default(true)
+  
+  // Template metadata
+  isDefault        Boolean  @default(false)
+  isActive         Boolean  @default(true)
+  category         String?  // conservative, balanced, aggressive, custom
+  
+  // User who created this template
+  createdBy        String?
+  
+  // Timestamps
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  
+  // Relations
+  userPreferences  UserScorePreferences[]
+  
+  @@index([name])
+  @@index([category])
+  @@index([isActive])
+  @@index([isDefault])
+}
+
+// User Strategy Score Preferences
+model UserScorePreferences {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  
+  // Default scoring template
+  defaultTemplateId String?
+  
+  // Custom weight overrides
+  profitabilityWeight Float?
+  consistencyWeight   Float?
+  riskAdjustedWeight  Float?
+  drawdownWeight      Float?
+  
+  // Notification preferences
+  enableScoreAlerts Boolean @default(true)
+  scoreChangeThreshold Float @default(5.0) // Alert when score changes by this %
+  enableWeeklyReports Boolean @default(true)
+  
+  // Display preferences
+  showDetailedMetrics Boolean @default(true)
+  showRecommendations Boolean @default(true)
+  showWarnings Boolean @default(true)
+  
+  // Relations
+  user             User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  defaultTemplate  ScoringTemplate? @relation(fields: [defaultTemplateId], references: [id])
+  
+  // Timestamps
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([userId])
+}
+
+// Strategy model is already defined above, no need to redefine
+
+// User model is already defined above, no need to redefine
+
+// ScoringTemplate model is already defined above, no need to redefine
+
+// ============================================================================
+// STRATEGY PERFORMANCE TRACKING
+// ============================================================================
+
+// Strategy Performance History (as specified in STRATEGY_IMPROVEMENT_PLAN.md)
+model StrategyPerformance {
+  id               String   @id @default(cuid())
+  strategyId       String
+  date             DateTime @default(now())
+  trades           Int      @default(0)
+  winRate          Float?
+  profitFactor     Float?
+  regime           String?
+  created_at       DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Additional performance metrics
+  totalReturn      Float?
+  maxDrawdown      Float?
+  sharpeRatio      Float?
+  avgWin           Float?
+  avgLoss          Float?
+  expectancy       Float?
+  
+  // Market conditions during this period
+  volatilityLevel  String?
+  marketCondition  String?
+  
+  // Relations
+  strategy         Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  
+  @@index([strategyId])
+  @@index([date])
+  @@index([regime])
+  @@unique([strategyId, date])
+}
+
+// ============================================================================
+// MARKET REGIME DATA
+// ============================================================================
+
+// Market Regime History
+model MarketRegimeHistory {
+  id               String   @id @default(cuid())
+  symbol           String
+  timeframe        String
+  regime           String   // TRENDING_UP, TRENDING_DOWN, RANGING, VOLATILE
+  confidence       Float    // 0-100
+  timestamp        DateTime @default(now())
+  
+  // Regime detection metrics
+  trendStrength    Float?
+  volatility       Float?
+  volume           Float?
+  
+  // Technical indicators used for detection
+  indicators       Json?
+  
+  // Transition data
+  previousRegime   String?
+  transitionReason String?
+  
+  @@index([symbol, timeframe, timestamp])
+  @@index([regime])
+  @@index([timestamp])
+  @@unique([symbol, timeframe, timestamp])
+}
+
+// Regime Performance Statistics
+model RegimePerformanceStats {
+  id               String   @id @default(cuid())
+  strategyId       String
+  regime           String
+  timeframe        String
+  
+  // Performance metrics by regime
+  totalTrades      Int      @default(0)
+  winningTrades    Int      @default(0)
+  winRate          Float    @default(0)
+  avgProfit        Float    @default(0)
+  avgLoss          Float    @default(0)
+  profitFactor     Float    @default(0)
+  maxDrawdown      Float    @default(0)
+  sharpeRatio      Float    @default(0)
+  
+  // Risk metrics by regime
+  avgPositionSize  Float    @default(0)
+  maxPositionSize  Float    @default(0)
+  riskRewardRatio  Float    @default(0)
+  
+  // Period covered
+  startDate        DateTime
+  endDate          DateTime
+  lastUpdated      DateTime @default(now())
+  
+  @@index([strategyId, regime])
+  @@index([timeframe])
+  @@unique([strategyId, regime, timeframe])
+}
+
+// Regime Detection Configuration
+model RegimeDetectionConfig {
+  id               String   @id @default(cuid())
+  userId           String
+  symbol           String
+  timeframe        String
+  
+  // Detection parameters
+  trendThreshold   Float    @default(0.02)
+  volatilityThreshold Float  @default(0.015)
+  rangeThreshold   Float    @default(0.01)
+  lookbackPeriod   Int      @default(20)
+  
+  // Multi-timeframe settings
+  enableMTF        Boolean  @default(false)
+  primaryTimeframe String   @default("H1")
+  secondaryTimeframes String[] @default(["M15", "H4"])
+  
+  // Detection methods
+  enableTrendDetection Boolean @default(true)
+  enableVolatilityDetection Boolean @default(true)
+  enableRangeDetection Boolean @default(true)
+  
+  // Confidence settings
+  minConfidence    Float    @default(70)
+  
+  // Notification settings
+  enableNotifications Boolean @default(true)
+  notifyOnTransition Boolean @default(true)
+  
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId])
+  @@index([symbol])
+  @@index([timeframe])
+  @@unique([userId, symbol, timeframe])
+}
+
+// Regime Transition History
+model RegimeTransitionHistory {
+  id               String   @id @default(cuid())
+  symbol           String
+  timeframe        String
+  fromRegime       String
+  toRegime         String
+  transitionTime   DateTime @default(now())
+  
+  // Transition analysis
+  transitionStrength Float?
+  volatilityBefore  Float?
+  volatilityAfter   Float?
+  volumeChange      Float?
+  
+  // Market context
+  marketEvent      String?
+  newsImpact       String?
+  
+  // Performance impact
+  tradesAffected   Int      @default(0)
+  performanceChange Float?
+  
+  // AI analysis
+  aiAnalysis       Json?
+  confidence       Float?
+  
+  @@index([symbol, timeframe])
+  @@index([transitionTime])
+  @@index([fromRegime, toRegime])
+}
+
+// Regime Prediction Data
+model RegimePrediction {
+  id               String   @id @default(cuid())
+  symbol           String
+  timeframe        String
+  currentRegime    String
+  predictedRegime  String
+  predictionTime   DateTime @default(now())
+  targetTime       DateTime
+  
+  // Prediction metrics
+  confidence       Float    // 0-100
+  probability      Float    // 0-1
+  
+  // Prediction model data
+  modelType        String   // technical, ml, hybrid
+  modelVersion     String
+  features         Json?    // Features used for prediction
+  
+  // Actual outcome (filled later)
+  actualRegime     String?
+  wasCorrect       Boolean?
+  
+  @@index([symbol, timeframe])
+  @@index([predictionTime])
+  @@index([targetTime])
+  @@index([confidence])
+}
+
+// Regime-Based Strategy Adjustments
+model RegimeStrategyAdjustment {
+  id               String   @id @default(cuid())
+  strategyId       String
+  regime           String
+  isActive         Boolean  @default(true)
+  
+  // Position sizing adjustments
+  positionSizeMultiplier Float @default(1.0)
+  maxPositionSize   Float?
+  
+  // Risk management adjustments
+  stopLossMultiplier Float @default(1.0)
+  takeProfitMultiplier Float @default(1.0)
+  trailingStopAdjustment Float @default(1.0)
+  
+  // Entry adjustments
+  entryThresholdMultiplier Float @default(1.0)
+  confirmationRequired Boolean @default(false)
+  
+  // Exit adjustments
+  exitThresholdMultiplier Float @default(1.0)
+  partialExitEnabled Boolean @default(false)
+  partialExitLevels Json?
+  
+  // Performance tracking
+  totalTrades      Int      @default(0)
+  winRate          Float    @default(0)
+  profitFactor     Float    @default(0)
+  sharpeRatio      Float    @default(0)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  strategy Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
+  
+  @@index([strategyId])
+  @@index([regime])
+  @@index([isActive])
+  @@unique([strategyId, regime])
+}
+
+// Regime Detection Cache
+model RegimeDetectionCache {
+  id               String   @id @default(cuid())
+  symbol           String
+  timeframe        String
+  timestamp        DateTime
+  regime           String
+  confidence       Float
+  data             Json     // Cached detection data
+  expiresAt        DateTime
+  
+  @@index([symbol, timeframe])
+  @@index([timestamp])
+  @@index([expiresAt])
+  @@unique([symbol, timeframe, timestamp])
+}
+
+// ============================================================================
+// POSITION SIZING HISTORY
+// ============================================================================
+
+// Position Sizing History
+model PositionSizingHistory {
+  id               String   @id @default(cuid())
+  userId           String
+  strategyId       String?
+  tradeId          String?
+  executorId       String?
+  
+  // Position sizing details
+  method           String   // fixed_lot, percentage_risk, atr_based, volatility_based, kelly_criterion, account_equity
+  baseLotSize      Float
+  adjustedLotSize  Float
+  riskPercentage   Float?
+  accountBalance   Float?
+  riskAmount       Float?
+  
+  // Calculation parameters
+  atrValue         Float?
+  volatility       Float?
+  stopLossPips     Float?
+  confidence       Float?
+  
+  // Adjustment factors
+  sessionMultiplier Float?
+  regimeMultiplier  Float?
+  correlationMultiplier Float?
+  
+  // Result
+  finalLotSize     Float
+  timestamp        DateTime @default(now())
+  
+  @@index([userId])
+  @@index([strategyId])
+  @@index([tradeId])
+  @@index([timestamp])
+  @@index([method])
+}
+
+// Position Sizing Configuration History
+model PositionSizingConfigHistory {
+  id               String   @id @default(cuid())
+  userId           String
+  strategyId       String?
+  
+  // Configuration snapshot
+  method           String
+  config           Json
+  isActive         Boolean  @default(true)
+  
+  // Change tracking
+  changedBy        String?  // user_id or system
+  changeReason     String?
+  previousConfigId String?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([strategyId])
+  @@index([method])
+  @@index([isActive])
+}
+
+// ============================================================================
+// CORRELATION DATA (Integrated from correlation-schema.prisma)
+// ============================================================================
+
+model CorrelationMatrix {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  timeframe   String
+  lookbackPeriod Int
+  totalPairs  Int
+  averageCorrelation Float
+  highestCorrelation Float
+  lowestCorrelation Float
+  volatilityAdjusted Boolean @default(false)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  correlationEntries CorrelationEntry[]
+  
+  @@map("correlation_matrices")
+}
+
+model CorrelationEntry {
+  id                String @id @default(cuid())
+  matrixId          String
+  symbol1           String
+  symbol2           String
+  correlation       Float
+  pValue            Float
+  sampleSize        Int
+  standardError     Float
+  confidenceLow     Float
+  confidenceHigh    Float
+  trend             String // 'increasing' | 'decreasing' | 'stable'
+  changeRate        Float
+  lastUpdated       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  matrix            CorrelationMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  historicalData    HistoricalCorrelation[]
+  
+  @@unique([matrixId, symbol1, symbol2])
+  @@map("correlation_entries")
+}
+
+model HistoricalCorrelation {
+  id                String @id @default(cuid())
+  entryId           String
+  date              DateTime
+  correlation       Float
+  volatility        Float
+  
+  // Relations
+  entry             CorrelationEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  
+  @@map("historical_correlations")
+}
+
+model CorrelationGroup {
+  id                        String @id @default(cuid())
+  currency                  String
+  averageInternalCorrelation Float
+  riskFactor                Float
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  
+  // Relations
+  groupMembers              CorrelationGroupMember[]
+  
+  @@map("correlation_groups")
+}
+
+model CorrelationGroupMember {
+  id       String @id @default(cuid())
+  groupId  String
+  symbol   String
+  createdAt DateTime @default(now())
+  
+  // Relations
+  group    CorrelationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  @@unique([groupId, symbol])
+  @@map("correlation_group_members")
+}
+
+model CorrelationThreshold {
+  id                    String @id @default(cuid())
+  symbol                String
+  threshold             Float
+  adjustedForVolatility Boolean @default(false)
+  volatilityMultiplier  Float
+  timeframe             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+  
+  @@unique([symbol, timeframe])
+  @@map("correlation_thresholds")
+}
+
+model CorrelationAnalysisResult {
+  id                    String @id @default(cuid())
+  symbol                String
+  shouldSkip            Boolean
+  reason                String?
+  recommendedAction      String // 'proceed' | 'skip' | 'reduce_size'
+  adjustedPositionSize  Float?
+  confidence            Float
+  userId                String
+  strategyId            String?
+  createdAt             DateTime @default(now())
+  
+  // Relations
+  conflictingPositions   CorrelationConflict[]
+  
+  @@map("correlation_analysis_results")
+}
+
+model CorrelationConflict {
+  id                String @id @default(cuid())
+  analysisResultId  String
+  symbol            String
+  correlation       Float
+  positionSize      Float
+  createdAt         DateTime @default(now())
+  
+  // Relations
+  analysisResult    CorrelationAnalysisResult @relation(fields: [analysisResultId], references: [id], onDelete: Cascade)
+  
+  @@map("correlation_conflicts")
+}
+
+model CorrelationCache {
+  id         String @id @default(cuid())
+  key        String @unique
+  data       Json
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  
+  @@map("correlation_cache")
+}
+
+// ============================================================================
+// ANALYTICS DATA
+// ============================================================================
+
+// Analytics Data Storage
+model AnalyticsData {
+  id               String   @id @default(cuid())
+  userId           String
+  strategyId       String?
+  timeframe        String?
+  
+  // Time period
+  startDate        DateTime
+  endDate          DateTime
+  
+  // Performance metrics
+  totalReturn      Float?
+  returnPercentage Float?
+  winRate          Float?
+  profitFactor     Float?
+  sharpeRatio      Float?
+  maxDrawdown      Float?
+  maxDrawdownPercent Float?
+  
+  // Trade statistics
+  totalTrades      Int?
+  winningTrades    Int?
+  losingTrades     Int?
+  avgWin           Float?
+  avgLoss          Float?
+  expectancy       Float?
+  
+  // Risk metrics
+  var95            Float?
+  sortinoRatio     Float?
+  calmarRatio      Float?
+  
+  // Advanced metrics
+  skewness         Float?
+  kurtosis         Float?
+  
+  // Market conditions
+  marketRegime     String?
+  volatilityLevel  String?
+  
+  // Data source
+  dataSource       String   @default("trades") // trades, backtests, combined
+  
+  // Raw data
+  rawData          Json?
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  @@index([userId])
+  @@index([strategyId])
+  @@index([startDate, endDate])
+  @@index([dataSource])
+  @@unique([userId, strategyId, startDate, endDate, dataSource])
+}
+
+// Analytics Cache
+model AnalyticsCache {
+  id               String   @id @default(cuid())
+  userId           String
+  cacheKey         String
+  data             Json
+  expiresAt        DateTime
+  createdAt        DateTime @default(now())
+  
+  @@unique([userId, cacheKey])
+  @@index([expiresAt])
+}
+
+// ============================================================================
+// MULTI-TIMEFRAME ANALYSIS
+// ============================================================================
+
+// MultiTimeframe Analysis Results
+model MultiTimeframeAnalysis {
+  id               String   @id @default(cuid())
+  strategyId       String
+  symbol           String
+  primaryTimeframe String
+  analysisDate     DateTime @default(now())
+  
+  // Analysis results
+  overallSignal    String   // BUY, SELL, HOLD, NEUTRAL
+  confidence       Float    // 0-100
+  
+  // Timeframe data
+  timeframeData    Json     // Analysis data for each timeframe
+  
+  // Market context
+  marketRegime     String?
+  volatility       Float?
+  
+  // Recommendations
+  recommendations   Json?
+  
+  createdAt        DateTime @default(now())
+  
+  @@index([strategyId])
+  @@index([symbol])
+  @@index([analysisDate])
+  @@unique([strategyId, symbol, analysisDate])
+}
+
+// ============================================================================
+// SMART EXITS DATA
+// ============================================================================
+
+// Smart Exit History
+model SmartExitHistory {
+  id               String   @id @default(cuid())
+  tradeId          String
+  userId           String
+  
+  // Exit configuration
+  exitType         String   // fixed, atr, support, trailing, partial
+  exitConfig       Json
+  
+  // Market data at exit
+  marketData       Json?
+  
+  // Exit decision
+  exitReason       String?
+  exitPrice        Float?
+  exitTime         DateTime?
+  
+  // Performance impact
+  actualProfit     Float?
+  projectedProfit  Float?
+  improvement      Float?
+  
+  // AI/ML data
+  aiAnalysis       Json?
+  confidence       Float?
+  
+  createdAt        DateTime @default(now())
+  
+  @@index([tradeId])
+  @@index([userId])
+  @@index([exitType])
+  @@index([exitTime])
+}
+
+// Partial Exit History
+model PartialExitHistory {
+  id               String   @id @default(cuid())
+  tradeId          String
+  exitSequence     Int      // 1, 2, 3...
+  
+  // Exit details
+  exitPercentage   Float    // Percentage of position closed
+  exitPrice        Float
+  exitTime         DateTime
+  
+  // Exit configuration
+  exitConfig       Json
+  exitReason       String?
+  
+  // Performance
+  profitAtExit     Float?
+  remainingProfit  Float?
+  
+  createdAt        DateTime @default(now())
+  
+  @@index([tradeId])
+  @@index([exitTime])
+  @@unique([tradeId, exitSequence])
 }

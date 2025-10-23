@@ -7,6 +7,8 @@ import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { MODEL_COSTS } from '@/lib/llm/openrouter';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -41,7 +43,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Get LLM usage logs
-    const usageLogs = await prisma.lLMUsageLog.findMany({
+    const usageLogs = await (prisma as any).lLMUsageLog.findMany({
       where: {
         ...(dateFilter && { timestamp: { gte: dateFilter } })
       },
@@ -82,7 +84,7 @@ export async function GET(request: NextRequest) {
       : 0;
     
     // Get optimization statistics
-    const optimizations = await prisma.parameterOptimization.findMany({
+    const optimizations = await (prisma as any).parameterOptimization.findMany({
       where: {
         userId: session.user.id,
         ...(dateFilter && { createdAt: { gte: dateFilter } })

@@ -3,6 +3,7 @@
 
 import OpenAI from 'openai';
 import { prisma } from '@/lib/prisma';
+import { SYSTEM_PROMPTS } from './prompts';
 
 // Lazy initialize OpenRouter client
 let openrouterInstance: OpenAI | null = null;
@@ -204,6 +205,112 @@ async function trackLLMUsage(data: {
 export function estimateCost(model: string, tokens: number): number {
   const costPerM = MODEL_COSTS[model] || 0.35;
   return (tokens / 1_000_000) * costPerM;
+}
+
+/**
+ * Enhanced strategy generation with market context
+ */
+export async function generateEnhancedStrategy(
+  prompt: string,
+  symbol: string,
+  timeframe: string,
+  marketContext?: any,
+  model?: string
+) {
+  const selectedModel = model || MODELS.CRITICAL;
+  
+  try {
+    // Build enhanced prompt if market context is available
+    let enhancedPrompt = prompt;
+    let systemPrompt = SYSTEM_PROMPTS.SUPERVISOR;
+    
+    if (marketContext) {
+      // Use the enhanced strategy generation prompt
+      const { buildEnhancedStrategyPrompt } = await import('./prompts');
+      
+      enhancedPrompt = buildEnhancedStrategyPrompt(
+        'automated', // strategy type
+        symbol,
+        timeframe,
+        ['RSI', 'MACD', 'EMA', 'ATR'], // default indicators
+        formatMarketContextForPrompt(marketContext),
+        marketContext.volatility?.currentATR || 0.002,
+        1.5, // 1.5% risk
+        marketContext.session?.activeSessions || ['london', 'newYork']
+      );
+      
+      systemPrompt = `You are an expert forex trading strategy developer. Create a comprehensive trading strategy based on the provided requirements and market context. Focus on practical, implementable strategies that account for current market conditions.`;
+    }
+    
+    console.log(`🤖 Generating enhanced strategy for ${symbol} ${timeframe}...`);
+    
+    const result = await callLLM(
+      enhancedPrompt,
+      'optimization', // Use optimization tier for strategy generation
+      systemPrompt,
+      0.4 // Slightly higher creativity for strategy generation
+    );
+    
+    console.log(`✅ Enhanced strategy generated for ${symbol}`);
+    return result;
+    
+  } catch (error) {
+    console.error('❌ Enhanced strategy generation failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Market analysis with AI
+ */
+export async function analyzeMarketConditions(
+  marketData: string,
+  model?: string
+) {
+  const selectedModel = model || MODELS.CRITICAL;
+  
+  try {
+    const { buildMarketAnalysisPrompt } = await import('./prompts');
+    const prompt = buildMarketAnalysisPrompt(marketData);
+    
+    console.log('🤖 Analyzing market conditions...');
+    
+    const result = await callLLM(
+      prompt,
+      'analysis',
+      SYSTEM_PROMPTS.PERFORMANCE_ANALYSIS,
+      0.3
+    );
+    
+    console.log('✅ Market analysis completed');
+    return result;
+    
+  } catch (error) {
+    console.error('❌ Market analysis failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Format market context for prompt
+ */
+function formatMarketContextForPrompt(context: any): string {
+  if (!context) return '';
+  
+  return `
+Market Context for ${context.symbol} (${context.timeframe}):
+- Current Price: ${context.price?.current?.toFixed(5) || 'N/A'} (${context.price?.changePercent >= 0 ? '+' : ''}${context.price?.changePercent?.toFixed(2) || 'N/A'}%)
+- Volatility: ${context.volatility?.volatilityLevel || 'unknown'} (ATR: ${context.volatility?.currentATR?.toFixed(5) || 'N/A'})
+- Trend: ${context.trend?.direction || 'unknown'} (Strength: ${context.trend?.strength || 'N/A'}/100)
+- Key Levels: Support ${context.keyLevels?.nearestSupport?.toFixed(5) || 'N/A'}, Resistance ${context.keyLevels?.nearestResistance?.toFixed(5) || 'N/A'}
+- Market Sessions: ${context.session?.activeSessions?.join(', ') || 'none'} (${context.session?.marketCondition || 'unknown'} activity)
+- Optimal for ${context.symbol}: ${context.session?.isOptimalForPair ? 'YES' : 'NO'}
+
+Session Recommendations:
+- Active Sessions: ${context.session?.activeSessions?.join(', ') || 'none'}
+- Optimal Pairs: ${context.session?.recommendedPairs?.join(', ') || 'none'}
+- Market Condition: ${context.session?.marketCondition || 'unknown'} volume
+`;
 }
 
 /**

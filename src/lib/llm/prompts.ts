@@ -222,6 +222,202 @@ Output Format (JSON):
 };
 
 /**
+ * Enhanced AI Strategy Generation with Market Context
+ */
+export const ENHANCED_STRATEGY_PROMPTS = {
+  /**
+   * Main strategy generation prompt template
+   */
+  STRATEGY_GENERATION_TEMPLATE: `You are an expert forex trading strategy developer with deep knowledge of technical analysis, risk management, and market dynamics.
+
+You are creating a {strategyType} strategy for {symbol} on {timeframe}.
+
+Market Context:
+{marketContext}
+
+Strategy Requirements:
+1. Entry: Use {indicators} with market structure analysis
+2. Exit: Dynamic based on ATR ({atrValue}) and market conditions
+3. Risk: Max {riskPercent}% per trade with volatility adjustment
+4. Filter: Only trade during {optimalSessions}
+5. Position sizing: Account-based with ATR volatility adjustment
+
+Generate a complete trading strategy with:
+- Clear entry rules (minimum 2 conditions with logical AND/OR)
+- Adaptive exit based on current volatility and ATR
+- Position sizing formula that adjusts to market conditions
+- Market condition filters for optimal timing
+- Risk management rules that protect capital
+
+Strategy should be:
+- Suitable for current market conditions ({trendDirection} trend, {volatilityLevel} volatility)
+- Optimized for active sessions: {activeSessions}
+- Realistic and implementable in live trading
+- Profitable with minimum 1:2 risk-reward ratio
+
+Output Format (JSON):
+{
+  "name": "Clear strategy name",
+  "description": "Brief description of strategy logic",
+  "symbol": "{symbol}",
+  "timeframe": "{timeframe}",
+  "rules": {
+    "entry": {
+      "conditions": [
+        {
+          "indicator": "RSI",
+          "condition": "less_than",
+          "value": 30,
+          "description": "RSI oversold"
+        }
+      ],
+      "logic": "AND"
+    },
+    "exit": {
+      "takeProfit": {
+        "type": "atr",
+        "value": 2.0
+      },
+      "stopLoss": {
+        "type": "atr", 
+        "value": 1.5
+      }
+    },
+    "riskManagement": {
+      "lotSize": 0.01,
+      "maxPositions": 1,
+      "maxDailyLoss": 100
+    },
+    "dynamicRisk": {
+      "useATRSizing": true,
+      "atrMultiplier": 1.5,
+      "riskPercentage": 1.5,
+      "autoAdjustLotSize": true,
+      "reduceInHighVolatility": true,
+      "volatilityThreshold": 0.0025
+    },
+    "sessionFilter": {
+      "enabled": true,
+      "allowedSessions": ["london", "newYork"],
+      "useOptimalPairs": true,
+      "aggressivenessMultiplier": {
+        "optimal": 1.2,
+        "suboptimal": 0.8
+      }
+    }
+  }
+}`,
+
+  /**
+   * Market context analysis prompt template
+   */
+  MARKET_ANALYSIS_TEMPLATE: `Analyze the current market conditions and provide trading insights.
+
+Market Data:
+{marketData}
+
+Analysis Requirements:
+1. Trend Analysis: Identify current trend direction and strength
+2. Volatility Assessment: Evaluate current volatility vs historical average
+3. Key Levels: Identify important support and resistance levels
+4. Session Analysis: Assess current market session and optimal pairs
+5. Risk Assessment: Evaluate current risk conditions
+
+Provide specific trading recommendations based on:
+- Current market conditions
+- Optimal entry points
+- Risk management considerations
+- Session-specific opportunities
+
+Output Format (JSON):
+{
+  "trend": {
+    "direction": "bullish|bearish|sideways",
+    "strength": 0-100,
+    "timeframe": "primary_trend_timeframe"
+  },
+  "volatility": {
+    "current": "current_atr_value",
+    "historical": "average_atr_value", 
+    "level": "low|medium|high",
+    "implications": "trading_implications"
+  },
+  "keyLevels": {
+    "support": [1.1000, 1.0950],
+    "resistance": [1.1050, 1.1100],
+    "nearestSupport": 1.1000,
+    "nearestResistance": 1.1050
+  },
+  "sessions": {
+    "active": ["london", "newYork"],
+    "optimal": true,
+    "condition": "low|medium|high",
+    "recommendations": "session_specific_advice"
+  },
+  "recommendations": {
+    "strategyType": "scalping|swing|position",
+    "riskLevel": "conservative|moderate|aggressive",
+    "entryPoints": ["specific_entry_conditions"],
+    "exitStrategy": "exit_management_approach"
+  }
+}`,
+
+  /**
+   * Strategy optimization with market context template
+   */
+  OPTIMIZATION_WITH_CONTEXT_TEMPLATE: `Optimize this trading strategy based on current market conditions.
+
+Current Strategy:
+{currentStrategy}
+
+Market Context:
+{marketContext}
+
+Optimization Goals:
+1. Improve profitability based on current market conditions
+2. Adjust risk parameters for current volatility
+3. Optimize entry/exit rules for current trend
+4. Enhance session-based performance
+5. Improve risk-reward ratio
+
+Analysis Framework:
+- Review strategy performance in current market conditions
+- Identify weaknesses based on recent market behavior
+- Suggest parameter adjustments for better performance
+- Optimize for current volatility and trend
+- Ensure risk management remains sound
+
+Output Format (JSON):
+{
+  "currentAnalysis": {
+    "performanceIssues": ["identified_issues"],
+    "marketFit": "good|moderate|poor",
+    "riskLevel": "appropriate|too_high|too_low"
+  },
+  "optimizations": [
+    {
+      "parameter": "stopLossPips",
+      "current": 50,
+      "proposed": 60,
+      "reasoning": "adjustment_based_on_volatility",
+      "expectedImpact": "positive|neutral|negative"
+    }
+  ],
+  "marketAdaptations": {
+    "volatilityAdjustment": "specific_changes",
+    "trendAlignment": "strategy_modifications",
+    "sessionOptimization": "timing_improvements"
+  },
+  "riskAdjustments": {
+    "positionSizing": "sizing_formula_changes",
+    "stopLossStrategy": "sl_optimization",
+    "riskPercentage": "risk_parameter_update"
+  },
+  "overallImprovement": "expected_performance_gain"
+}`
+};
+
+/**
  * Build context-specific prompt with trading data
  */
 export function buildOptimizationPrompt(
@@ -300,4 +496,69 @@ ${recentTrades.slice(0, 10).map((t, i) =>
 
 Detect any anomalies and assess their severity.
 Provide clear recommendations for action if needed.`;
+}
+
+/**
+ * Build enhanced strategy generation prompt with market context
+ */
+export function buildEnhancedStrategyPrompt(
+  strategyType: string,
+  symbol: string,
+  timeframe: string,
+  indicators: string[],
+  marketContext: string,
+  atrValue: number,
+  riskPercent: number,
+  optimalSessions: string[]
+): string {
+  return ENHANCED_STRATEGY_PROMPTS.STRATEGY_GENERATION_TEMPLATE
+    .replace(/{strategyType}/g, strategyType)
+    .replace(/{symbol}/g, symbol)
+    .replace(/{timeframe}/g, timeframe)
+    .replace(/{marketContext}/g, marketContext)
+    .replace(/{indicators}/g, indicators.join(', '))
+    .replace(/{atrValue}/g, atrValue.toString())
+    .replace(/{riskPercent}/g, riskPercent.toString())
+    .replace(/{optimalSessions}/g, optimalSessions.join(', '))
+    .replace(/{trendDirection}/g, extractTrendDirection(marketContext))
+    .replace(/{volatilityLevel}/g, extractVolatilityLevel(marketContext))
+    .replace(/{activeSessions}/g, extractActiveSessions(marketContext));
+}
+
+/**
+ * Build market analysis prompt
+ */
+export function buildMarketAnalysisPrompt(marketData: string): string {
+  return ENHANCED_STRATEGY_PROMPTS.MARKET_ANALYSIS_TEMPLATE
+    .replace(/{marketData}/g, marketData);
+}
+
+/**
+ * Build optimization prompt with context
+ */
+export function buildOptimizationWithContextPrompt(
+  currentStrategy: string,
+  marketContext: string
+): string {
+  return ENHANCED_STRATEGY_PROMPTS.OPTIMIZATION_WITH_CONTEXT_TEMPLATE
+    .replace(/{currentStrategy}/g, currentStrategy)
+    .replace(/{marketContext}/g, marketContext);
+}
+
+/**
+ * Helper functions to extract information from market context
+ */
+function extractTrendDirection(marketContext: string): string {
+  const trendMatch = marketContext.match(/Trend: (\w+)/);
+  return trendMatch ? trendMatch[1] : 'neutral';
+}
+
+function extractVolatilityLevel(marketContext: string): string {
+  const volatilityMatch = marketContext.match(/Volatility: (\w+)/);
+  return volatilityMatch ? volatilityMatch[1] : 'medium';
+}
+
+function extractActiveSessions(marketContext: string): string {
+  const sessionMatch = marketContext.match(/Market Sessions: ([^(\n]+)/);
+  return sessionMatch ? sessionMatch[1].trim() : 'none';
 }

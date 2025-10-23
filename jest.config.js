@@ -28,7 +28,9 @@ module.exports = {
   
   // Transform files with TypeScript
   transform: {
-    '^.+\\.ts$': 'ts-jest'
+    '^.+\\.ts$': ['ts-jest', {
+      tsconfig: 'tsconfig.json'
+    }]
   },
   
   // Module file extensions
@@ -97,15 +99,9 @@ module.exports = {
     }
   },
   
-  // Global variables
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.json'
-    }
-  },
   
   // Module name mapping
-  moduleNameMapping: {
+  moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1'
   },
   
@@ -113,54 +109,5 @@ module.exports = {
   testTimeout: 30000,
   
   // Verbose output
-  verbose: false,
-  
-  // Projects for different test types
-  projects: [
-    // Unit tests
-    {
-      displayName: 'Unit Tests',
-      testMatch: ['<rootDir>/src/**/__tests__/*.test.ts'],
-      testPathIgnorePatterns: [
-        '<rootDir>/src/**/__tests__/*.integration.test.ts',
-        '<rootDir>/src/**/__tests__/*.e2e.test.ts',
-        '<rootDir>/src/**/__tests__/*.load.test.ts',
-        '<rootDir>/src/**/__tests__/*.security.test.ts'
-      ],
-      setupFilesAfterEnv: ['<rootDir>/src/lib/testing/test-setup.ts']
-    },
-    
-    // Integration tests
-    {
-      displayName: 'Integration Tests',
-      testMatch: ['<rootDir>/src/**/__tests__/*.integration.test.ts'],
-      testTimeout: 60000,
-      setupFilesAfterEnv: ['<rootDir>/src/lib/testing/integration-setup.ts']
-    },
-    
-    // End-to-end tests
-    {
-      displayName: 'End-to-End Tests',
-      testMatch: ['<rootDir>/src/**/__tests__/*.e2e.test.ts'],
-      testTimeout: 120000,
-      setupFilesAfterEnv: ['<rootDir>/src/lib/testing/e2e-setup.ts']
-    },
-    
-    // Load tests
-    {
-      displayName: 'Load Tests',
-      testMatch: ['<rootDir>/src/**/__tests__/*.load.test.ts'],
-      testTimeout: 300000,
-      maxWorkers: 1, // Run load tests sequentially
-      setupFilesAfterEnv: ['<rootDir>/src/lib/testing/load-setup.ts']
-    },
-    
-    // Security tests
-    {
-      displayName: 'Security Tests',
-      testMatch: ['<rootDir>/src/**/__tests__/*.security.test.ts'],
-      testTimeout: 120000,
-      setupFilesAfterEnv: ['<rootDir>/src/lib/testing/security-setup.ts']
-    }
-  ]
+  verbose: false
 };

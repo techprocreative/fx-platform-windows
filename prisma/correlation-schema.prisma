@@ -1,0 +1,167 @@
+// This file contains the database schema for correlation data
+// It should be merged with your main prisma/schema.prisma file
+
+model CorrelationMatrix {
+  id          String   @id @default(cuid())
+  timestamp   DateTime @default(now())
+  timeframe   String
+  lookbackPeriod Int
+  totalPairs  Int
+  averageCorrelation Float
+  highestCorrelation Float
+  lowestCorrelation Float
+  volatilityAdjusted Boolean @default(false)
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  correlationEntries CorrelationEntry[]
+  
+  @@map("correlation_matrices")
+}
+
+model CorrelationEntry {
+  id                String @id @default(cuid())
+  matrixId          String
+  symbol1           String
+  symbol2           String
+  correlation       Float
+  pValue            Float
+  sampleSize        Int
+  standardError     Float
+  confidenceLow     Float
+  confidenceHigh    Float
+  trend             String // 'increasing' | 'decreasing' | 'stable'
+  changeRate        Float
+  lastUpdated       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  
+  // Relations
+  matrix            CorrelationMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+  historicalData    HistoricalCorrelation[]
+  
+  @@unique([matrixId, symbol1, symbol2])
+  @@map("correlation_entries")
+}
+
+model HistoricalCorrelation {
+  id                String @id @default(cuid())
+  entryId           String
+  date              DateTime
+  correlation       Float
+  volatility        Float
+  
+  // Relations
+  entry             CorrelationEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+  
+  @@map("historical_correlations")
+}
+
+model CorrelationGroup {
+  id                        String @id @default(cuid())
+  currency                  String
+  averageInternalCorrelation Float
+  riskFactor                Float
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+  
+  // Relations
+  groupMembers              CorrelationGroupMember[]
+  
+  @@map("correlation_groups")
+}
+
+model CorrelationGroupMember {
+  id       String @id @default(cuid())
+  groupId  String
+  symbol   String
+  createdAt DateTime @default(now())
+  
+  // Relations
+  group    CorrelationGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  @@unique([groupId, symbol])
+  @@map("correlation_group_members")
+}
+
+model CorrelationThreshold {
+  id                    String @id @default(cuid())
+  symbol                String
+  threshold             Float
+  adjustedForVolatility Boolean @default(false)
+  volatilityMultiplier  Float
+  timeframe             String
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt)
+  
+  @@unique([symbol, timeframe])
+  @@map("correlation_thresholds")
+}
+
+model CorrelationAnalysisResult {
+  id                    String @id @default(cuid())
+  symbol                String
+  shouldSkip            Boolean
+  reason                String?
+  recommendedAction      String // 'proceed' | 'skip' | 'reduce_size'
+  adjustedPositionSize  Float?
+  confidence            Float
+  userId                String
+  strategyId            String?
+  createdAt             DateTime @default(now())
+  
+  // Relations
+  conflictingPositions   CorrelationConflict[]
+  
+  @@map("correlation_analysis_results")
+}
+
+model CorrelationConflict {
+  id                String @id @default(cuid())
+  analysisResultId  String
+  symbol            String
+  correlation       Float
+  positionSize      Float
+  createdAt         DateTime @default(now())
+  
+  // Relations
+  analysisResult    CorrelationAnalysisResult @relation(fields: [analysisResultId], references: [id], onDelete: Cascade)
+  
+  @@map("correlation_conflicts")
+}
+
+model CorrelationCache {
+  id         String @id @default(cuid())
+  key        String @unique
+  data       Json
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  
+  @@map("correlation_cache")
+}
+
+// Indexes for better performance
+model CorrelationMatrixIndex {
+  // This model is used to define indexes for the correlation tables
+  // In a real implementation, these would be defined directly in the database
+  
+  // Indexes for CorrelationMatrix
+  // CREATE INDEX idx_correlation_matrices_timestamp ON correlation_matrices(timestamp);
+  // CREATE INDEX idx_correlation_matrices_timeframe ON correlation_matrices(timeframe);
+  
+  // Indexes for CorrelationEntry
+  // CREATE INDEX idx_correlation_entries_symbol1 ON correlation_entries(symbol1);
+  // CREATE INDEX idx_correlation_entries_symbol2 ON correlation_entries(symbol2);
+  // CREATE INDEX idx_correlation_entries_correlation ON correlation_entries(correlation);
+  
+  // Indexes for HistoricalCorrelation
+  // CREATE INDEX idx_historical_correlations_entry_id ON historical_correlations(entryId);
+  // CREATE INDEX idx_historical_correlations_date ON historical_correlations(date);
+  
+  // Indexes for CorrelationAnalysisResult
+  // CREATE INDEX idx_correlation_analysis_results_user_id ON correlation_analysis_results(userId);
+  // CREATE INDEX idx_correlation_analysis_results_symbol ON correlation_analysis_results(symbol);
+  // CREATE INDEX idx_correlation_analysis_results_created_at ON correlation_analysis_results(createdAt);
+}

@@ -5,9 +5,23 @@ import { useSession } from 'next-auth/react';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { EquityCurveChart } from '@/components/analytics/EquityCurveChart';
 import { ProfitDistributionChart } from '@/components/analytics/ProfitDistributionChart';
 import { MonthlyPerformanceChart } from '@/components/analytics/MonthlyPerformanceChart';
+import { StrategyPerformanceOverview } from '@/components/analytics/StrategyPerformanceOverview';
+import { WinRateAnalysis } from '@/components/analytics/WinRateAnalysis';
+import { RiskMetricsDashboard } from '@/components/analytics/RiskMetricsDashboard';
+import { StrategyComparison } from '@/components/analytics/StrategyComparison';
+import {
+  PerformanceMetrics,
+  StrategyScore,
+  StrategyPerformanceData,
+  AnalyticsComparison,
+  PerformanceTrend,
+  TimeFrame,
+  AnalyticsFilters
+} from '@/types';
 import {
   BarChart3,
   TrendingUp,
@@ -22,51 +36,39 @@ import {
   Target,
   Zap,
   Award,
-  AlertCircle
+  AlertCircle,
+  Settings,
+  RefreshCw,
+  ChevronDown
 } from 'lucide-react';
 
-interface PerformanceData {
-  totalTrades: number;
-  winningTrades: number;
-  losingTrades: number;
-  totalProfit: number;
-  winRate: number;
-  profitFactor: number;
-  maxDrawdown: number;
-  averageWin: number;
-  averageLoss: number;
-  sharpeRatio: number;
-  monthlyData: {
-    month: string;
-    profit: number;
-    trades: number;
-  }[];
-  strategyPerformance: {
-    strategyId: string;
-    name: string;
-    profit: number;
-    winRate: number;
-    trades: number;
-  }[];
-  equityCurve: {
-    timestamp: string;
-    equity: number;
-    date: string;
-  }[];
-  // Additional metadata from new API
-  source?: 'trades' | 'backtests' | 'combined';
-  hasRealTrades?: boolean;
-  hasBacktests?: boolean;
+interface AnalyticsData {
+  performance: StrategyPerformanceData | null;
+  trends: PerformanceTrend[];
+  comparison: AnalyticsComparison | null;
+  filters: AnalyticsFilters;
+  summary: {
+    totalStrategies?: number;
+    totalTrades: number;
+    totalProfit: number;
+    avgWinRate?: number;
+    avgSharpeRatio?: number;
+    bestStrategy?: any;
+    worstStrategy?: any;
+  };
 }
 
 export default function AnalyticsPage() {
   const { data: session, status } = useSession();
-  const [data, setData] = useState<PerformanceData | null>(null);
+  const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState<'1M' | '3M' | '6M' | '1Y' | 'ALL'>('6M');
-  const [selectedMetric, setSelectedMetric] = useState<'overview' | 'profitability' | 'risk' | 'consistency'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'winrate' | 'risk' | 'comparison' | 'trends'>('overview');
+  const [timeframe, setTimeframe] = useState<TimeFrame>('6M');
+  const [selectedStrategy, setSelectedStrategy] = useState<string>('all');
+  const [selectedSymbol, setSelectedSymbol] = useState<string>('all');
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportFormat, setExportFormat] = useState<'pdf' | 'csv' | 'excel'>('pdf');
+  const [showFilters, setShowFilters] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -75,26 +77,110 @@ export default function AnalyticsPage() {
     if (status === 'authenticated') {
       fetchAnalytics();
     }
-  }, [status, timeframe]);
+  }, [status, timeframe, selectedStrategy, selectedSymbol]);
 
   const fetchAnalytics = async () => {
+    setLoading(true);
     try {
-      const response = await fetch(`/api/analytics?timeframe=${timeframe}`);
-      if (response.ok) {
-        const analyticsData = await response.json();
-        
-        // Check if data is empty and provide guidance
-        if (!analyticsData || analyticsData.totalTrades === 0) {
-          return;
-        }
-        
-        setData(analyticsData);
+      // Fetch performance data
+      const performanceResponse = await fetch(
+        `/api/analytics/performance?timeframe=${timeframe}${
+          selectedStrategy !== 'all' ? `&strategyId=${selectedStrategy}` : ''
+        }${
+          selectedSymbol !== 'all' ? `&symbol=${selectedSymbol}` : ''
+        }`
+      );
+      
+      // Fetch trends data
+      const trendsResponse = await fetch(
+        `/api/analytics/trends?timeframe=${timeframe}&period=monthly&metric=profit`
+      );
+      
+      // Fetch comparison data
+      const comparisonResponse = await fetch(
+        `/api/analytics/comparison?type=strategy&timeframe=${timeframe}`
+      );
+      
+      let performanceData = null;
+      let trendsData = [];
+      let comparisonData = null;
+      
+      if (performanceResponse.ok) {
+        const performanceResult = await performanceResponse.json();
+        performanceData = performanceResult.performance;
       }
+      
+      if (trendsResponse.ok) {
+        const trendsResult = await trendsResponse.json();
+        trendsData = trendsResult.trends || [];
+      }
+      
+      if (comparisonResponse.ok) {
+        const comparisonResult = await comparisonResponse.json();
+        comparisonData = comparisonResult.comparison;
+      }
+      
+      setData({
+        performance: performanceData,
+        trends: trendsData,
+        comparison: comparisonData,
+        filters: {
+          timeFrame: timeframe,
+          strategies: selectedStrategy !== 'all' ? [selectedStrategy] : [],
+          symbols: selectedSymbol !== 'all' ? [selectedSymbol] : []
+        },
+        summary: performanceData ? {
+          totalTrades: performanceData.metrics.totalTrades,
+          totalProfit: performanceData.metrics.totalProfit,
+          avgWinRate: performanceData.metrics.winRate,
+          avgSharpeRatio: performanceData.metrics.sharpeRatio
+        } : {
+          totalTrades: 0,
+          totalProfit: 0,
+          avgWinRate: 0,
+          avgSharpeRatio: 0
+        }
+      });
     } catch (error) {
       console.error('Failed to fetch analytics:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleRefresh = () => {
+    fetchAnalytics();
+  };
+
+  const handleExport = async () => {
+    try {
+      const response = await fetch('/api/analytics/export', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          format: exportFormat,
+          timeframe,
+          filters: data?.filters
+        }),
+      });
+      
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `analytics-report.${exportFormat}`;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Failed to export analytics:', error);
+    }
+    setShowExportDialog(false);
   };
 
   if (loading) {
@@ -107,9 +193,9 @@ export default function AnalyticsPage() {
     );
   }
 
-  if (!data || data.totalTrades === 0) {
+  if (!data || !data.performance || data.performance.metrics.totalTrades === 0) {
     return (
-      <div className="text-center py-12 bg-blue-50 border border border-blue-200 rounded-lg p-6 text-center">
+      <div className="text-center py-12 bg-blue-50 border border-blue-200 rounded-lg p-6">
         <div className="mx-auto mb-4">
           <Activity className="h-12 w-12 text-blue-600 mx-auto mb-4" />
           <p className="text-lg font-semibold text-blue-900 mb-2">No Activity Yet</p>
@@ -159,15 +245,34 @@ export default function AnalyticsPage() {
         <div className="flex items-center gap-3">
           <select
             value={timeframe}
-            onChange={(e) => setTimeframe(e.target.value as any)}
+            onChange={(e) => setTimeframe(e.target.value as TimeFrame)}
             className="rounded-lg border border-neutral-300 px-4 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
           >
+            <option value="1D">Last Day</option>
+            <option value="1W">Last Week</option>
             <option value="1M">Last Month</option>
             <option value="3M">Last 3 Months</option>
             <option value="6M">Last 6 Months</option>
             <option value="1Y">Last Year</option>
             <option value="ALL">All Time</option>
           </select>
+
+          <button
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="h-4 w-4" />
+            Filters
+            <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
+
+          <button
+            className="flex items-center gap-2 px-4 py-2 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+            onClick={handleRefresh}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Refresh
+          </button>
 
           <button
             className="flex items-center gap-2 px-4 py-2 text-sm border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
@@ -179,267 +284,259 @@ export default function AnalyticsPage() {
         </div>
       </div>
 
+      {/* Filters Panel */}
+      {showFilters && (
+        <Card className="p-4 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">Strategy</label>
+              <select
+                value={selectedStrategy}
+                onChange={(e) => setSelectedStrategy(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              >
+                <option value="all">All Strategies</option>
+                {/* Strategy options would be populated from API */}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">Symbol</label>
+              <select
+                value={selectedSymbol}
+                onChange={(e) => setSelectedSymbol(e.target.value)}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
+              >
+                <option value="all">All Symbols</option>
+                {/* Symbol options would be populated from API */}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button
+                onClick={() => {
+                  setSelectedStrategy('all');
+                  setSelectedSymbol('all');
+                }}
+                variant="secondary"
+                className="w-full"
+              >
+                Reset Filters
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       {/* Data Source Info */}
-      {data && (data.hasRealTrades || data.hasBacktests) && (
+      {data && data.performance && (
         <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
           <div className="flex items-start gap-3">
             <Activity className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h4 className="text-sm font-semibold text-blue-900 mb-1">
-                Data Source: {data.hasRealTrades ? 'Real Trading' : 'Backtests'}
+                Performance Analytics
               </h4>
               <p className="text-xs text-blue-700 leading-relaxed">
-                {data.hasRealTrades ? (
-                  <>Analytics calculated from <strong>{data.totalTrades} real trades</strong>. These are actual trading results from your executed strategies.</>
-                ) : (
-                  <>Analytics calculated from <strong>{data.totalTrades} backtest executions</strong>. Run real trades to see live performance metrics.</>
-                )}
+                Analytics calculated from <strong>{data.performance.metrics.totalTrades} trades</strong>.
+                Showing performance metrics for the selected timeframe and filters.
               </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Metric Selector */}
-      <div className="flex gap-2 mb-6">
+      {/* Tab Navigation */}
+      <div className="flex gap-2 mb-6 overflow-x-auto">
         {[
           { id: 'overview', label: 'Overview', icon: BarChart3 },
-          { id: 'profitability', label: 'Profitability', icon: DollarSign },
+          { id: 'performance', label: 'Performance', icon: TrendingUp },
+          { id: 'winrate', label: 'Win Rate', icon: Target },
           { id: 'risk', label: 'Risk Analysis', icon: Target },
-          { id: 'consistency', label: 'Consistency', icon: Zap }
-        ].map((metric) => (
+          { id: 'comparison', label: 'Comparison', icon: Award },
+          { id: 'trends', label: 'Trends', icon: LineChart }
+        ].map((tab) => (
           <button
-            key={metric.id}
-            onClick={() => setSelectedMetric(metric.id as any)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
-              selectedMetric === metric.id
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap ${
+              activeTab === tab.id
                 ? 'bg-primary-600 text-white'
                 : 'bg-white border border-neutral-300 text-neutral-700 hover:bg-neutral-50'
             }`}
           >
-            <metric.icon className="h-4 w-4" />
-            {metric.label}
+            <tab.icon className="h-4 w-4" />
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {/* Performance Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-lg border border-neutral-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-neutral-600">Total Trades</span>
-            <Activity className="h-4 w-4 text-blue-500" />
-          </div>
-          <p className="text-2xl font-bold text-neutral-900">{data.totalTrades}</p>
-          <p className="text-xs text-neutral-500 mt-1">
-            {data.winningTrades} wins, {data.losingTrades} losses
-          </p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-neutral-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-neutral-600">Total Profit</span>
-            {data.totalProfit >= 0 ? (
-              <TrendingUp className="h-4 w-4 text-green-500" />
-            ) : (
-              <TrendingDown className="h-4 w-4 text-red-500" />
-            )}
-          </div>
-          <p className={`text-2xl font-bold ${data.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-            ${data.totalProfit.toFixed(2)}
-          </p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-neutral-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-neutral-600">Win Rate</span>
-            <Activity className="h-4 w-4 text-purple-500" />
-          </div>
-          <p className="text-2xl font-bold text-neutral-900">{data.winRate.toFixed(1)}%</p>
-        </div>
-
-        <div className="bg-white rounded-lg border border-neutral-200 p-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm text-neutral-600">Max Drawdown</span>
-            <TrendingDown className="h-4 w-4 text-orange-500" />
-          </div>
-          <p className="text-2xl font-bold text-orange-600">-{data.maxDrawdown.toFixed(1)}%</p>
-        </div>
-      </div>
-
-      {/* Interactive Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Equity Curve */}
-        <div className="bg-white rounded-lg border border-neutral-200 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-            <LineChart className="h-5 w-5" />
-            Equity Curve
-          </h2>
-          <EquityCurveChart 
-            data={data.equityCurve || []} 
-            initialBalance={10000}
-          />
-        </div>
-
-        {/* Profit Distribution */}
-        <div className="bg-white rounded-lg border border-neutral-200 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-            <PieChart className="h-5 w-5" />
-            Profit Distribution by Strategy
-          </h2>
-          <ProfitDistributionChart 
-            data={data.strategyPerformance || []}
-          />
-        </div>
-      </div>
-
-      {/* Strategy Comparison */}
-      <div className="bg-white rounded-lg border border-neutral-200 p-6">
-        <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-          <Award className="h-5 w-5" />
-          Strategy Performance Comparison
-        </h2>
-        {data.strategyPerformance.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-neutral-200">
-                  <th className="text-left py-2 px-4 text-sm font-medium text-neutral-700">Strategy</th>
-                  <th className="text-right py-2 px-4 text-sm font-medium text-neutral-700">Profit</th>
-                  <th className="text-right py-2 px-4 text-sm font-medium text-neutral-700">Win Rate</th>
-                  <th className="text-right py-2 px-4 text-sm font-medium text-neutral-700">Trades</th>
-                  <th className="text-right py-2 px-4 text-sm font-medium text-neutral-700">Profit Factor</th>
-                  <th className="text-center py-2 px-4 text-sm font-medium text-neutral-700">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.strategyPerformance.map((strategy) => (
-                  <tr key={strategy.strategyId} className="border-b border-neutral-100">
-                    <td className="py-3 px-4">
-                      <div>
-                        <p className="font-medium text-neutral-900">{strategy.name}</p>
-                        <p className="text-xs text-neutral-500">ID: {strategy.strategyId}</p>
-                      </div>
-                    </td>
-                    <td className={`py-3 px-4 text-right font-medium ${
-                      strategy.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      ${strategy.profit.toFixed(2)}
-                    </td>
-                    <td className="py-3 px-4 text-right">
-                      <span className={`inline-flex px-2 py-1 text-xs rounded-full ${
-                        strategy.winRate >= 50 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {strategy.winRate.toFixed(1)}%
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 text-right text-neutral-900">{strategy.trades}</td>
-                    <td className="py-3 px-4 text-right text-neutral-900">
-                      {(strategy.profit / (strategy.trades * 0.01)).toFixed(2)}
-                    </td>
-                    <td className="py-3 px-4 text-center">
-                      <button className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-                        View Details
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <p className="text-neutral-500 text-center py-4">No strategy data available</p>
-        )}
-      </div>
-
-      {/* Monthly Performance Chart - Full Width */}
-      <div className="bg-white rounded-lg border border-neutral-200 p-6">
-        <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
-          <BarChart3 className="h-5 w-5" />
-          Monthly Performance
-        </h2>
-        <MonthlyPerformanceChart 
-          data={data.monthlyData.filter(m => m.month !== 'No Data')} 
-        />
-      </div>
-
-      {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Strategy Performance */}
-        <div className="bg-white rounded-lg border border-neutral-200 p-6">
-          <h2 className="text-lg font-semibold text-neutral-900 mb-4">Strategy Performance</h2>
-          {data.strategyPerformance.length > 0 ? (
-            <div className="space-y-3">
-              {data.strategyPerformance.map((strategy) => (
-                <div key={strategy.strategyId} className="border-b border-neutral-100 pb-3 last:border-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-neutral-900">
-                      {strategy.name}
-                    </span>
-                    <span className={`text-sm font-medium ${
-                      strategy.profit >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      ${strategy.profit.toFixed(2)}
-                    </span>
+      {/* Tab Content */}
+      {data && data.performance && (
+        <>
+          {activeTab === 'overview' && (
+            <div className="space-y-6">
+              {/* Quick Stats */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-neutral-600">Total Trades</span>
+                    <Activity className="h-4 w-4 text-blue-500" />
                   </div>
-                  <div className="flex items-center justify-between text-xs text-neutral-500">
-                    <span>{strategy.trades} trades</span>
-                    <span>Win Rate: {strategy.winRate.toFixed(1)}%</span>
+                  <p className="text-2xl font-bold text-neutral-900">{data.performance.metrics.totalTrades}</p>
+                  <p className="text-xs text-neutral-500 mt-1">
+                    {data.performance.metrics.winningTrades} wins, {data.performance.metrics.losingTrades} losses
+                  </p>
+                </Card>
+
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-neutral-600">Total Profit</span>
+                    {data.performance.metrics.totalProfit >= 0 ? (
+                      <TrendingUp className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <TrendingDown className="h-4 w-4 text-red-500" />
+                    )}
                   </div>
-                </div>
-              ))}
+                  <p className={`text-2xl font-bold ${data.performance.metrics.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    ${data.performance.metrics.totalProfit.toFixed(2)}
+                  </p>
+                </Card>
+
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-neutral-600">Win Rate</span>
+                    <Activity className="h-4 w-4 text-purple-500" />
+                  </div>
+                  <p className="text-2xl font-bold text-neutral-900">{data.performance.metrics.winRate.toFixed(1)}%</p>
+                </Card>
+
+                <Card className="p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm text-neutral-600">Max Drawdown</span>
+                    <TrendingDown className="h-4 w-4 text-orange-500" />
+                  </div>
+                  <p className="text-2xl font-bold text-orange-600">-{data.performance.metrics.maxDrawdownPercent.toFixed(1)}%</p>
+                </Card>
+              </div>
+
+              {/* Charts */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Equity Curve</h3>
+                  <EquityCurveChart
+                    data={data.performance.equityCurve.map(point => ({
+                      timestamp: point.timestamp.toISOString(),
+                      equity: point.equity,
+                      date: point.date
+                    })) || []}
+                    initialBalance={10000}
+                  />
+                </Card>
+
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold text-neutral-900 mb-4">Monthly Performance</h3>
+                  <MonthlyPerformanceChart
+                    data={data.performance.monthlyData.map(m => ({
+                      month: m.month,
+                      profit: m.profit,
+                      trades: m.trades
+                    }))}
+                  />
+                </Card>
+              </div>
             </div>
-          ) : (
-            <p className="text-neutral-500 text-center py-4">No strategy data available</p>
           )}
-        </div>
-      </div>
 
-      {/* Additional Metrics */}
-      <div className="bg-white rounded-lg border border-neutral-200 p-6">
-        <h2 className="text-lg font-semibold text-neutral-900 mb-4">Risk Metrics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div>
-            <p className="text-sm text-neutral-600 mb-1">Profit Factor</p>
-            <p className="text-xl font-bold text-neutral-900">{data.profitFactor.toFixed(2)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-neutral-600 mb-1">Average Win</p>
-            <p className="text-xl font-bold text-green-600">${data.averageWin.toFixed(2)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-neutral-600 mb-1">Average Loss</p>
-            <p className="text-xl font-bold text-red-600">${data.averageLoss.toFixed(2)}</p>
-          </div>
-          <div>
-            <p className="text-sm text-neutral-600 mb-1">Sharpe Ratio</p>
-            <p className="text-xl font-bold text-neutral-900">{data.sharpeRatio.toFixed(2)}</p>
-          </div>
-        </div>
-      </div>
+          {activeTab === 'performance' && (
+            <StrategyPerformanceOverview
+              metrics={data.performance.metrics}
+              score={data.performance.score}
+            />
+          )}
+
+          {activeTab === 'winrate' && (
+            <WinRateAnalysis
+              metrics={data.performance.metrics}
+              monthlyData={data.performance.monthlyData}
+            />
+          )}
+
+          {activeTab === 'risk' && (
+            <RiskMetricsDashboard
+              metrics={data.performance.metrics}
+              drawdownPeriods={data.performance.drawdownPeriods}
+              equityCurve={data.performance.equityCurve.map(point => ({
+                timestamp: point.timestamp.toISOString(),
+                equity: point.equity,
+                date: point.date
+              }))}
+            />
+          )}
+
+          {activeTab === 'comparison' && (
+            <StrategyComparison
+              comparison={data.comparison}
+              onRefresh={handleRefresh}
+              onExport={handleExport}
+            />
+          )}
+
+          {activeTab === 'trends' && (
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-neutral-900 mb-4">Performance Trends</h3>
+              <div className="h-80">
+                {data.trends.length > 0 ? (
+                  <div className="space-y-4">
+                    {data.trends.map((trend, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-neutral-900">{trend.period}</p>
+                          <p className="text-sm text-neutral-600">{trend.metric}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className={`font-semibold ${trend.trend === 'up' ? 'text-green-600' : trend.trend === 'down' ? 'text-red-600' : 'text-neutral-600'}`}>
+                            {trend.value.toFixed(2)}
+                          </p>
+                          <p className={`text-sm ${trend.change >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {trend.change >= 0 ? '+' : ''}{trend.change.toFixed(2)} ({trend.changePercent.toFixed(1)}%)
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-center h-full bg-neutral-50 rounded-lg">
+                    <p className="text-neutral-500">No trend data available</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
 
       {/* Performance Tips */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-        <h3 className="font-semibold text-blue-900 mb-2">Performance Insights</h3>
-        <ul className="text-sm text-blue-800 space-y-1">
-          {data.winRate < 40 && (
-            <li>• Consider reviewing your entry/exit criteria to improve win rate</li>
-          )}
-          {data.maxDrawdown > 20 && (
-            <li>• Your drawdown is quite high. Consider reducing position sizes</li>
-          )}
-          {data.profitFactor < 1.5 && (
-            <li>• Focus on improving your profit factor by cutting losses early</li>
-          )}
-          {data.totalTrades < 20 && (
-            <li>• You need more trades to get statistically significant results</li>
-          )}
-          {data.winRate >= 50 && data.profitFactor >= 1.5 && data.maxDrawdown <= 10 && (
-            <li>• Great performance! Consider gradually increasing position sizes</li>
-          )}
-        </ul>
-      </div>
+      {data && data.performance && (
+        <Card className="p-6">
+          <h3 className="font-semibold text-blue-900 mb-2">Performance Insights</h3>
+          <ul className="text-sm text-blue-800 space-y-1">
+            {data.performance.metrics.winRate < 40 && (
+              <li>• Consider reviewing your entry/exit criteria to improve win rate</li>
+            )}
+            {data.performance.metrics.maxDrawdownPercent > 20 && (
+              <li>• Your drawdown is quite high. Consider reducing position sizes</li>
+            )}
+            {data.performance.metrics.profitFactor < 1.5 && (
+              <li>• Focus on improving your profit factor by cutting losses early</li>
+            )}
+            {data.performance.metrics.totalTrades < 20 && (
+              <li>• You need more trades to get statistically significant results</li>
+            )}
+            {data.performance.metrics.winRate >= 50 && data.performance.metrics.profitFactor >= 1.5 && data.performance.metrics.maxDrawdownPercent <= 10 && (
+              <li>• Great performance! Consider gradually increasing position sizes</li>
+            )}
+          </ul>
+        </Card>
+      )}
 
       {/* Export Dialog */}
       {showExportDialog && (
@@ -485,11 +582,7 @@ export default function AnalyticsPage() {
                 Cancel
               </Button>
               <Button
-                onClick={() => {
-                  // Handle export logic here
-                  console.log(`Exporting as ${exportFormat}`);
-                  setShowExportDialog(false);
-                }}
+                onClick={handleExport}
                 className="flex-1"
               >
                 Export Report
