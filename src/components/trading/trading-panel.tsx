@@ -13,6 +13,7 @@ import {
   Calculator,
 } from "lucide-react";
 import { TradeParams, AccountInfo, SymbolInfo } from "@/lib/risk/types";
+import { TRADING_CONFIG } from "@/lib/config";
 
 interface TradingPanelProps {
   accountInfo?: AccountInfo;
@@ -26,17 +27,7 @@ export function TradingPanel({
   accountInfo,
   symbolInfo,
   onTrade,
-  symbols = [
-    "EURUSD",
-    "GBPUSD",
-    "USDJPY",
-    "AUDUSD",
-    "USDCAD",
-    "XAUUSD",
-    "XAGUSD",
-    "USOIL",
-    "UKOIL",
-  ],
+  symbols = TRADING_CONFIG.SUPPORTED_SYMBOLS,
   className = "",
 }: TradingPanelProps) {
   const [selectedSymbol, setSelectedSymbol] = useState(symbols[0]);

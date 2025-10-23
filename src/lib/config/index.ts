@@ -98,6 +98,7 @@ export const TRADING_CONFIG = {
 
   // Symbols
   SUPPORTED_SYMBOLS: process.env.SUPPORTED_SYMBOLS?.split(",") || [
+    // Major Forex Pairs
     "EURUSD",
     "GBPUSD",
     "USDJPY",
@@ -105,6 +106,7 @@ export const TRADING_CONFIG = {
     "AUDUSD",
     "USDCAD",
     "NZDUSD",
+    // Minor Forex Pairs
     "EURGBP",
     "EURJPY",
     "EURCHF",
@@ -116,12 +118,37 @@ export const TRADING_CONFIG = {
     "GBPAUD",
     "GBPNZD",
     "GBPCAD",
-    "USDJPY",
-    "USDCHF",
-    "USDCAD",
-    "USDAUD",
+    "AUDJPY",
+    "CHFJPY",
+    "CADJPY",
+    "NZDJPY",
+    // Exotic Forex Pairs
     "USDNOK",
     "USDSEK",
+    "USDSGD",
+    "USDHKD",
+    "USDZAR",
+    "USDTRY",
+    "USDMXN",
+    // Commodities - Precious Metals
+    "XAUUSD", // Gold
+    "XAGUSD", // Silver
+    "XPTUSD", // Platinum
+    "XPDUSD", // Palladium
+    // Commodities - Energy
+    "USOIL", // WTI Crude Oil
+    "UKOIL", // Brent Crude Oil
+    "NGAS",  // Natural Gas
+    // Commodities - Base Metals
+    "COPPER",
+    "XCULON", // Copper London
+    // Commodities - Agricultural
+    "WHEAT",
+    "CORN",
+    "SOYBEAN",
+    "COFFEE",
+    "SUGAR",
+    "COTTON",
   ],
 
   // Timeframes
