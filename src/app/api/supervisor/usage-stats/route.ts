@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     
     // Calculate statistics
     const totalCalls = usageLogs.length;
-    const successfulCalls = usageLogs.filter(log => log.success).length;
+    const successfulCalls = usageLogs.filter((log: any) => log.success).length;
     const failedCalls = totalCalls - successfulCalls;
     
     const totalTokens = usageLogs.reduce((sum: number, log: any) => sum + log.totalTokens, 0);
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     
     // Average duration
     const avgDuration = totalCalls > 0
-      ? usageLogs.reduce((sum, log) => sum + log.duration, 0) / totalCalls
+      ? usageLogs.reduce((sum: number, log: any) => sum + log.duration, 0) / totalCalls
       : 0;
     
     // Get optimization statistics
@@ -93,15 +93,15 @@ export async function GET(request: NextRequest) {
     
     const optimizationStats = {
       total: optimizations.length,
-      approved: optimizations.filter(o => o.status === 'APPROVED').length,
-      pending: optimizations.filter(o => o.status === 'PENDING_APPROVAL').length,
-      rejected: optimizations.filter(o => o.status === 'REJECTED').length,
-      testing: optimizations.filter(o => o.status === 'TESTING').length,
-      active: optimizations.filter(o => o.status === 'ACTIVE').length,
-      rolledBack: optimizations.filter(o => o.status === 'ROLLED_BACK').length,
-      successful: optimizations.filter(o => o.wasSuccessful === true).length,
+      approved: optimizations.filter((o: any) => o.status === 'APPROVED').length,
+      pending: optimizations.filter((o: any) => o.status === 'PENDING_APPROVAL').length,
+      rejected: optimizations.filter((o: any) => o.status === 'REJECTED').length,
+      testing: optimizations.filter((o: any) => o.status === 'TESTING').length,
+      active: optimizations.filter((o: any) => o.status === 'ACTIVE').length,
+      rolledBack: optimizations.filter((o: any) => o.status === 'ROLLED_BACK').length,
+      successful: optimizations.filter((o: any) => o.wasSuccessful === true).length,
       avgConfidence: optimizations.length > 0
-        ? optimizations.reduce((sum, o) => sum + o.confidenceScore, 0) / optimizations.length
+        ? optimizations.reduce((sum: number, o: any) => sum + o.confidenceScore, 0) / optimizations.length
         : 0
     };
     
