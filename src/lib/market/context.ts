@@ -1,20 +1,28 @@
 /**
  * Market Context Provider for Enhanced AI Strategy Generation
  * 
- * This module provides real-time market context data using Yahoo Finance API including:
+ * This module provides real-time market context data using Yahoo Finance including:
  * - Current volatility (ATR) - calculated from real historical data
  * - Trend direction - analyzed from real price movements
  * - Key support/resistance levels - identified from actual price swings
  * - Market session information - from current time and trading hours
  * - Optimal trading conditions - based on session analysis
  * 
- * Data Source: Yahoo Finance (via RapidAPI)
+ * Data Source: Yahoo Finance (via yahoo-finance2 package - no API key required)
  * Cache TTL: 5 minutes
  */
 
 import { getCurrentSessionContext, getOptimalPairsForCurrentSessions } from './sessions';
-import { MarketDataService } from '../market-data/service';
-import type { OHLCV } from '../data-providers/common/types';
+import yahooFinance from 'yahoo-finance2';
+
+export interface OHLCV {
+  timestamp: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
 
 export interface MarketContext {
   symbol: string;
@@ -63,35 +71,10 @@ export interface MarketContextRequest {
 export class MarketContextProvider {
   private cache: Map<string, { context: MarketContext; timestamp: Date }>;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-  private marketDataService: MarketDataService | null = null;
 
   constructor() {
     this.cache = new Map();
-    this.initializeMarketDataService();
-  }
-
-  /**
-   * Initialize market data service with Yahoo Finance
-   */
-  private initializeMarketDataService(): void {
-    try {
-      const yahooApiKey = process.env.YAHOO_FINANCE_API_KEY;
-      const yahooApiHost = process.env.YAHOO_FINANCE_API_HOST;
-
-      if (yahooApiKey && yahooApiHost) {
-        this.marketDataService = new MarketDataService({
-          yahooFinanceApiKey: yahooApiKey,
-          yahooFinanceApiHost: yahooApiHost,
-          preferredProvider: 'yahoo-finance',
-          enableFallback: false
-        });
-        console.log('✅ Market Context: Yahoo Finance data provider initialized');
-      } else {
-        console.warn('⚠️ Market Context: Yahoo Finance API credentials not found');
-      }
-    } catch (error) {
-      console.error('❌ Market Context: Failed to initialize Yahoo Finance provider:', error);
-    }
+    console.log('✅ Market Context: Using yahoo-finance2 package (no API key required)');
   }
 
   /**
@@ -179,32 +162,42 @@ export class MarketContextProvider {
   }
 
   /**
-   * Get real market data from Yahoo Finance
+   * Get real market data from Yahoo Finance using yahoo-finance2 package
    */
   private async getMarketData(symbol: string, timeframe: string, periods: number): Promise<OHLCV[]> {
-    // Check if market data service is available
-    if (!this.marketDataService) {
-      throw new Error('Market data service not initialized. Please configure Yahoo Finance API credentials.');
-    }
-
     try {
-      // Convert timeframe format to match provider expectations
-      const providerTimeframe = this.convertTimeframeFormat(timeframe);
+      // Convert symbol to Yahoo Finance format
+      const yahooSymbol = this.convertSymbolToYahooFormat(symbol);
       
-      // Fetch real historical data from Yahoo Finance
-      const historicalData = await this.marketDataService.getHistoricalData(
-        symbol,
-        providerTimeframe,
-        periods
-      );
+      // Calculate date range based on timeframe and periods
+      const { period1, period2, interval } = this.calculateDateRange(timeframe, periods);
+      
+      console.log(`📊 Fetching ${periods} candles for ${yahooSymbol} (${timeframe}) from Yahoo Finance...`);
+      
+      // Fetch historical data using yahoo-finance2
+      const result = await yahooFinance.historical(yahooSymbol, {
+        period1,
+        period2,
+        interval
+      });
 
-      if (!historicalData || !historicalData.data || historicalData.data.length === 0) {
-        throw new Error(`No historical data available for ${symbol} on ${timeframe}`);
+      if (!result || result.length === 0) {
+        throw new Error(`No historical data available for ${symbol}`);
       }
 
-      console.log(`✅ Fetched ${historicalData.data.length} real candles for ${symbol} from Yahoo Finance`);
+      // Convert to OHLCV format
+      const ohlcvData: OHLCV[] = result.map(candle => ({
+        timestamp: candle.date,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: candle.volume
+      }));
+
+      console.log(`✅ Fetched ${ohlcvData.length} real candles for ${symbol} from Yahoo Finance`);
       
-      return historicalData.data;
+      return ohlcvData;
     } catch (error) {
       console.error(`❌ Failed to fetch market data for ${symbol}:`, error);
       throw new Error(`Failed to fetch market data: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -212,33 +205,67 @@ export class MarketContextProvider {
   }
 
   /**
-   * Convert timeframe format to provider-compatible format
+   * Convert symbol to Yahoo Finance format
    */
-  private convertTimeframeFormat(timeframe: string): string {
-    // Map common timeframe formats to provider format
-    const timeframeMap: Record<string, string> = {
-      'M1': '1min',
-      'M5': '5min',
-      'M15': '15min',
-      'M30': '30min',
-      'H1': '1h',
-      'H4': '4h',
-      'D1': '1day',
-      'W1': '1week',
-      'MN1': '1month',
-      // Also support lowercase versions
-      'm1': '1min',
-      'm5': '5min',
-      'm15': '15min',
-      'm30': '30min',
-      'h1': '1h',
-      'h4': '4h',
-      'd1': '1day',
-      'w1': '1week',
-      'mn1': '1month'
+  private convertSymbolToYahooFormat(symbol: string): string {
+    // Forex pairs need =X suffix
+    const forexPairs: Record<string, string> = {
+      'EURUSD': 'EURUSD=X',
+      'GBPUSD': 'GBPUSD=X',
+      'USDJPY': 'USDJPY=X',
+      'USDCHF': 'USDCHF=X',
+      'AUDUSD': 'AUDUSD=X',
+      'USDCAD': 'USDCAD=X',
+      'NZDUSD': 'NZDUSD=X',
+      'EURGBP': 'EURGBP=X',
+      'EURJPY': 'EURJPY=X',
+      'GBPJPY': 'GBPJPY=X',
+      'AUDJPY': 'AUDJPY=X',
+      'CHFJPY': 'CHFJPY=X',
+      'CADJPY': 'CADJPY=X',
+      'NZDJPY': 'NZDJPY=X',
     };
 
-    return timeframeMap[timeframe] || timeframe;
+    // Commodities
+    const commodities: Record<string, string> = {
+      'XAUUSD': 'GC=F',  // Gold Futures
+      'XAGUSD': 'SI=F',  // Silver Futures
+      'USOIL': 'CL=F',   // WTI Crude Oil Futures
+      'UKOIL': 'BZ=F',   // Brent Crude Futures
+      'NGAS': 'NG=F',    // Natural Gas Futures
+    };
+
+    return forexPairs[symbol] || commodities[symbol] || symbol;
+  }
+
+  /**
+   * Calculate date range and interval for Yahoo Finance
+   */
+  private calculateDateRange(timeframe: string, periods: number): { period1: Date; period2: Date; interval: any } {
+    const period2 = new Date(); // Current time
+    
+    // Map timeframes to intervals and calculate period1
+    const timeframeMap: Record<string, { interval: any; durationMs: number }> = {
+      'M1': { interval: '1m' as any, durationMs: 60 * 1000 },
+      'M5': { interval: '5m' as any, durationMs: 5 * 60 * 1000 },
+      'M15': { interval: '15m' as any, durationMs: 15 * 60 * 1000 },
+      'M30': { interval: '30m' as any, durationMs: 30 * 60 * 1000 },
+      'H1': { interval: '1h' as any, durationMs: 60 * 60 * 1000 },
+      'H4': { interval: '1h' as any, durationMs: 4 * 60 * 60 * 1000 }, // Yahoo doesn't have 4h, use 1h
+      'D1': { interval: '1d' as any, durationMs: 24 * 60 * 60 * 1000 },
+      'W1': { interval: '1wk' as any, durationMs: 7 * 24 * 60 * 60 * 1000 },
+      'MN1': { interval: '1mo' as any, durationMs: 30 * 24 * 60 * 60 * 1000 },
+    };
+
+    const tf = timeframeMap[timeframe] || timeframeMap['H1'];
+    const totalDuration = tf.durationMs * periods * 1.5; // Add 50% buffer to ensure enough data
+    const period1 = new Date(period2.getTime() - totalDuration);
+
+    return {
+      period1,
+      period2,
+      interval: tf.interval
+    };
   }
 
   /**

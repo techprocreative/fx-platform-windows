@@ -1,7 +1,7 @@
 # Market Context Real Data Integration
 
 ## Overview
-Successfully integrated Yahoo Finance API for real market data in Market Context Provider, replacing mock/random data generation.
+Successfully integrated Yahoo Finance using **yahoo-finance2** package for real market data in Market Context Provider, replacing mock/random data generation. **No API key required!**
 
 ## Changes Made (2025-10-23)
 
@@ -164,16 +164,9 @@ AI Strategy Generation / Analysis
 
 ### Environment Variables Required
 
-```bash
-# .env or .env.local
-YAHOO_FINANCE_API_KEY=your_rapidapi_key
-YAHOO_FINANCE_API_HOST=yahoo-finance166.p.rapidapi.com
-```
+**✅ NO API KEY REQUIRED!**
 
-**Get API Key:**
-1. Sign up at https://rapidapi.com
-2. Subscribe to Yahoo Finance API: https://rapidapi.com/sparior/api/yahoo-finance166
-3. Copy API Key and Host from dashboard
+Market Context now uses `yahoo-finance2` npm package which fetches data directly from Yahoo Finance without requiring any API credentials. This makes deployment simpler and removes API rate limits and costs.
 
 ## Technical Details
 
