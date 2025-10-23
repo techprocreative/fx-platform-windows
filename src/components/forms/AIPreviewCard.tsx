@@ -33,6 +33,22 @@ export function AIPreviewCard({ strategy, onReview, onUseAsIs }: AIPreviewCardPr
   const stopLossPips = Math.round((strategy.parameters?.stopLoss || 0.002) * 10000);
   const lotSize = strategy.parameters?.riskPerTrade || 0.01;
   const maxLoss = strategy.parameters?.maxDailyLoss || 100;
+  const riskRewardRatio = (takeProfitPips / stopLossPips).toFixed(2);
+  
+  // Extract all indicators from conditions
+  const extractIndicators = () => {
+    const indicators = new Set<string>();
+    strategy.rules?.forEach((rule: any) => {
+      rule.conditions?.forEach((cond: any) => {
+        if (cond.indicator) {
+          indicators.add(cond.indicator.toUpperCase());
+        }
+      });
+    });
+    return Array.from(indicators);
+  };
+  
+  const indicators = extractIndicators();
 
   return (
     <Card className="border-2 border-purple-300 bg-gradient-to-br from-purple-50 via-white to-purple-50 shadow-lg">
@@ -117,6 +133,96 @@ export function AIPreviewCard({ strategy, onReview, onUseAsIs }: AIPreviewCardPr
               <span className="text-xs font-medium text-amber-900">Max Daily Loss</span>
             </div>
             <p className="text-lg font-bold text-amber-700">${maxLoss}</p>
+          </div>
+        </div>
+
+        {/* Indicators Used */}
+        {indicators.length > 0 && (
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+              <h4 className="text-sm font-semibold text-blue-900">Indicators Used</h4>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {indicators.map((indicator, idx) => (
+                <span
+                  key={idx}
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold border border-blue-300"
+                >
+                  {indicator}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Risk-Reward Ratio */}
+        <div className="rounded-lg bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="h-5 w-5 text-green-600" />
+              <span className="text-sm font-semibold text-neutral-700">Risk-Reward Ratio:</span>
+            </div>
+            <span className="text-2xl font-bold text-green-600">
+              1:{riskRewardRatio}
+            </span>
+          </div>
+          <p className="text-xs text-neutral-600 mt-2">
+            For every $1 risked, potential to gain ${riskRewardRatio}
+          </p>
+        </div>
+
+        {/* Advanced Features */}
+        {(strategy.parameters?.smartExit || strategy.parameters?.dynamicRisk || strategy.parameters?.sessionFilter || strategy.parameters?.correlationFilter || strategy.parameters?.regimeDetection) && (
+          <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="h-4 w-4 text-indigo-600" />
+              <h4 className="text-sm font-semibold text-indigo-900">Advanced Features Enabled</h4>
+            </div>
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              {strategy.parameters?.smartExit && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="text-green-700 font-semibold">Smart Exit Rules</span>
+                </div>
+              )}
+              {strategy.parameters?.dynamicRisk && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="text-green-700 font-semibold">Dynamic Risk</span>
+                </div>
+              )}
+              {strategy.parameters?.sessionFilter && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="text-green-700 font-semibold">Session Filter</span>
+                </div>
+              )}
+              {strategy.parameters?.correlationFilter && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="text-green-700 font-semibold">Correlation Filter</span>
+                </div>
+              )}
+              {strategy.parameters?.regimeDetection && (
+                <div className="flex items-center gap-2">
+                  <div className="h-2 w-2 rounded-full bg-green-500" />
+                  <span className="text-green-700 font-semibold">Regime Detection</span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Total Conditions Count */}
+        <div className="rounded-lg border border-neutral-200 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-neutral-600">Total Entry Conditions:</span>
+            <span className="text-lg font-bold text-neutral-900">{entryConditionsCount}</span>
+          </div>
+          <div className="flex items-center justify-between mt-2">
+            <span className="text-sm text-neutral-600">Total Rules:</span>
+            <span className="text-lg font-bold text-neutral-900">{strategy.rules?.length || 0}</span>
           </div>
         </div>
 
