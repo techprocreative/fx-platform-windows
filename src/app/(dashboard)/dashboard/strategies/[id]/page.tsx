@@ -13,6 +13,10 @@ import {
   Server,
   Brain,
   Sparkles,
+  TrendingUp,
+  Shield,
+  AlertCircle,
+  CheckCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -465,92 +469,279 @@ export default function StrategyDetailPage({
 
         <div className="p-6">
           {activeTab === "overview" && (
-            <div className="space-y-4">
-              <h3 className="font-bold text-neutral-900">Strategy Rules</h3>
+            <div className="space-y-6">
+              <h3 className="text-xl font-bold text-neutral-900">Strategy Overview</h3>
 
               {strategy.description && (
-                <div>
-                  <p className="text-sm font-medium text-neutral-600 mb-1">
-                    Description
-                  </p>
-                  <p className="text-neutral-700">{strategy.description}</p>
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <AlertCircle className="h-4 w-4 text-blue-600" />
+                    <p className="text-sm font-semibold text-blue-900">Description</p>
+                  </div>
+                  <p className="text-sm text-blue-800">{strategy.description}</p>
                 </div>
               )}
 
-              <div>
-                <p className="text-sm font-medium text-neutral-600 mb-2">
-                  Entry Conditions
-                </p>
-                <div className="space-y-2">
-                  {strategy.rules?.entry?.conditions?.map(
-                    (cond: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="text-sm bg-neutral-50 p-3 rounded-lg"
-                      >
-                        {cond.indicator} {cond.condition} {cond.value}
+              {/* Extracted Indicators */}
+              {(() => {
+                const indicators = new Set<string>();
+                strategy.rules?.entry?.conditions?.forEach((cond: any) => {
+                  if (cond.indicator) {
+                    indicators.add(cond.indicator.toUpperCase().replace(/_/g, ' '));
+                  }
+                });
+                const indicatorList = Array.from(indicators);
+                
+                if (indicatorList.length > 0) {
+                  return (
+                    <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <TrendingUp className="h-4 w-4 text-indigo-600" />
+                        <h4 className="text-sm font-semibold text-indigo-900">Technical Indicators Used</h4>
                       </div>
-                    ),
+                      <div className="flex flex-wrap gap-2">
+                        {indicatorList.map((indicator, idx) => (
+                          <span
+                            key={idx}
+                            className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-indigo-100 text-indigo-800 text-xs font-semibold border border-indigo-300"
+                          >
+                            {indicator}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+
+              {/* Entry Conditions */}
+              <div className="rounded-lg border border-green-200 bg-white p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <h4 className="text-base font-bold text-green-900">
+                    Entry Rules ({strategy.rules?.entry?.logic?.toUpperCase() || 'AND'} Logic)
+                  </h4>
+                </div>
+                <p className="text-xs text-green-700 mb-4">
+                  {strategy.rules?.entry?.logic === 'OR' 
+                    ? '✓ At least one condition must be true to enter trade'
+                    : '✓ All conditions must be true to enter trade'}
+                </p>
+                <div className="space-y-3">
+                  {strategy.rules?.entry?.conditions?.map(
+                    (cond: any, idx: number) => {
+                      // Format condition operator
+                      const formatOperator = (op: string) => {
+                        const operators: Record<string, string> = {
+                          'greater_than': '>',
+                          'less_than': '<',
+                          'greater_than_or_equal': '≥',
+                          'less_than_or_equal': '≤',
+                          'equal': '=',
+                          'crosses_above': '↗ crosses above',
+                          'crosses_below': '↘ crosses below',
+                          'gt': '>',
+                          'lt': '<',
+                          'gte': '≥',
+                          'lte': '≤',
+                          'eq': '=',
+                        };
+                        return operators[op] || op;
+                      };
+
+                      // Format indicator name
+                      const formatIndicator = (ind: string) => {
+                        return ind.toUpperCase().replace(/_/g, ' ');
+                      };
+
+                      return (
+                        <div
+                          key={idx}
+                          className="border-l-4 border-green-500 bg-green-50 p-3 rounded-r-lg"
+                        >
+                          <div className="flex items-start gap-2">
+                            <span className="flex-shrink-0 inline-flex items-center justify-center w-6 h-6 rounded-full bg-green-500 text-white text-xs font-bold">
+                              {idx + 1}
+                            </span>
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-green-900">
+                                {formatIndicator(cond.indicator)} {formatOperator(cond.condition)} {cond.value || formatIndicator(cond.compareIndicator || '')}
+                              </p>
+                              <p className="text-xs text-green-700 mt-1">
+                                {cond.indicator === 'rsi' && 'Relative Strength Index - measures momentum'}
+                                {cond.indicator === 'cci' && 'Commodity Channel Index - identifies cyclical trends'}
+                                {cond.indicator === 'macd' && 'Moving Average Convergence Divergence - trend and momentum'}
+                                {cond.indicator === 'ema' && 'Exponential Moving Average - price trend'}
+                                {cond.indicator === 'sma' && 'Simple Moving Average - price trend'}
+                                {cond.indicator === 'price' && 'Current market price'}
+                                {cond.indicator.includes('ema_') && `${cond.indicator.split('_')[1]}-period Exponential Moving Average`}
+                                {cond.indicator.includes('sma_') && `${cond.indicator.split('_')[1]}-period Simple Moving Average`}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    },
                   )}
                 </div>
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-neutral-600 mb-2">
-                  Exit Rules
-                </p>
+              {/* Risk-Reward Ratio */}
+              {strategy.rules?.exit?.takeProfit?.value && strategy.rules?.exit?.stopLoss?.value && (
+                <div className="rounded-lg bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-green-600" />
+                      <span className="text-sm font-semibold text-neutral-700">Risk-Reward Ratio:</span>
+                    </div>
+                    <span className="text-3xl font-bold text-green-600">
+                      1:{(strategy.rules.exit.takeProfit.value / strategy.rules.exit.stopLoss.value).toFixed(2)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-neutral-600 mt-2">
+                    For every ${strategy.rules.exit.stopLoss.value} risked ({strategy.rules.exit.stopLoss.value} {strategy.rules.exit.stopLoss.type}), 
+                    potential to gain ${strategy.rules.exit.takeProfit.value} ({strategy.rules.exit.takeProfit.value} {strategy.rules.exit.takeProfit.type})
+                  </p>
+                </div>
+              )}
+
+              {/* Exit Rules */}
+              <div className="rounded-lg border border-neutral-200 bg-white p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <TrendingUp className="h-5 w-5 text-neutral-600" />
+                  <h4 className="text-base font-bold text-neutral-900">Exit Strategy</h4>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="text-sm bg-neutral-50 p-3 rounded-lg">
-                    <p className="font-medium text-neutral-700">Take Profit</p>
-                    <p className="text-neutral-600">
+                  <div className="rounded-lg border-2 border-green-300 bg-green-50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <TrendingUp className="h-4 w-4 text-green-600" />
+                      <p className="text-xs font-semibold text-green-900">TAKE PROFIT</p>
+                    </div>
+                    <p className="text-2xl font-bold text-green-700">
                       {strategy.rules?.exit?.takeProfit?.value}{" "}
                       {strategy.rules?.exit?.takeProfit?.type}
                     </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Profit target per trade
+                    </p>
                   </div>
-                  <div className="text-sm bg-neutral-50 p-3 rounded-lg">
-                    <p className="font-medium text-neutral-700">Stop Loss</p>
-                    <p className="text-neutral-600">
+                  <div className="rounded-lg border-2 border-red-300 bg-red-50 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Shield className="h-4 w-4 text-red-600" />
+                      <p className="text-xs font-semibold text-red-900">STOP LOSS</p>
+                    </div>
+                    <p className="text-2xl font-bold text-red-700">
                       {strategy.rules?.exit?.stopLoss?.value}{" "}
                       {strategy.rules?.exit?.stopLoss?.type}
+                    </p>
+                    <p className="text-xs text-red-600 mt-1">
+                      Maximum loss per trade
                     </p>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <p className="text-sm font-medium text-neutral-600 mb-2">
-                  Risk Management
-                </p>
+              {/* Risk Management */}
+              <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Shield className="h-5 w-5 text-orange-600" />
+                  <h4 className="text-base font-bold text-orange-900">Risk Management</h4>
+                </div>
                 <div className="grid grid-cols-3 gap-4">
-                  <div className="text-sm bg-neutral-50 p-3 rounded-lg">
-                    <p className="text-neutral-600">Lot Size</p>
-                    <p className="font-medium text-neutral-900">
-                      {strategy.rules?.riskManagement?.lotSize}
+                  <div className="rounded-lg bg-white border border-orange-200 p-3">
+                    <p className="text-xs text-orange-700 mb-1">Position Size</p>
+                    <p className="text-lg font-bold text-orange-900">
+                      {strategy.rules?.riskManagement?.lotSize} lots
                     </p>
                   </div>
-                  <div className="text-sm bg-neutral-50 p-3 rounded-lg">
-                    <p className="text-neutral-600">Max Positions</p>
-                    <p className="font-medium text-neutral-900">
-                      {strategy.rules?.riskManagement?.maxPositions}
+                  <div className="rounded-lg bg-white border border-orange-200 p-3">
+                    <p className="text-xs text-orange-700 mb-1">Max Concurrent</p>
+                    <p className="text-lg font-bold text-orange-900">
+                      {strategy.rules?.riskManagement?.maxPositions} {strategy.rules?.riskManagement?.maxPositions === 1 ? 'position' : 'positions'}
                     </p>
                   </div>
-                  <div className="text-sm bg-neutral-50 p-3 rounded-lg">
-                    <p className="text-neutral-600">Max Daily Loss</p>
-                    <p className="font-medium text-neutral-900">
+                  <div className="rounded-lg bg-white border border-orange-200 p-3">
+                    <p className="text-xs text-orange-700 mb-1">Daily Loss Limit</p>
+                    <p className="text-lg font-bold text-orange-900">
                       ${strategy.rules?.riskManagement?.maxDailyLoss}
                     </p>
                   </div>
                 </div>
               </div>
 
+              {/* Advanced Features */}
+              {(strategy.rules?.smartExit || strategy.rules?.dynamicRisk || strategy.rules?.sessionFilter || strategy.rules?.correlationFilter || strategy.rules?.regimeDetection) && (
+                <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Sparkles className="h-5 w-5 text-purple-600" />
+                    <h4 className="text-base font-bold text-purple-900">Advanced Features</h4>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    {strategy.rules?.smartExit && (
+                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
+                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                        <div>
+                          <p className="text-sm font-semibold text-purple-900">Smart Exit Rules</p>
+                          <p className="text-xs text-purple-700">ATR-based trailing stop & partial exits</p>
+                        </div>
+                      </div>
+                    )}
+                    {strategy.rules?.dynamicRisk && (
+                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
+                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                        <div>
+                          <p className="text-sm font-semibold text-purple-900">Dynamic Risk</p>
+                          <p className="text-xs text-purple-700">Volatility-adjusted position sizing</p>
+                        </div>
+                      </div>
+                    )}
+                    {strategy.rules?.sessionFilter && (
+                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
+                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                        <div>
+                          <p className="text-sm font-semibold text-purple-900">Session Filter</p>
+                          <p className="text-xs text-purple-700">Trade only during optimal sessions</p>
+                        </div>
+                      </div>
+                    )}
+                    {strategy.rules?.correlationFilter && (
+                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
+                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                        <div>
+                          <p className="text-sm font-semibold text-purple-900">Correlation Filter</p>
+                          <p className="text-xs text-purple-700">Avoid correlated pair exposure</p>
+                        </div>
+                      </div>
+                    )}
+                    {strategy.rules?.regimeDetection && (
+                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
+                        <div className="h-2 w-2 rounded-full bg-green-500" />
+                        <div>
+                          <p className="text-sm font-semibold text-purple-900">Regime Detection</p>
+                          <p className="text-xs text-purple-700">Adapt to market conditions</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Action Buttons */}
               <div className="mt-8 flex gap-4 pt-6 border-t border-neutral-200">
                 <Link
                   href={`/dashboard/backtest?strategyId=${strategy.id}`}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-semibold"
                 >
-                  <BarChart3 className="h-4 w-4" />
+                  <BarChart3 className="h-5 w-5" />
                   Run Backtest
+                </Link>
+                <Link
+                  href={`/dashboard/strategies/${strategy.id}/edit`}
+                  className="inline-flex items-center gap-2 px-6 py-3 border-2 border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-semibold"
+                >
+                  <Edit2 className="h-5 w-5" />
+                  Edit Strategy
                 </Link>
               </div>
             </div>
