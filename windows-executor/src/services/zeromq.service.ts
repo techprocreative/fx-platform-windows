@@ -1,25 +1,37 @@
-import * as zmq from 'zeromq';
-import { TradeParams, TradeResult, ZeroMQRequest, ZeroMQResponse, AppConfig, ConnectionStatus } from '../types/command.types';
+import * as zmq from "zeromq";
+import {
+  TradeParams,
+  TradeResult,
+  ZeroMQRequest,
+  ZeroMQResponse,
+  AppConfig,
+  ConnectionStatus,
+} from "../types/command.types";
 
 export class ZeroMQService {
   private socket: zmq.Request | null = null;
-  private connectionStatus: ConnectionStatus['zeromq'] = 'disconnected';
+  private connectionStatus: ConnectionStatus["zeromq"] = "disconnected";
   private config: AppConfig | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectTimeout: any = null;
   private requestTimeouts: Map<string, any> = new Map();
-  private pendingRequests: Map<string, {
-    resolve: (value: any) => void;
-    reject: (reason: any) => void;
-    startTime: number;
-  }> = new Map();
+  private pendingRequests: Map<
+    string,
+    {
+      resolve: (value: any) => void;
+      reject: (reason: any) => void;
+      startTime: number;
+    }
+  > = new Map();
   private logger: (level: string, message: string, metadata?: any) => void;
   private connectionPool: zmq.Request[] = [];
   private maxPoolSize = 3;
   private currentPoolIndex = 0;
 
-  constructor(logger?: (level: string, message: string, metadata?: any) => void) {
+  constructor(
+    logger?: (level: string, message: string, metadata?: any) => void,
+  ) {
     this.logger = logger || this.defaultLogger;
   }
 
@@ -33,10 +45,10 @@ export class ZeroMQService {
   async connect(config: AppConfig): Promise<boolean> {
     try {
       this.config = config;
-      this.connectionStatus = 'connecting';
-      this.log('info', 'Connecting to ZeroMQ...', { 
-        host: config.zmqHost, 
-        port: config.zmqPort 
+      this.connectionStatus = "connecting";
+      this.log("info", "Connecting to ZeroMQ...", {
+        host: config.zmqHost,
+        port: config.zmqPort,
       });
 
       // Clear any existing reconnect timeout
@@ -52,31 +64,38 @@ export class ZeroMQService {
       }
 
       const poolResults = await Promise.allSettled(poolPromises);
-      const successfulConnections = poolResults.filter(result => result.status === 'fulfilled').length;
+      const successfulConnections = poolResults.filter(
+        (result) => result.status === "fulfilled",
+      ).length;
 
       if (successfulConnections > 0) {
         // Set up main socket for backwards compatibility
         this.socket = this.connectionPool[0];
-        
+
         // Test connection
         const isConnected = await this.ping();
-        this.connectionStatus = isConnected ? 'connected' : 'error';
-        
+        this.connectionStatus = isConnected ? "connected" : "error";
+
         if (isConnected) {
-          this.log('info', `ZeroMQ connected successfully with ${successfulConnections} connections in pool`);
+          this.log(
+            "info",
+            `ZeroMQ connected successfully with ${successfulConnections} connections in pool`,
+          );
           return true;
         } else {
-          this.log('error', 'ZeroMQ connection test failed');
+          this.log("error", "ZeroMQ connection test failed");
           return false;
         }
       } else {
-        this.log('error', 'Failed to create any ZeroMQ connections');
-        this.connectionStatus = 'error';
+        this.log("error", "Failed to create any ZeroMQ connections");
+        this.connectionStatus = "error";
         return false;
       }
     } catch (error) {
-      this.log('error', 'Failed to connect to ZeroMQ', { error: (error as Error).message });
-      this.connectionStatus = 'error';
+      this.log("error", "Failed to connect to ZeroMQ", {
+        error: (error as Error).message,
+      });
+      this.connectionStatus = "error";
       this.scheduleReconnect();
       return false;
     }
@@ -87,20 +106,44 @@ export class ZeroMQService {
    */
   private async createPoolConnection(): Promise<zmq.Request> {
     const socket = new zmq.Request();
-    
+
     await socket.connect(`${this.config!.zmqHost}:${this.config!.zmqPort}`);
-    
+
     // Set up event handlers for the socket
-    socket.events.on('connect', () => {
-      this.log('debug', 'ZeroMQ socket connected');
+    socket.events.on("connect", () => {
+      this.log("debug", "ZeroMQ socket connected");
     });
 
-    socket.events.on('disconnect', () => {
-      this.log('warn', 'ZeroMQ socket disconnected');
+    socket.events.on("disconnect", () => {
+      this.log("warn", "ZeroMQ socket disconnected");
     });
 
-    socket.events.on('error', (error: any) => {
-      this.log('error', 'ZeroMQ socket error', { error });
+    socket.events.on("bind:error", (event: any) => {
+      this.log("error", "ZeroMQ socket bind error", {
+        error: event.error,
+        address: event.address,
+      });
+    });
+
+    socket.events.on("connect:retry", (event: any) => {
+      this.log("warn", "ZeroMQ socket connect retry", {
+        interval: event.interval,
+        address: event.address,
+      });
+    });
+
+    socket.events.on("close:error", (event: any) => {
+      this.log("error", "ZeroMQ socket close error", {
+        error: event.error,
+        address: event.address,
+      });
+    });
+
+    socket.events.on("accept:error", (event: any) => {
+      this.log("error", "ZeroMQ socket accept error", {
+        error: event.error,
+        address: event.address,
+      });
     });
 
     return socket;
@@ -115,7 +158,8 @@ export class ZeroMQService {
     }
 
     const socket = this.connectionPool[this.currentPoolIndex];
-    this.currentPoolIndex = (this.currentPoolIndex + 1) % this.connectionPool.length;
+    this.currentPoolIndex =
+      (this.currentPoolIndex + 1) % this.connectionPool.length;
     return socket;
   }
 
@@ -124,12 +168,15 @@ export class ZeroMQService {
    */
   async ping(): Promise<boolean> {
     try {
-      const response = await this.sendRequest({
-        command: 'PING',
-        requestId: this.generateRequestId(),
-        timestamp: new Date().toISOString(),
-      }, 3000);
-      return response.status === 'OK';
+      const response = await this.sendRequest(
+        {
+          command: "PING",
+          requestId: this.generateRequestId(),
+          timestamp: new Date().toISOString(),
+        },
+        3000,
+      );
+      return response.status === "OK";
     } catch (error) {
       return false;
     }
@@ -140,15 +187,15 @@ export class ZeroMQService {
    */
   async openPosition(params: TradeParams): Promise<TradeResult> {
     const request: ZeroMQRequest = {
-      command: 'OPEN_POSITION',
+      command: "OPEN_POSITION",
       requestId: this.generateRequestId(),
       timestamp: new Date().toISOString(),
       parameters: params,
     };
-    
+
     const response = await this.sendRequest(request);
-    
-    if (response.status === 'OK') {
+
+    if (response.status === "OK") {
       return {
         success: true,
         ticket: response.data.ticket,
@@ -167,7 +214,7 @@ export class ZeroMQService {
     } else {
       return {
         success: false,
-        error: response.error || 'Unknown error',
+        error: response.error || "Unknown error",
         timestamp: response.timestamp,
         executionTime: response.executionTime,
       } as TradeResult;
@@ -179,15 +226,15 @@ export class ZeroMQService {
    */
   async closePosition(ticket: number): Promise<TradeResult> {
     const request: ZeroMQRequest = {
-      command: 'CLOSE_POSITION',
+      command: "CLOSE_POSITION",
       requestId: this.generateRequestId(),
       timestamp: new Date().toISOString(),
       parameters: { ticket },
     };
-    
+
     const response = await this.sendRequest(request);
-    
-    if (response.status === 'OK') {
+
+    if (response.status === "OK") {
       return {
         success: true,
         ticket: response.data.ticket,
@@ -205,7 +252,7 @@ export class ZeroMQService {
     } else {
       return {
         success: false,
-        error: response.error || 'Unknown error',
+        error: response.error || "Unknown error",
         timestamp: response.timestamp,
         executionTime: response.executionTime,
       } as TradeResult;
@@ -217,14 +264,14 @@ export class ZeroMQService {
    */
   async closeAllPositions(): Promise<TradeResult[]> {
     const request: ZeroMQRequest = {
-      command: 'CLOSE_ALL_POSITIONS',
+      command: "CLOSE_ALL_POSITIONS",
       requestId: this.generateRequestId(),
       timestamp: new Date().toISOString(),
     };
-    
+
     const response = await this.sendRequest(request);
-    
-    if (response.status === 'OK' && response.data.results) {
+
+    if (response.status === "OK" && response.data.results) {
       return response.data.results.map((result: any) => ({
         success: result.success,
         ticket: result.ticket,
@@ -235,33 +282,38 @@ export class ZeroMQService {
         timestamp: result.timestamp,
       }));
     } else {
-      return [{
-        success: false,
-        ticket: 0,
-        symbol: '',
-        type: 'BUY',
-        volume: 0,
-        openPrice: 0,
-        error: response.error || 'Unknown error',
-        timestamp: response.timestamp,
-      }];
+      return [
+        {
+          success: false,
+          ticket: 0,
+          symbol: "",
+          type: "BUY",
+          volume: 0,
+          openPrice: 0,
+          error: response.error || "Unknown error",
+          timestamp: response.timestamp,
+        },
+      ];
     }
   }
 
   /**
    * Modify an existing position
    */
-  async modifyPosition(ticket: number, params: Partial<TradeParams>): Promise<TradeResult> {
+  async modifyPosition(
+    ticket: number,
+    params: Partial<TradeParams>,
+  ): Promise<TradeResult> {
     const request: ZeroMQRequest = {
-      command: 'MODIFY_POSITION',
+      command: "MODIFY_POSITION",
       requestId: this.generateRequestId(),
       timestamp: new Date().toISOString(),
       parameters: { ticket, ...params },
     };
-    
+
     const response = await this.sendRequest(request);
-    
-    if (response.status === 'OK') {
+
+    if (response.status === "OK") {
       return {
         success: true,
         ticket: response.data.ticket,
@@ -277,7 +329,7 @@ export class ZeroMQService {
     } else {
       return {
         success: false,
-        error: response.error || 'Unknown error',
+        error: response.error || "Unknown error",
         timestamp: response.timestamp,
         executionTime: response.executionTime,
       } as TradeResult;
@@ -289,14 +341,14 @@ export class ZeroMQService {
    */
   async getPositions(): Promise<any[]> {
     const request: ZeroMQRequest = {
-      command: 'GET_POSITIONS',
+      command: "GET_POSITIONS",
       requestId: this.generateRequestId(),
       timestamp: new Date().toISOString(),
     };
-    
+
     const response = await this.sendRequest(request);
-    
-    if (response.status === 'OK' && response.data.positions) {
+
+    if (response.status === "OK" && response.data.positions) {
       return response.data.positions;
     } else {
       return [];
@@ -308,17 +360,17 @@ export class ZeroMQService {
    */
   async getAccountInfo(): Promise<any> {
     const request: ZeroMQRequest = {
-      command: 'GET_ACCOUNT_INFO',
+      command: "GET_ACCOUNT_INFO",
       requestId: this.generateRequestId(),
       timestamp: new Date().toISOString(),
     };
-    
+
     const response = await this.sendRequest(request);
-    
-    if (response.status === 'OK') {
+
+    if (response.status === "OK") {
       return response.data;
     } else {
-      throw new Error(response.error || 'Failed to get account info');
+      throw new Error(response.error || "Failed to get account info");
     }
   }
 
@@ -327,27 +379,30 @@ export class ZeroMQService {
    */
   async getSymbolInfo(symbol: string): Promise<any> {
     const request: ZeroMQRequest = {
-      command: 'GET_SYMBOL_INFO',
+      command: "GET_SYMBOL_INFO",
       requestId: this.generateRequestId(),
       timestamp: new Date().toISOString(),
       parameters: { symbol },
     };
-    
+
     const response = await this.sendRequest(request);
-    
-    if (response.status === 'OK') {
+
+    if (response.status === "OK") {
       return response.data;
     } else {
-      throw new Error(response.error || 'Failed to get symbol info');
+      throw new Error(response.error || "Failed to get symbol info");
     }
   }
 
   /**
    * Send request to ZeroMQ with timeout and retry logic
    */
-  private async sendRequest(request: ZeroMQRequest, timeout: number = 5000): Promise<ZeroMQResponse> {
+  private async sendRequest(
+    request: ZeroMQRequest,
+    timeout: number = 5000,
+  ): Promise<ZeroMQResponse> {
     if (!this.isConnected()) {
-      throw new Error('ZeroMQ not connected');
+      throw new Error("ZeroMQ not connected");
     }
 
     const requestId = request.requestId || this.generateRequestId();
@@ -364,7 +419,7 @@ export class ZeroMQService {
       // Set up timeout
       const timeoutId = setTimeout(() => {
         this.pendingRequests.delete(requestId);
-        reject(new Error('Request timeout'));
+        reject(new Error("Request timeout"));
       }, timeout);
 
       this.requestTimeouts.set(requestId, timeoutId);
@@ -385,17 +440,17 @@ export class ZeroMQService {
   private async sendWithPool(request: ZeroMQRequest): Promise<void> {
     const socket = this.getSocketFromPool();
     if (!socket) {
-      throw new Error('No available socket in pool');
+      throw new Error("No available socket in pool");
     }
 
     try {
       // Send request
       await socket.send(JSON.stringify(request));
-      
+
       // Wait for response
       const [msg] = await socket.receive();
       const response = JSON.parse(msg.toString());
-      
+
       // Clear timeout and resolve promise
       const timeoutId = this.requestTimeouts.get(request.requestId!);
       if (timeoutId) {
@@ -406,10 +461,10 @@ export class ZeroMQService {
       const pendingRequest = this.pendingRequests.get(request.requestId!);
       if (pendingRequest) {
         this.pendingRequests.delete(request.requestId!);
-        
+
         // Calculate execution time
         response.executionTime = Date.now() - pendingRequest.startTime;
-        
+
         pendingRequest.resolve(response);
       }
     } catch (error) {
@@ -433,17 +488,23 @@ export class ZeroMQService {
    */
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      this.log('error', 'Max reconnection attempts reached');
+      this.log("error", "Max reconnection attempts reached");
       return;
     }
 
     // Calculate exponential backoff delay
     const baseDelay = 1000; // 1 second
     const maxDelay = 30000; // 30 seconds
-    const delay = Math.min(baseDelay * Math.pow(2, this.reconnectAttempts), maxDelay);
+    const delay = Math.min(
+      baseDelay * Math.pow(2, this.reconnectAttempts),
+      maxDelay,
+    );
 
     this.reconnectAttempts++;
-    this.log('info', `Scheduling reconnection attempt ${this.reconnectAttempts} in ${delay}ms`);
+    this.log(
+      "info",
+      `Scheduling reconnection attempt ${this.reconnectAttempts} in ${delay}ms`,
+    );
 
     this.reconnectTimeout = setTimeout(async () => {
       if (this.config) {
@@ -462,7 +523,7 @@ export class ZeroMQService {
   /**
    * Get connection status
    */
-  getConnectionStatus(): ConnectionStatus['zeromq'] {
+  getConnectionStatus(): ConnectionStatus["zeromq"] {
     return this.connectionStatus;
   }
 
@@ -470,7 +531,7 @@ export class ZeroMQService {
    * Check if connected
    */
   isConnected(): boolean {
-    return this.connectionStatus === 'connected' && this.socket !== null;
+    return this.connectionStatus === "connected" && this.socket !== null;
   }
 
   /**
@@ -484,7 +545,8 @@ export class ZeroMQService {
       poolSize: this.connectionPool.length,
       maxPoolSize: this.maxPoolSize,
       pendingRequests: this.pendingRequests.size,
-      connectedAt: this.connectionStatus === 'connected' ? new Date().toISOString() : null,
+      connectedAt:
+        this.connectionStatus === "connected" ? new Date().toISOString() : null,
     };
   }
 
@@ -492,7 +554,7 @@ export class ZeroMQService {
    * Disconnect from ZeroMQ
    */
   disconnect(): void {
-    this.log('info', 'Disconnecting from ZeroMQ...');
+    this.log("info", "Disconnecting from ZeroMQ...");
 
     // Clear timeouts
     if (this.reconnectTimeout) {
@@ -501,42 +563,42 @@ export class ZeroMQService {
     }
 
     // Clear pending requests
-    this.requestTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    this.requestTimeouts.forEach((timeoutId) => clearTimeout(timeoutId));
     this.requestTimeouts.clear();
-    
-    this.pendingRequests.forEach(request => {
-      request.reject(new Error('Connection closed'));
+
+    this.pendingRequests.forEach((request) => {
+      request.reject(new Error("Connection closed"));
     });
     this.pendingRequests.clear();
 
     // Close all sockets in pool
-    this.connectionPool.forEach(socket => {
+    this.connectionPool.forEach((socket) => {
       try {
         socket.close();
       } catch (error) {
-        this.log('error', 'Error closing socket', { error });
+        this.log("error", "Error closing socket", { error });
       }
     });
     this.connectionPool = [];
 
     this.socket = null;
-    this.connectionStatus = 'disconnected';
+    this.connectionStatus = "disconnected";
     this.reconnectAttempts = 0;
 
-    this.log('info', 'ZeroMQ disconnected');
+    this.log("info", "ZeroMQ disconnected");
   }
 
   /**
    * Force reconnection
    */
   async forceReconnect(): Promise<boolean> {
-    this.log('info', 'Force reconnection requested');
+    this.log("info", "Force reconnection requested");
     this.disconnect();
-    
+
     if (this.config) {
       return await this.connect(this.config);
     }
-    
+
     return false;
   }
 
@@ -548,18 +610,25 @@ export class ZeroMQService {
     const logEntry = {
       timestamp,
       level,
-      service: 'ZeroMQService',
+      service: "ZeroMQService",
       message,
       metadata,
     };
 
-    (console as any)[level] ? (console as any)[level](`[${timestamp}] [${level}] [ZeroMQService] ${message}`, metadata) : console.log(logEntry);
+    (console as any)[level]
+      ? (console as any)[level](
+          `[${timestamp}] [${level}] [ZeroMQService] ${message}`,
+          metadata,
+        )
+      : console.log(logEntry);
   }
 
   /**
    * Set custom logger
    */
-  setLogger(logger: (level: string, message: string, metadata?: any) => void): void {
+  setLogger(
+    logger: (level: string, message: string, metadata?: any) => void,
+  ): void {
     this.logger = logger;
   }
 
@@ -574,27 +643,30 @@ export class ZeroMQService {
     const healthPromises = this.connectionPool.map(async (socket, index) => {
       try {
         const testRequest: ZeroMQRequest = {
-          command: 'PING',
+          command: "PING",
           requestId: this.generateRequestId(),
           timestamp: new Date().toISOString(),
         };
-        
+
         await socket.send(JSON.stringify(testRequest));
         const [msg] = await socket.receive();
         const response = JSON.parse(msg.toString());
-        
-        return response.status === 'OK';
+
+        return response.status === "OK";
       } catch (error) {
-        this.log('warn', `Health check failed for socket ${index}`, { error });
+        this.log("warn", `Health check failed for socket ${index}`, { error });
         return false;
       }
     });
 
     const results = await Promise.all(healthPromises);
-    const healthyCount = results.filter(result => result).length;
-    
-    this.log('info', `Health check completed: ${healthyCount}/${this.connectionPool.length} sockets healthy`);
-    
+    const healthyCount = results.filter((result) => result).length;
+
+    this.log(
+      "info",
+      `Health check completed: ${healthyCount}/${this.connectionPool.length} sockets healthy`,
+    );
+
     return healthyCount > 0;
   }
 }

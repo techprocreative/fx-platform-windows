@@ -22,7 +22,19 @@
     "type-check": "tsc --noEmit",
     "clean": "rimraf dist",
     "clean:logs": "rimraf logs",
-    "start": "electron ."
+    "start": "electron .",
+    "download:libzmq": "node scripts/download-libzmq.js",
+    "setup:libzmq": "node scripts/setup-libzmq.js",
+    "setup:libzmq:force": "node scripts/setup-libzmq.js --force",
+    "setup:libzmq:win": "powershell -ExecutionPolicy Bypass -File scripts/setup-libzmq-simple.ps1",
+    "setup:libzmq:win:force": "powershell -ExecutionPolicy Bypass -File scripts/setup-libzmq-simple.ps1 -Force",
+    "prepare:resources": "npm run setup:libzmq && echo 'Resources prepared successfully'",
+    "build:production": "node scripts/build-production.js",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:e2e": "jest --testPathPattern=e2e",
+    "test:zeromq": "node scripts/test-zeromq.js",
+    "test:mt5-detection": "node scripts/test-mt5-detection.js",
+    "verify:installation": "node scripts/verify-installation.js"
   },
   "keywords": [
     "electron",

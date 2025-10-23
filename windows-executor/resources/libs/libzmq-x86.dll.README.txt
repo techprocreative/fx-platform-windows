@@ -1,0 +1,47 @@
+
+This is a PLACEHOLDER file for libzmq-x86.dll
+===========================================
+
+This file needs to be replaced with the actual ZeroMQ DLL.
+
+
+        Manual Download Instructions for 32-bit DLL:
+        1. Visit: https://github.com/zeromq/libzmq/releases
+        2. Look for Windows binaries (usually named like libzmq-v14x-Win32-*.zip)
+        3. Download and extract the 32-bit DLL
+        4. Rename it to 'libzmq-x86.dll'
+        5. Place it in: resources/libs/
+      
+
+Alternative Download Methods:
+
+  NuGet Package:
+  You can also get libzmq from NuGet packages
+  https://www.nuget.org/packages/libzmq_vc140
+  
+        1. Download the .nupkg file
+        2. Rename .nupkg to .zip
+        3. Extract and find the DLL files in runtimes/win-x64/native/ or runtimes/win-x86/native/
+      
+
+
+  vcpkg:
+  Install via vcpkg package manager
+  
+  
+        1. Install vcpkg: git clone https://github.com/Microsoft/vcpkg.git
+        2. Run: vcpkg install zeromq:x64-windows zeromq:x86-windows
+        3. Find DLLs in vcpkg/installed/*/bin/
+      
+
+
+  Pre-built binaries:
+  Community maintained pre-built binaries
+  https://github.com/zeromq/libzmq/wiki/Windows-builds
+  
+        Visit the ZeroMQ Wiki for Windows builds information
+      
+
+
+IMPORTANT: After downloading the real DLL, replace this file!
+    

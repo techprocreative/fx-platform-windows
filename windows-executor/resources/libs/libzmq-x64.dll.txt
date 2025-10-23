@@ -1,0 +1,21 @@
+
+ATTENTION: ZeroMQ DLL Download Failed
+======================================
+
+The automatic download of libzmq-x64.dll has failed.
+
+To manually install libzmq.dll:
+
+1. Download libzmq from: https://github.com/zeromq/libzmq/releases
+2. Extract the DLL files
+3. Place them in: /home/luckyn00b/Documents/fx-platform-windows/windows-executor/resources/libs
+4. Rename to: libzmq-x64.dll
+
+Required files:
+- libzmq-x64.dll (for 64-bit Windows)
+
+Alternative: Install via vcpkg
+  vcpkg install zeromq:x64-windows
+
+For more information, visit:
+https://zeromq.org/download/

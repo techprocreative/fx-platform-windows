@@ -3,19 +3,18 @@
  * Handles file operations, backups, hashing, and permission checks
  */
 
-import * as fs from 'fs-extra';
-import * as path from 'path';
-import * as crypto from 'crypto';
-import { promisify } from 'util';
-import { exec } from 'child_process';
-import * as os from 'os';
+import * as fs from "fs-extra";
+import * as path from "path";
+import * as crypto from "crypto";
+import { promisify } from "util";
+import { exec } from "child_process";
+import * as os from "os";
 import {
   FileOperationResult,
   FileHash,
-  BackupInfo,
   ErrorContext,
-  Architecture
-} from '../types/mt5.types';
+  Architecture,
+} from "../types/mt5.types";
 
 const execAsync = promisify(exec);
 
@@ -26,7 +25,7 @@ export class FileUtils {
   static async copyWithBackup(
     sourcePath: string,
     destinationPath: string,
-    createBackup: boolean = true
+    createBackup: boolean = true,
   ): Promise<FileOperationResult> {
     const result: FileOperationResult = {
       success: false,
@@ -36,7 +35,7 @@ export class FileUtils {
 
     try {
       // Check if source exists
-      if (!await fs.pathExists(sourcePath)) {
+      if (!(await fs.pathExists(sourcePath))) {
         throw new Error(`Source file does not exist: ${sourcePath}`);
       }
 
@@ -44,21 +43,20 @@ export class FileUtils {
       await fs.ensureDir(path.dirname(destinationPath));
 
       // Create backup if destination exists and backup is requested
-      if (createBackup && await fs.pathExists(destinationPath)) {
+      if (createBackup && (await fs.pathExists(destinationPath))) {
         const backupPath = await this.createBackup(destinationPath);
         result.backupPath = backupPath;
       }
 
       // Copy the file
       await fs.copy(sourcePath, destinationPath);
-      
+
       // Verify the copy
       if (await fs.pathExists(destinationPath)) {
         result.success = true;
       } else {
-        throw new Error('File copy verification failed');
+        throw new Error("File copy verification failed");
       }
-
     } catch (error) {
       result.error = (error as Error).message;
     }
@@ -67,12 +65,28 @@ export class FileUtils {
   }
 
   /**
+   * Copy file from source to destination
+   */
+  static async copy(
+    sourcePath: string,
+    destinationPath: string,
+  ): Promise<boolean> {
+    try {
+      await fs.ensureDir(path.dirname(destinationPath));
+      await fs.copy(sourcePath, destinationPath);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+
+  /**
    * Create backup of a file with timestamp
    */
   static async createBackup(filePath: string): Promise<string> {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const backupPath = `${filePath}.backup.${timestamp}`;
-    
+
     await fs.copy(filePath, backupPath);
     return backupPath;
   }
@@ -81,17 +95,17 @@ export class FileUtils {
    * Calculate file hash using specified algorithm
    */
   static async calculateFileHash(
-    filePath: string, 
-    algorithm: 'sha256' | 'md5' = 'sha256'
+    filePath: string,
+    algorithm: "sha256" | "md5" = "sha256",
   ): Promise<FileHash> {
     try {
       const fileBuffer = await fs.readFile(filePath);
       const hashSum = crypto.createHash(algorithm);
       hashSum.update(fileBuffer);
-      const hash = hashSum.digest('hex');
-      
+      const hash = hashSum.digest("hex");
+
       const stats = await fs.stat(filePath);
-      
+
       return {
         path: filePath,
         hash,
@@ -100,7 +114,9 @@ export class FileUtils {
         lastModified: stats.mtime,
       };
     } catch (error) {
-      throw new Error(`Failed to calculate hash for ${filePath}: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to calculate hash for ${filePath}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -108,8 +124,8 @@ export class FileUtils {
    * Compare two files by hash
    */
   static async compareFiles(
-    file1Path: string, 
-    file2Path: string
+    file1Path: string,
+    file2Path: string,
   ): Promise<boolean> {
     try {
       const hash1 = await this.calculateFileHash(file1Path);
@@ -124,14 +140,14 @@ export class FileUtils {
    * Check if file is up to date by comparing hashes
    */
   static async isFileUpToDate(
-    sourcePath: string, 
-    destinationPath: string
+    sourcePath: string,
+    destinationPath: string,
   ): Promise<boolean> {
     try {
-      if (!await fs.pathExists(destinationPath)) {
+      if (!(await fs.pathExists(destinationPath))) {
         return false;
       }
-      
+
       return await this.compareFiles(sourcePath, destinationPath);
     } catch (error) {
       return false;
@@ -143,8 +159,8 @@ export class FileUtils {
    */
   static async checkWritePermissions(directoryPath: string): Promise<boolean> {
     try {
-      const testFile = path.join(directoryPath, '.write-test');
-      await fs.writeFile(testFile, 'test');
+      const testFile = path.join(directoryPath, ".write-test");
+      await fs.writeFile(testFile, "test");
       await fs.remove(testFile);
       return true;
     } catch (error) {
@@ -169,20 +185,23 @@ export class FileUtils {
    */
   static async getFileVersion(filePath: string): Promise<string> {
     try {
-      if (process.platform !== 'win32') {
-        return 'Unknown';
+      if (process.platform !== "win32") {
+        return "Unknown";
       }
 
       // Use PowerShell to get file version
       const command = `Get-ItemProperty "${filePath}" | Select-Object -ExpandProperty VersionInfo | Select-Object -ExpandProperty FileVersion`;
-      const { stdout } = await execAsync(`powershell -Command "${command}"`, {
-        timeout: 5000,
-      });
-      
-      const version = stdout.trim();
-      return version || 'Unknown';
+      const { stdout: versionOutput } = await execAsync(
+        `powershell -Command "${command}"`,
+        {
+          timeout: 5000,
+        },
+      );
+
+      const version = versionOutput.trim();
+      return version || "Unknown";
     } catch (error) {
-      return 'Unknown';
+      return "Unknown";
     }
   }
 
@@ -191,8 +210,8 @@ export class FileUtils {
    */
   static async getProductVersion(filePath: string): Promise<string> {
     try {
-      if (process.platform !== 'win32') {
-        return 'Unknown';
+      if (process.platform !== "win32") {
+        return "Unknown";
       }
 
       // Use PowerShell to get product version
@@ -200,31 +219,35 @@ export class FileUtils {
       const { stdout } = await execAsync(`powershell -Command "${command}"`, {
         timeout: 5000,
       });
-      
+
       const version = stdout.trim();
-      return version || 'Unknown';
+      return version || "Unknown";
     } catch (error) {
-      return 'Unknown';
+      return "Unknown";
     }
   }
 
   /**
    * Get architecture of executable (32-bit or 64-bit)
    */
-  static async getExecutableArchitecture(filePath: string): Promise<Architecture> {
+  static async getExecutableArchitecture(
+    filePath: string,
+  ): Promise<Architecture> {
     try {
-      if (process.platform !== 'win32') {
+      if (process.platform !== "win32") {
         return Architecture.X64;
       }
 
       // Use PowerShell to check if file is 64-bit
       const command = `(Get-Item "${filePath}").Length -gt 0; (Get-Command "$env:windir\\SysWOW64\\cmd.exe" 2>$null) -ne $null`;
-      const { stdout } = await execAsync(`powershell -Command "${command}"`, {
+      await execAsync(`powershell -Command "${command}"`, {
         timeout: 5000,
       });
-      
+
       // This is a simplified check - in production, you'd want to use proper PE header parsing
-      return filePath.includes('64') || filePath.includes('x64') ? Architecture.X64 : Architecture.X86;
+      return filePath.includes("64") || filePath.includes("x64")
+        ? Architecture.X64
+        : Architecture.X86;
     } catch (error) {
       return Architecture.X64; // Default to 64-bit
     }
@@ -235,10 +258,13 @@ export class FileUtils {
    */
   static async isProcessRunning(processName: string): Promise<boolean> {
     try {
-      if (process.platform === 'win32') {
-        const { stdout } = await execAsync(`tasklist /FI "IMAGENAME eq ${processName}" /FO CSV /NH`, {
-          timeout: 3000,
-        });
+      if (process.platform === "win32") {
+        const { stdout } = await execAsync(
+          `tasklist /FI "IMAGENAME eq ${processName}" /FO CSV /NH`,
+          {
+            timeout: 3000,
+          },
+        );
         return stdout.includes(processName);
       } else {
         const { stdout } = await execAsync(`pgrep -f "${processName}"`, {
@@ -254,39 +280,47 @@ export class FileUtils {
   /**
    * Get all running processes matching a pattern
    */
-  static async getRunningProcesses(processPattern: string): Promise<Array<{pid: number, name: string, path: string}>> {
+  static async getRunningProcesses(
+    processPattern: string,
+  ): Promise<Array<{ pid: number; name: string; path: string }>> {
     try {
-      if (process.platform === 'win32') {
-        const { stdout } = await execAsync(`wmic process where "name like '%${processPattern}%'" get ProcessId,Name,ExecutablePath /format:csv`, {
-          timeout: 5000,
-        });
-        
-        const lines = stdout.trim().split('\n').slice(1); // Skip header
+      if (process.platform === "win32") {
+        const { stdout } = await execAsync(
+          `wmic process where "name like '%${processPattern}%'" get ProcessId,Name,ExecutablePath /format:csv`,
+          {
+            timeout: 5000,
+          },
+        );
+
+        const lines = stdout.trim().split("\n").slice(1); // Skip header
         return lines
-          .filter(line => line.trim())
+          .filter((line) => line.trim())
           .map((line: string) => {
-            const parts = line.split(',');
+            const parts = line.split(",");
             return {
               pid: parseInt(parts[1]) || 0,
-              name: parts[2] || '',
-              path: parts[3] || '',
+              name: parts[2] || "",
+              path: parts[3] || "",
             };
           })
           .filter((proc: any) => proc.pid > 0);
       } else {
-        const { stdout } = await execAsync(`ps aux | grep "${processPattern}"`, {
-          timeout: 5000,
-        });
-        
-        const lines = stdout.trim().split('\n');
+        const { stdout } = await execAsync(
+          `ps aux | grep "${processPattern}"`,
+          {
+            timeout: 5000,
+          },
+        );
+
+        const lines = stdout.trim().split("\n");
         return lines
-          .filter(line => line.trim() && !line.includes('grep'))
+          .filter((line) => line.trim() && !line.includes("grep"))
           .map((line: string) => {
             const parts = line.trim().split(/\s+/);
             return {
               pid: parseInt(parts[1]) || 0,
-              name: parts[10] || '',
-              path: parts[10] || '',
+              name: parts[10] || "",
+              path: parts[10] || "",
             };
           })
           .filter((proc: any) => proc.pid > 0);
@@ -334,8 +368,8 @@ export class FileUtils {
    * List files in directory with filtering
    */
   static async listFiles(
-    directoryPath: string, 
-    pattern?: RegExp
+    directoryPath: string,
+    pattern?: RegExp,
   ): Promise<string[]> {
     try {
       const files = await fs.readdir(directoryPath);
@@ -353,9 +387,11 @@ export class FileUtils {
    */
   static async readFile(filePath: string): Promise<string> {
     try {
-      return await fs.readFile(filePath, 'utf-8');
+      return await fs.readFile(filePath, "utf-8");
     } catch (error) {
-      throw new Error(`Failed to read file ${filePath}: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to read file ${filePath}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -365,10 +401,12 @@ export class FileUtils {
   static async writeFile(filePath: string, content: string): Promise<boolean> {
     try {
       await fs.ensureDir(path.dirname(filePath));
-      await fs.writeFile(filePath, content, 'utf-8');
+      await fs.writeFile(filePath, content, "utf-8");
       return true;
     } catch (error) {
-      throw new Error(`Failed to write file ${filePath}: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to write file ${filePath}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -379,7 +417,9 @@ export class FileUtils {
     try {
       return await fs.readJson(filePath);
     } catch (error) {
-      throw new Error(`Failed to read JSON file ${filePath}: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to read JSON file ${filePath}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -392,7 +432,9 @@ export class FileUtils {
       await fs.writeJson(filePath, data, { spaces: 2 });
       return true;
     } catch (error) {
-      throw new Error(`Failed to write JSON file ${filePath}: ${(error as Error).message}`);
+      throw new Error(
+        `Failed to write JSON file ${filePath}: ${(error as Error).message}`,
+      );
     }
   }
 
@@ -411,7 +453,10 @@ export class FileUtils {
   /**
    * Move file from source to destination
    */
-  static async move(sourcePath: string, destinationPath: string): Promise<boolean> {
+  static async move(
+    sourcePath: string,
+    destinationPath: string,
+  ): Promise<boolean> {
     try {
       await fs.ensureDir(path.dirname(destinationPath));
       await fs.move(sourcePath, destinationPath);
@@ -431,13 +476,17 @@ export class FileUtils {
   /**
    * Create temporary file with content
    */
-  static async createTempFile(prefix: string, content: string, extension: string = '.tmp'): Promise<string> {
+  static async createTempFile(
+    prefix: string,
+    content: string,
+    extension: string = ".tmp",
+  ): Promise<string> {
     const tempDir = this.getTempDirectory();
     const timestamp = Date.now();
     const random = Math.random().toString(36).substring(2);
     const fileName = `${prefix}-${timestamp}-${random}${extension}`;
     const filePath = path.join(tempDir, fileName);
-    
+
     await fs.writeFile(filePath, content);
     return filePath;
   }
@@ -446,13 +495,13 @@ export class FileUtils {
    * Check if application is running with administrator privileges
    */
   static async isRunningAsAdministrator(): Promise<boolean> {
-    if (process.platform !== 'win32') {
-      return process.getuid && process.getuid() === 0;
+    if (process.platform !== "win32") {
+      return !!(process.getuid && process.getuid() === 0);
     }
 
     try {
-      const { stdout } = await execAsync('net session', { timeout: 3000 });
-      return stdout.includes('The command completed successfully');
+      const { stdout } = await execAsync("net session", { timeout: 3000 });
+      return stdout.includes("The command completed successfully");
     } catch (error) {
       return false;
     }
@@ -461,7 +510,10 @@ export class FileUtils {
   /**
    * Error context helper
    */
-  static createErrorContext(operation: string, filePath?: string): ErrorContext {
+  static createErrorContext(
+    operation: string,
+    filePath?: string,
+  ): ErrorContext {
     return {
       operation,
       path: filePath,
@@ -479,15 +531,15 @@ export class FileUtils {
    * Format file size for display
    */
   static formatFileSize(bytes: number): string {
-    const units = ['B', 'KB', 'MB', 'GB'];
+    const units = ["B", "KB", "MB", "GB"];
     let size = bytes;
     let unitIndex = 0;
-    
+
     while (size >= 1024 && unitIndex < units.length - 1) {
       size /= 1024;
       unitIndex++;
     }
-    
+
     return `${size.toFixed(2)} ${units[unitIndex]}`;
   }
 
@@ -498,7 +550,7 @@ export class FileUtils {
     try {
       // Resolve the path to check for directory traversal
       const resolved = path.resolve(filePath);
-      return !resolved.includes('..') && !resolved.includes('~');
+      return !resolved.includes("..") && !resolved.includes("~");
     } catch (error) {
       return false;
     }

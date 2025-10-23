@@ -9,16 +9,24 @@
     "dist/**/*",
     "resources/**/*",
     "node_modules/**/*",
-    "package.json"
+    "package.json",
+    "scripts/**/*"
   ],
   "extraResources": [
     {
       "from": "resources/libs",
-      "to": "libs"
+      "to": "libs",
+      "filter": ["**/*"]
     },
     {
       "from": "resources/experts",
-      "to": "experts"
+      "to": "experts",
+      "filter": ["**/*"]
+    },
+    {
+      "from": "resources/icons",
+      "to": "icons",
+      "filter": ["**/*"]
     }
   ],
   "win": {
@@ -43,7 +51,9 @@
     "shortcutName": "FX Platform Executor",
     "installerIcon": "resources/icons/icon.ico",
     "uninstallerIcon": "resources/icons/icon.ico",
-    "installerHeaderIcon": "resources/icons/icon.ico"
+    "installerHeaderIcon": "resources/icons/icon.ico",
+    "include": "scripts/installer.nsh",
+    "script": "scripts/installer.nsh"
   },
   "publish": {
     "provider": "github",
