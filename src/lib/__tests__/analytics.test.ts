@@ -3,6 +3,7 @@ import { adaptTradesFromDB, filterClosedTrades } from '@/lib/analytics/adapters'
 // Define local types for testing
 interface AnalyticsTrade {
   id: string;
+  tradeId: string;
   status: 'open' | 'closed';
   strategyId: string;
   symbol: string;
@@ -26,6 +27,7 @@ interface AnalyticsTrade {
   swap: number;
   pips: number;
   netProfit: number;
+  duration: number;
   comment?: string;
   magicNumber?: number;
   createdAt: Date;
@@ -48,6 +50,7 @@ describe('Analytics Performance Processor', () => {
       
       trades.push({
         id: `trade_${i}`,
+        tradeId: `trade_${i}`,
         status: 'closed',
         strategyId: 'strategy_1',
         symbol: 'EURUSD',
@@ -71,6 +74,7 @@ describe('Analytics Performance Processor', () => {
         swap: 0,
         pips: Math.abs(exitPrice - entryPrice) * 10000,
         netProfit: profit - 7,
+        duration: Math.random() * 24 * 60 * 60 * 1000,
         createdAt: entryTime,
         updatedAt: exitTime
       });
@@ -186,7 +190,7 @@ describe('Analytics Performance Processor', () => {
     // Process real-time performance
     const realTimeData = await performanceProcessor.processRealTimePerformance(
       mockTrades as any,
-      mockTrades,
+      mockTrades as any,
       10500
     );
     
