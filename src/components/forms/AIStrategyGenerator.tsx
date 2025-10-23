@@ -72,7 +72,7 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
   // State for generated strategy summary
   const [generatedStrategy, setGeneratedStrategy] = useState<any | null>(null);
 
-  // Fixed model - Grok (from OpenRouter)
+  // Fixed model - AI NusaNexus (powered by OpenRouter)
   const AI_MODEL = "x-ai/grok-4-fast";
 
   // Load usage info on mount
@@ -294,7 +294,7 @@ Please create a strategy that takes this current market situation into account.`
             )}
           </div>
           <p className="text-xs text-neutral-500">
-            Using xAI's Grok 4 Fast with real-time market analysis for optimal strategy generation
+            Using AI NusaNexus with real-time market analysis for optimal strategy generation
           </p>
         </div>
 
