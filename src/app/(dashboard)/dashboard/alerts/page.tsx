@@ -59,6 +59,7 @@ export default function AlertsPage() {
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [alertRules, setAlertRules] = useState<AlertRule[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'unread' | 'acknowledged' | 'unacknowledged'>('all');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [showRuleDialog, setShowRuleDialog] = useState(false);
@@ -92,75 +93,12 @@ export default function AlertsPage() {
       
       if (data.success) {
         setAlerts(data.alerts || []);
-        return;
+        setError(null);
       }
     } catch (error) {
       console.error('Error fetching alerts:', error);
-      // Fallback to mock data if API fails
-      const mockAlerts: Alert[] = [
-        {
-          id: 'alert_001',
-          type: 'price',
-          severity: 'high',
-          title: 'EUR/USD Price Alert',
-          message: 'EUR/USD has reached 1.0900 (target price)',
-          timestamp: new Date(Date.now() - 300000), // 5 minutes ago
-          acknowledged: false,
-          read: false,
-          source: 'price_monitor',
-          metadata: { symbol: 'EURUSD', price: 1.0900, targetPrice: 1.0900 }
-        },
-        {
-          id: 'alert_002',
-          type: 'risk',
-          severity: 'medium',
-          title: 'Risk Level Warning',
-          message: 'Daily loss is approaching 5% of account balance',
-          timestamp: new Date(Date.now() - 900000), // 15 minutes ago
-          acknowledged: true,
-          read: true,
-          source: 'risk_monitor',
-          metadata: { currentLoss: 4.5, maxLoss: 6 }
-        },
-        {
-          id: 'alert_003',
-          type: 'position',
-          severity: 'low',
-          title: 'Position Update',
-          message: 'GBPUSD position has hit break-even',
-          timestamp: new Date(Date.now() - 1800000), // 30 minutes ago
-          acknowledged: false,
-          read: true,
-          source: 'position_monitor',
-          metadata: { symbol: 'GBPUSD', ticket: 12346, profit: 0 }
-        },
-        {
-          id: 'alert_004',
-          type: 'system',
-          severity: 'critical',
-          title: 'Connection Lost',
-          message: 'Connection to broker server has been lost',
-          timestamp: new Date(Date.now() - 3600000), // 1 hour ago
-          acknowledged: true,
-          read: true,
-          source: 'connection_monitor',
-          metadata: { broker: 'MT5', server: 'demo-server' }
-        },
-        {
-          id: 'alert_005',
-          type: 'news',
-          severity: 'medium',
-          title: 'High Impact News Event',
-          message: 'FOMC Interest Rate Decision in 30 minutes',
-          timestamp: new Date(Date.now() - 7200000), // 2 hours ago
-          acknowledged: false,
-          read: false,
-          source: 'news_monitor',
-          metadata: { event: 'FOMC', currency: 'USD', impact: 'high' }
-        }
-      ];
-
-      setAlerts(mockAlerts);
+      setError('Failed to load alerts. Please try again.');
+      setAlerts([]);
     } finally {
       setLoading(false);
     }
@@ -168,57 +106,12 @@ export default function AlertsPage() {
 
   const fetchAlertRules = async () => {
     try {
-      // Mock data for now
-      const mockRules: AlertRule[] = [
-        {
-          id: 'rule_001',
-          name: 'EUR/USD Price Alert',
-          type: 'price',
-          enabled: true,
-          conditions: [
-            { field: 'symbol', operator: 'eq', value: 'EURUSD' },
-            { field: 'price', operator: 'gte', value: 1.0900 }
-          ],
-          actions: [
-            { type: 'notification', enabled: true },
-            { type: 'email', enabled: true }
-          ],
-          createdAt: new Date(Date.now() - 86400000 * 7),
-          lastTriggered: new Date(Date.now() - 300000)
-        },
-        {
-          id: 'rule_002',
-          name: 'Daily Loss Limit',
-          type: 'risk',
-          enabled: true,
-          conditions: [
-            { field: 'dailyLossPercent', operator: 'gte', value: 5 }
-          ],
-          actions: [
-            { type: 'notification', enabled: true },
-            { type: 'email', enabled: true }
-          ],
-          createdAt: new Date(Date.now() - 86400000 * 14),
-          lastTriggered: new Date(Date.now() - 900000)
-        },
-        {
-          id: 'rule_003',
-          name: 'Position Stop Loss',
-          type: 'position',
-          enabled: false,
-          conditions: [
-            { field: 'profit', operator: 'lte', value: -100 }
-          ],
-          actions: [
-            { type: 'notification', enabled: true }
-          ],
-          createdAt: new Date(Date.now() - 86400000 * 3)
-        }
-      ];
-
-      setAlertRules(mockRules);
+      // TODO: Implement alert rules API endpoint
+      // For now, set empty array until API is ready
+      setAlertRules([]);
     } catch (error) {
       console.error('Failed to fetch alert rules:', error);
+      setAlertRules([]);
     }
   };
 

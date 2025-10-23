@@ -25,6 +25,7 @@ export default function PositionsPage() {
   const [positions, setPositions] = useState<MonitoredPosition[]>([]);
   const [pnlReport, setPnlReport] = useState<PnLReport | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(true);
   const [filter, setFilter] = useState<'all' | 'profitable' | 'losing'>('all');
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -58,120 +59,13 @@ export default function PositionsPage() {
         setPositions(data.positions || []);
         setPnlReport(data.pnlReport || null);
         setLastUpdate(new Date());
+        setError(null);
       }
     } catch (error) {
       console.error('Error fetching positions:', error);
-      // Fallback to mock data if API fails
-      const mockPositions: MonitoredPosition[] = [
-        {
-          ticket: 12345,
-          symbol: 'EURUSD',
-          type: 0, // BUY
-          volume: 0.1,
-          priceOpen: 1.0850,
-          priceCurrent: 1.0875,
-          priceSL: 1.0800,
-          priceTP: 1.0900,
-          swap: 0.25,
-          profit: 25.00,
-          comment: 'Manual trade',
-          openTime: new Date(Date.now() - 3600000), // 1 hour ago
-          expiration: new Date(Date.now() + 86400000), // 1 day from now
-          magic: 123,
-          commission: 0.50,
-          storage: 0,
-          identifier: 456,
-          unrealizedPnL: 25.00,
-          realizedPnL: 0,
-          totalPnL: 25.00,
-          lastUpdated: new Date()
-        },
-        {
-          ticket: 12346,
-          symbol: 'GBPUSD',
-          type: 1, // SELL
-          volume: 0.05,
-          priceOpen: 1.2750,
-          priceCurrent: 1.2730,
-          priceSL: 1.2800,
-          priceTP: 1.2700,
-          swap: -0.15,
-          profit: 10.00,
-          comment: 'Strategy trade',
-          openTime: new Date(Date.now() - 7200000), // 2 hours ago
-          expiration: new Date(Date.now() + 86400000),
-          magic: 456,
-          commission: 0.25,
-          storage: 0,
-          identifier: 789,
-          unrealizedPnL: 10.00,
-          realizedPnL: 0,
-          totalPnL: 10.00,
-          lastUpdated: new Date()
-        },
-        {
-          ticket: 12347,
-          symbol: 'USDJPY',
-          type: 0, // BUY
-          volume: 0.2,
-          priceOpen: 150.50,
-          priceCurrent: 150.25,
-          priceSL: 149.50,
-          priceTP: 152.00,
-          swap: 0.50,
-          profit: -50.00,
-          comment: 'Test position',
-          openTime: new Date(Date.now() - 1800000), // 30 minutes ago
-          expiration: new Date(Date.now() + 86400000),
-          magic: 789,
-          commission: 1.00,
-          storage: 0,
-          identifier: 101,
-          unrealizedPnL: -50.00,
-          realizedPnL: 0,
-          totalPnL: -50.00,
-          lastUpdated: new Date()
-        }
-      ];
-
-      setPositions(mockPositions);
-      setLastUpdate(new Date());
-
-      // Calculate P&L report
-      const totalUnrealized = mockPositions.reduce((sum, pos) => sum + (pos.unrealizedPnL || 0), 0);
-      const totalRealized = mockPositions.reduce((sum, pos) => sum + (pos.realizedPnL || 0), 0);
-      const totalPnL = totalUnrealized + totalRealized;
-
-      const report: PnLReport = {
-        totalUnrealizedPnL: totalUnrealized,
-        totalRealizedPnL: totalRealized,
-        totalPnL: totalPnL,
-        positions: mockPositions.map(pos => ({
-          ticket: pos.ticket,
-          symbol: pos.symbol,
-          type: pos.type,
-          volume: pos.volume,
-          openPrice: pos.priceOpen,
-          currentPrice: pos.priceCurrent,
-          unrealizedPnL: pos.unrealizedPnL || 0,
-          realizedPnL: pos.realizedPnL || 0,
-          totalPnL: pos.totalPnL || 0,
-          pips: 0, // Would calculate based on price difference
-          commission: pos.commission,
-          swap: pos.swap,
-          currency: 'USD',
-          marginUsed: 0 // Would calculate based on position size
-        })),
-        currency: 'USD',
-        timestamp: new Date(),
-        accountBalance: 10000,
-        accountEquity: 10000 + totalPnL,
-        dailyPnL: totalPnL,
-        weeklyPnL: totalPnL * 2,
-        monthlyPnL: totalPnL * 5
-      };
-
-      setPnlReport(report);
+      setError('Failed to load positions. Please try again.');
+      setPositions([]);
+      setPnlReport(null);
     } finally {
       setLoading(false);
       setIsRefreshing(false);

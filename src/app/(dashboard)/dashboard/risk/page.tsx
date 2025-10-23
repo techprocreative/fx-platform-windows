@@ -25,6 +25,7 @@ export default function RiskPage() {
   const [riskHistory, setRiskHistory] = useState<any[]>([]);
   const [riskAlerts, setRiskAlerts] = useState<RiskViolation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showDetails, setShowDetails] = useState(true);
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -56,64 +57,16 @@ export default function RiskPage() {
       if (data.success) {
         setRiskExposure(data.riskExposure || null);
         setRiskAlerts(data.violations || []);
+        setRiskHistory([]); // TODO: Implement risk history endpoint
         setLastUpdate(new Date());
+        setError(null);
       }
     } catch (error) {
       console.error('Error fetching risk data:', error);
-      // Fallback to mock data if API fails
-      const mockRiskExposure: RiskExposure = {
-        balance: 10000,
-        totalRiskExposure: 500,
-        riskExposurePercent: 5,
-        openPositions: 3,
-        dailyLoss: 50,
-        dailyLossPercent: 0.5,
-        currentDrawdown: 200,
-        drawdownPercent: 2,
-        availableMargin: 9500,
-        limitsExceeded: false,
-        violations: [
-          {
-            type: 'MAX_DAILY_LOSS',
-            currentValue: 4.5,
-            limit: 6,
-            severity: 'WARNING',
-            message: 'Daily loss is approaching the maximum limit'
-          }
-        ]
-      };
-
-      const mockRiskHistory = [
-        { date: new Date(Date.now() - 86400000 * 7), riskLevel: 3.2, exposure: 320 },
-        { date: new Date(Date.now() - 86400000 * 6), riskLevel: 4.1, exposure: 410 },
-        { date: new Date(Date.now() - 86400000 * 5), riskLevel: 3.8, exposure: 380 },
-        { date: new Date(Date.now() - 86400000 * 4), riskLevel: 5.2, exposure: 520 },
-        { date: new Date(Date.now() - 86400000 * 3), riskLevel: 4.7, exposure: 470 },
-        { date: new Date(Date.now() - 86400000 * 2), riskLevel: 4.3, exposure: 430 },
-        { date: new Date(Date.now() - 86400000 * 1), riskLevel: 5.0, exposure: 500 },
-      ];
-
-      const mockRiskAlerts: RiskViolation[] = [
-        {
-          type: 'MAX_DAILY_LOSS',
-          currentValue: 4.5,
-          limit: 6,
-          severity: 'WARNING',
-          message: 'Daily loss is approaching the maximum limit'
-        },
-        {
-          type: 'MAX_POSITIONS',
-          currentValue: 3,
-          limit: 5,
-          severity: 'WARNING',
-          message: 'You have 3 out of 5 maximum open positions'
-        }
-      ];
-
-      setRiskExposure(mockRiskExposure);
-      setRiskHistory(mockRiskHistory);
-      setRiskAlerts(mockRiskAlerts);
-      setLastUpdate(new Date());
+      setError('Failed to load risk data. Please try again.');
+      setRiskExposure(null);
+      setRiskHistory([]);
+      setRiskAlerts([]);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
