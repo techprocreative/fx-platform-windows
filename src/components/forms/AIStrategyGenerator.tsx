@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/Card";
+import { TRADING_CONFIG } from "@/lib/config";
 
 // Market context types
 interface MarketContext {
@@ -271,14 +272,11 @@ Please create a strategy that takes this current market situation into account.`
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
               disabled={loading}
             >
-              <option value="EURUSD">EURUSD</option>
-              <option value="GBPUSD">GBPUSD</option>
-              <option value="USDJPY">USDJPY</option>
-              <option value="AUDUSD">AUDUSD</option>
-              <option value="USDCAD">USDCAD</option>
-              <option value="EURJPY">EURJPY</option>
-              <option value="GBPJPY">GBPJPY</option>
-              <option value="EURGBP">EURGBP</option>
+              {TRADING_CONFIG.SUPPORTED_SYMBOLS.map((sym) => (
+                <option key={sym} value={sym}>
+                  {sym}
+                </option>
+              ))}
             </select>
           </div>
           
