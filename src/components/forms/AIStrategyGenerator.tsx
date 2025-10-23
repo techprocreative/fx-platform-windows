@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sparkles, Loader2, TrendingUp, TrendingDown, Activity, Clock } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -71,6 +71,7 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
   
   // State for generated strategy summary
   const [generatedStrategy, setGeneratedStrategy] = useState<any | null>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
 
   // Fixed model - AI NusaNexus (powered by OpenRouter)
   const AI_MODEL = "x-ai/grok-4-fast";
@@ -195,20 +196,33 @@ Please create a strategy that takes this current market situation into account.`
         marketContextUsed: enableMarketContext
       });
       
-      // Store generated strategy for summary display
-      setGeneratedStrategy(strategy);
+      // Store generated strategy for summary display with user-selected values
+      const enrichedStrategy = {
+        ...strategy,
+        symbol: symbol,  // ALWAYS use user-selected symbol
+        timeframe: timeframe,  // ALWAYS use user-selected timeframe
+      };
+      setGeneratedStrategy(enrichedStrategy);
       
       onGenerate({
         name: strategy.name,
         description: strategy.description,
-        symbol: strategy.symbol || symbol,         // Use selected symbol if not provided
-        timeframe: strategy.timeframe || timeframe,   // Use selected timeframe if not provided
+        symbol: symbol,  // Use user-selected symbol
+        timeframe: timeframe,  // Use user-selected timeframe
         rules: strategy.rules,
         parameters: strategy.parameters, // IMPORTANT: Pass parameters!
       });
 
       toast.success("Strategy generated! Review the summary below and customize if needed.");
       setPrompt(""); // Clear prompt after successful generation
+      
+      // Auto-scroll to summary after a brief delay
+      setTimeout(() => {
+        summaryRef.current?.scrollIntoView({ 
+          behavior: 'smooth', 
+          block: 'start' 
+        });
+      }, 300);
     } catch (error) {
       console.error("AI Generation error:", error);
       toast.error("An error occurred while generating strategy");
@@ -723,14 +737,17 @@ Please create a strategy that takes this current market situation into account.`
 
         {/* Strategy Summary Display */}
         {generatedStrategy && (
-          <div className="mt-6 space-y-4 rounded-lg border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-6">
+          <div 
+            ref={summaryRef}
+            className="mt-6 space-y-4 rounded-lg border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-6 shadow-lg"
+          >
             <div className="flex items-center gap-2 mb-4">
-              <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center animate-pulse">
                 <Sparkles className="h-4 w-4 text-white" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-green-900">Strategy Generated Successfully!</h3>
-                <p className="text-sm text-green-700">Review the details below and customize as needed</p>
+                <h3 className="text-lg font-bold text-green-900">✅ Strategy Generated Successfully!</h3>
+                <p className="text-sm text-green-700">Review the complete details below and customize as needed</p>
               </div>
             </div>
 
@@ -743,7 +760,7 @@ Please create a strategy that takes this current market situation into account.`
               <div className="rounded-lg bg-white border border-green-200 p-4">
                 <div className="text-xs font-semibold text-green-700 mb-1">SYMBOL & TIMEFRAME</div>
                 <div className="text-sm font-bold text-neutral-900">
-                  {generatedStrategy.symbol || symbol} • {generatedStrategy.timeframe || timeframe}
+                  {generatedStrategy.symbol} • {generatedStrategy.timeframe}
                 </div>
               </div>
             </div>
