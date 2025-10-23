@@ -58,6 +58,18 @@ interface AnalyticsData {
   };
 }
 
+// Helper function to safely convert timestamp to ISO string
+const toISOString = (timestamp: Date | string): string => {
+  if (typeof timestamp === 'string') {
+    return timestamp;
+  }
+  if (timestamp instanceof Date) {
+    return timestamp.toISOString();
+  }
+  // Fallback: try to parse and convert
+  return new Date(timestamp).toISOString();
+};
+
 export default function AnalyticsPage() {
   const { data: session, status } = useSession();
   const [data, setData] = useState<AnalyticsData | null>(null);
@@ -424,7 +436,7 @@ export default function AnalyticsPage() {
                   <h3 className="text-lg font-semibold text-neutral-900 mb-4">Equity Curve</h3>
                   <EquityCurveChart
                     data={data.performance.equityCurve.map(point => ({
-                      timestamp: point.timestamp.toISOString(),
+                      timestamp: toISOString(point.timestamp),
                       equity: point.equity,
                       date: point.date
                     })) || []}
@@ -465,7 +477,7 @@ export default function AnalyticsPage() {
               metrics={data.performance.metrics}
               drawdownPeriods={data.performance.drawdownPeriods}
               equityCurve={data.performance.equityCurve.map(point => ({
-                timestamp: point.timestamp.toISOString(),
+                timestamp: toISOString(point.timestamp),
                 equity: point.equity,
                 date: point.date
               }))}
