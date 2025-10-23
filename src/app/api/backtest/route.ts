@@ -468,10 +468,12 @@ export async function POST(request: NextRequest) {
         "INVALID_DATE_RANGE",
       );
     }
-    
+
     // Add warning for periods over 60 days
     if (daysDiff > 60) {
-      console.warn(`⚠️ WARNING: Long backtest period (${Math.round(daysDiff)} days) detected. Results may be less accurate due to API data limitations.`);
+      console.warn(
+        `⚠️ WARNING: Long backtest period (${Math.round(daysDiff)} days) detected. Results may be less accurate due to API data limitations.`,
+      );
     }
 
     // Create backtest record with lock information
@@ -700,7 +702,7 @@ export async function GET(request: NextRequest) {
 /**
  * Clean up all locks (for server shutdown)
  */
-export function cleanupAllBacktestLocks(): void {
+function cleanupAllBacktestLocks(): void {
   runningBacktests.clear();
   console.log("All backtest locks cleared");
 }

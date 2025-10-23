@@ -23,7 +23,7 @@ export function adaptTradeFromDB(dbTrade: PrismaTrade): AnalyticsTrade {
       : 0;
 
   return {
-    tradeId: dbTrade.id,
+    id: dbTrade.id,
     strategyId: dbTrade.strategyId,
     symbol: dbTrade.symbol,
     direction: dbTrade.type === "BUY" ? "BUY" : "SELL",
@@ -31,23 +31,11 @@ export function adaptTradeFromDB(dbTrade: PrismaTrade): AnalyticsTrade {
     exitTime: dbTrade.closeTime || undefined,
     entryPrice: dbTrade.openPrice,
     exitPrice: dbTrade.closePrice || undefined,
-    quantity: dbTrade.lots,
+    volume: dbTrade.lots,
     profit: dbTrade.profit || 0,
-    profitPercent,
     commission: dbTrade.commission || 0,
     swap: dbTrade.swap || 0,
-    pips: dbTrade.pips || undefined,
-    holdingTime,
     status: dbTrade.closeTime ? "CLOSED" : "OPEN",
-    metadata: {
-      ticket: dbTrade.ticket,
-      executorId: dbTrade.executorId,
-      stopLoss: dbTrade.stopLoss,
-      takeProfit: dbTrade.takeProfit,
-      magicNumber: dbTrade.magicNumber,
-      comment: dbTrade.comment,
-      netProfit: dbTrade.netProfit,
-    },
   };
 }
 
