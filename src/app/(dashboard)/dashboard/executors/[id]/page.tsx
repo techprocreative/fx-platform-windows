@@ -84,6 +84,7 @@ export default function ExecutorDetailPage({
   useEffect(() => {
     if (status === 'unauthenticated') {
       router.replace('/login');
+      return;
     }
     if (status === 'authenticated') {
       fetchExecutorDetails();

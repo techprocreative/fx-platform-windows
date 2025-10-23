@@ -142,7 +142,7 @@ export default function SupervisorPage() {
           param: key,
           from: current[key],
           to: value,
-          change: changePercent ? `${changePercent > 0 ? '+' : ''}${changePercent}%` : ''
+          change: changePercent ? `${Number(changePercent) > 0 ? '+' : ''}${changePercent}%` : ''
         });
       }
     }

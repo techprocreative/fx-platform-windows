@@ -110,6 +110,10 @@ export default function StrategyDetailPage({
   };
 
   const handleDeactivate = async () => {
+    if (!strategy) {
+      toast.error('Strategy not loaded');
+      return;
+    }
     if (!confirm('Are you sure you want to deactivate this strategy? All executors will stop executing it.')) {
       return;
     }
@@ -143,6 +147,10 @@ export default function StrategyDetailPage({
   };
 
   const handleStrategyActivated = () => {
+    if (!strategy) {
+      toast.error('Strategy not loaded');
+      return;
+    }
     // Refresh strategy data
     execute(async () => {
       const response = await fetch(`/api/strategy/${params.id}`);

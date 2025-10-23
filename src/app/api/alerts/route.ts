@@ -33,21 +33,21 @@ export async function GET(request: NextRequest) {
           }
         })
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { timestamp: 'desc' },
       take: limit
     });
 
     // Transform to alert format
     const transformedAlerts = alerts.map(log => ({
       id: log.id,
-      type: determineAlertType(log.action),
-      severity: determineSeverity(log.action),
-      title: generateTitle(log.action, log.resource),
-      message: log.details || `${log.action} on ${log.resource}`,
-      timestamp: log.createdAt,
+      type: determineAlertType(log.action || ''),
+      severity: determineSeverity(log.action || ''),
+      title: generateTitle(log.action || '', log.resource || ''),
+      message: `${log.action || 'Event'} on ${log.resource || 'Unknown'}`,
+      timestamp: log.timestamp,
       acknowledged: (log.metadata as any)?.acknowledged || false,
       read: (log.metadata as any)?.read || false,
-      source: log.resource,
+      source: log.resource || 'Unknown',
       metadata: log.metadata
     }));
 
@@ -104,15 +104,17 @@ export async function POST(request: NextRequest) {
     const alert = await prisma.auditLog.create({
       data: {
         userId: session.user.id,
+        eventType: `ALERT_${type.toUpperCase()}`,
         action: `ALERT_${type.toUpperCase()}`,
         resource: source || 'SYSTEM',
-        details: message,
+        result: 'success',
         ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
         userAgent: request.headers.get('user-agent') || 'unknown',
         metadata: {
           type,
           severity,
           title,
+          message,
           acknowledged: false,
           read: false,
           ...metadata
@@ -128,7 +130,7 @@ export async function POST(request: NextRequest) {
         severity,
         title,
         message,
-        timestamp: alert.createdAt,
+        timestamp: alert.timestamp,
         acknowledged: false,
         read: false,
         source,

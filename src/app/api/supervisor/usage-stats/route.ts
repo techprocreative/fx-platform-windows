@@ -55,9 +55,9 @@ export async function GET(request: NextRequest) {
     const successfulCalls = usageLogs.filter(log => log.success).length;
     const failedCalls = totalCalls - successfulCalls;
     
-    const totalTokens = usageLogs.reduce((sum, log) => sum + log.totalTokens, 0);
-    const totalPromptTokens = usageLogs.reduce((sum, log) => sum + log.promptTokens, 0);
-    const totalCompletionTokens = usageLogs.reduce((sum, log) => sum + log.completionTokens, 0);
+    const totalTokens = usageLogs.reduce((sum: number, log: any) => sum + log.totalTokens, 0);
+    const totalPromptTokens = usageLogs.reduce((sum: number, log: any) => sum + log.promptTokens, 0);
+    const totalCompletionTokens = usageLogs.reduce((sum: number, log: any) => sum + log.completionTokens, 0);
     
     // Calculate total cost
     let totalCost = 0;
@@ -109,7 +109,27 @@ export async function GET(request: NextRequest) {
     const dailyUsage: Record<string, { calls: number; tokens: number; cost: number }> = {};
     const last7Days = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     
-    for (const log of usageLogs.filter(l => l.timestamp >= last7Days)) {
+    for (const log of usageLogs) {
+      const date = new Date(log.timestamp).toISOString().split('T')[0];
+      if (!dailyUsage[date]) {
+        dailyUsage[date] = { calls: 0, tokens: 0, cost: 0 };
+      }
+      const costPerM = MODEL_COSTS[log.model] || 0.35;
+      const cost = (log.totalTokens / 1_000_000) * costPerM;
+      dailyUsage[date].calls += 1;
+      dailyUsage[date].tokens += log.totalTokens;
+      dailyUsage[date].cost += cost;
+    }
+    
+    // Model breakdown
+    const modelBreakdown = Object.keys(costByModel).map((o: string) => ({
+      model: o,
+      calls: callsByModel[o],
+      cost: costByModel[o],
+      avgCostPerCall: callsByModel[o] > 0 ? costByModel[o] / callsByModel[o] : 0
+    }));
+    
+    for (const log of usageLogs.filter((l: any) => l.timestamp >= last7Days)) {
       const day = log.timestamp.toISOString().split('T')[0];
       
       if (!dailyUsage[day]) {
@@ -125,7 +145,7 @@ export async function GET(request: NextRequest) {
     }
     
     // Recent logs (last 20)
-    const recentLogs = usageLogs.slice(0, 20).map(log => ({
+    const recentLogs = usageLogs.slice(0, 20).map((log: any) => ({
       id: log.id,
       model: log.model,
       tokens: log.totalTokens,

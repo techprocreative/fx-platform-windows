@@ -136,14 +136,10 @@ export async function GET(request: NextRequest) {
         id: opt.id,
         status: opt.status,
         confidence: opt.confidenceScore,
-        currentParameters: opt.currentParameters,
-        proposedParameters: opt.proposedParameters,
-        reasoning: opt.llmReasoning,
-        createdAt: opt.createdAt,
-        appliedAt: opt.appliedAt,
-        evaluatedAt: opt.evaluatedAt,
-        wasSuccessful: opt.wasSuccessful,
-        affectedExecutors: opt.affectedExecutors
+        currentParams: opt.currentParams,
+        proposedParams: opt.proposedParams,
+        reasoning: opt.reasoning,
+        createdAt: opt.approvedAt
       }))
     });
     

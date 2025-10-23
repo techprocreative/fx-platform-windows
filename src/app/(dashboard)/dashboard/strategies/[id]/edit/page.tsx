@@ -129,7 +129,7 @@ export default function EditStrategyPage({ params }: { params: { id: string } })
             id: `${index}`,
             ...condition,
           })) || [],
-          mode: 'advanced',
+          mode: 'manual',
         }}
         onSubmit={handleSubmit}
         onCancelHref={`/dashboard/strategies/${params.id}`}
