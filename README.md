@@ -94,7 +94,60 @@ npm run dev
 
 Visit `http://localhost:3000` to access the platform.
 
+## 🪟 Windows Executor Development
+
+The **Windows Executor** is a standalone application that connects to the web platform via Pusher and communicates with MetaTrader 5 using ZeroMQ.
+
+### Getting Started
+- **API Documentation**: See [EXECUTOR_API_DOCUMENTATION.md](./EXECUTOR_API_DOCUMENTATION.md)
+- **Architecture**: See [FINAL_ARCHITECTURE.md](./FINAL_ARCHITECTURE.md)
+- **Execution Guide**: See [STRATEGY_EXECUTION_GUIDE.md](./STRATEGY_EXECUTION_GUIDE.md)
+
+### Key Components
+- Real-time strategy updates via Pusher
+- Position management and monitoring
+- Trade execution with validation
+- Risk management integration
+- Performance tracking
+
+### Communication Flow
+```
+Web Platform (Strategy Creation)
+    ↓ Pusher Realtime
+Windows Executor (Receives & Executes)
+    ↓ ZeroMQ Protocol
+MetaTrader 5 Terminal (Trade Execution)
+```
+
+## 🔗 ZeroMQ EA Development
+
+The **ZeroMQ-based EA** (Expert Advisor) runs in MetaTrader 5 and handles:
+
+### Features
+- Real-time order execution
+- Position management
+- Trade monitoring
+- Risk validation
+- Performance reporting
+
+### Integration Points
+- Receives strategy signals from Windows Executor
+- Sends execution confirmations
+- Reports trade results
+- Handles risk management rules
+- Implements position sizing
+
+### Documentation
+- See [EXECUTOR_API_DOCUMENTATION.md](./EXECUTOR_API_DOCUMENTATION.md) for ZeroMQ protocol details
+- See [STRATEGY_EXECUTION_GUIDE.md](./STRATEGY_EXECUTION_GUIDE.md) for execution workflow
+
 ## 📚 Documentation
+
+### Core Documentation
+- [EXECUTOR_API_DOCUMENTATION.md](./EXECUTOR_API_DOCUMENTATION.md) - Windows Executor & ZeroMQ EA API specifications
+- [STRATEGY_EXECUTION_GUIDE.md](./STRATEGY_EXECUTION_GUIDE.md) - Complete strategy execution workflow
+- [FINAL_ARCHITECTURE.md](./FINAL_ARCHITECTURE.md) - System architecture and design
+- [AGENTS.md](./AGENTS.md) - Development guidelines and coding standards
 
 ### User Documentation
 - [User Guide](./docs/user-guide/README.md) - Complete user manual
