@@ -2,15 +2,22 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "target": "ES2020",
-    "module": "CommonJS",
+    "module": "ESNext",
+    "lib": ["ES2020"],
     "outDir": "../dist/electron",
-    "noEmit": false,
+    "emitDeclarationOnly": true,
+    "declaration": true,
     "jsx": "preserve",
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
+    "forceConsistentCasingInFileNames": true,
+    "moduleResolution": "node",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "strict": true
   },
-  "include": ["electron/**/*"],
+  "include": ["./**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }
