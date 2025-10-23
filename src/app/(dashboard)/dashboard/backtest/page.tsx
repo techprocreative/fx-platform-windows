@@ -196,28 +196,36 @@ export default function BacktestPage() {
 
   // Validate date range for interval (Yahoo Finance limitation)
   // Based on actual testing: 15min/30min limited to 60 days, but 1h can go up to 365+ days
-  const validateDateRange = (startDate: string, endDate: string, interval: string): string | null => {
+  const validateDateRange = (
+    startDate: string,
+    endDate: string,
+    interval: string,
+  ): string | null => {
     const start = new Date(startDate);
     const end = new Date(endDate);
     const today = new Date();
-    
+
     // Calculate days difference
-    const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    const daysFromToday = Math.ceil((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-    
+    const daysDiff = Math.ceil(
+      (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
+    const daysFromToday = Math.ceil(
+      (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+    );
+
     // Check if end date is in the future
     if (end > today) {
       return "End date cannot be in the future";
     }
-    
+
     // Check if start date is after end date
     if (start >= end) {
       return "Start date must be before end date";
     }
-    
+
     // Yahoo Finance limitations - ONLY 15min and 30min have 60-day limit
     // 1h interval works up to 365+ days (tested and verified)
-    const limitedIntradayIntervals = ['1min', '5min', '15min', '30min'];
+    const limitedIntradayIntervals = ["1min", "5min", "15min", "30min"];
     if (limitedIntradayIntervals.includes(interval)) {
       if (daysFromToday > 60) {
         return `⚠️ Yahoo Finance limits ${interval} data to the last 60 days. Your start date is ${daysFromToday} days ago. Please use a more recent start date, switch to 1h interval, or use daily interval.`;
@@ -226,19 +234,23 @@ export default function BacktestPage() {
         return `⚠️ Date range (${daysDiff} days) exceeds Yahoo Finance limit for ${interval} data (max 60 days). Please reduce the date range, use 1h interval, or switch to daily interval.`;
       }
     }
-    
+
     // Warning for very short ranges
     if (daysDiff < 7) {
       return `ℹ️ Short date range (${daysDiff} days) may not provide enough data for reliable backtest results.`;
     }
-    
+
     return null;
   };
 
   // Validate date range whenever interval or dates change
   useEffect(() => {
     if (formData.interval && formData.startDate && formData.endDate) {
-      const warning = validateDateRange(formData.startDate, formData.endDate, formData.interval);
+      const warning = validateDateRange(
+        formData.startDate,
+        formData.endDate,
+        formData.interval,
+      );
       setDateRangeWarning(warning);
     }
   }, [formData.interval, formData.startDate, formData.endDate]);
@@ -267,8 +279,12 @@ export default function BacktestPage() {
     }
 
     // Check for blocking errors (not warnings)
-    if (dateRangeWarning && !dateRangeWarning.startsWith('ℹ️')) {
-      if (dateRangeWarning.includes('60 days') || dateRangeWarning.includes('future') || dateRangeWarning.includes('must be before')) {
+    if (dateRangeWarning && !dateRangeWarning.startsWith("ℹ️")) {
+      if (
+        dateRangeWarning.includes("60 days") ||
+        dateRangeWarning.includes("future") ||
+        dateRangeWarning.includes("must be before")
+      ) {
         toast.error("Please fix the date range error before running backtest");
         return;
       }
@@ -324,7 +340,6 @@ export default function BacktestPage() {
             .split("T")[0],
           endDate: new Date().toISOString().split("T")[0],
           initialBalance: 10000,
-          preferredDataSource: "twelvedata",
         });
       }
     }
@@ -462,12 +477,15 @@ export default function BacktestPage() {
                 {strategies.map((strategy) => (
                   <option key={strategy.id} value={strategy.id}>
                     {strategy.name} ({strategy.symbol} {strategy.timeframe})
-                    {strategy.status !== 'active' && strategy.status !== 'draft' && ` [${strategy.status}]`}
+                    {strategy.status !== "active" &&
+                      strategy.status !== "draft" &&
+                      ` [${strategy.status}]`}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-neutral-500 mt-1">
-                All strategies are shown. Status badge indicates inactive strategies.
+                All strategies are shown. Status badge indicates inactive
+                strategies.
               </p>
             </div>
 
@@ -529,11 +547,12 @@ export default function BacktestPage() {
                     Data Source: Yahoo Finance
                   </h4>
                   <p className="text-xs text-blue-700 leading-relaxed">
-                    Backtests use Yahoo Finance API for market data. 
-                    <strong className="font-semibold"> Important:</strong> 15min and 30min intervals 
-                    are limited to the last <strong>60 days</strong>. 
-                    1h interval supports up to <strong>365 days</strong>. 
-                    Daily interval supports historical data beyond 365 days.
+                    Backtests use Yahoo Finance API for market data.
+                    <strong className="font-semibold"> Important:</strong> 15min
+                    and 30min intervals are limited to the last{" "}
+                    <strong>60 days</strong>. 1h interval supports up to{" "}
+                    <strong>365 days</strong>. Daily interval supports
+                    historical data beyond 365 days.
                   </p>
                 </div>
               </div>
@@ -573,40 +592,55 @@ export default function BacktestPage() {
 
             {/* Date Range Warning */}
             {dateRangeWarning && (
-              <div className={`col-span-2 rounded-lg border p-4 ${
-                dateRangeWarning.startsWith('⚠️') 
-                  ? 'bg-amber-50 border-amber-200' 
-                  : dateRangeWarning.startsWith('ℹ️')
-                  ? 'bg-blue-50 border-blue-200'
-                  : 'bg-red-50 border-red-200'
-              }`}>
+              <div
+                className={`col-span-2 rounded-lg border p-4 ${
+                  dateRangeWarning.startsWith("⚠️")
+                    ? "bg-amber-50 border-amber-200"
+                    : dateRangeWarning.startsWith("ℹ️")
+                      ? "bg-blue-50 border-blue-200"
+                      : "bg-red-50 border-red-200"
+                }`}
+              >
                 <div className="flex items-start gap-3">
-                  <div className={`flex-shrink-0 mt-0.5 ${
-                    dateRangeWarning.startsWith('⚠️') 
-                      ? 'text-amber-600' 
-                      : dateRangeWarning.startsWith('ℹ️')
-                      ? 'text-blue-600'
-                      : 'text-red-600'
-                  }`}>
-                    {dateRangeWarning.startsWith('⚠️') ? '⚠️' : dateRangeWarning.startsWith('ℹ️') ? 'ℹ️' : '❌'}
+                  <div
+                    className={`flex-shrink-0 mt-0.5 ${
+                      dateRangeWarning.startsWith("⚠️")
+                        ? "text-amber-600"
+                        : dateRangeWarning.startsWith("ℹ️")
+                          ? "text-blue-600"
+                          : "text-red-600"
+                    }`}
+                  >
+                    {dateRangeWarning.startsWith("⚠️")
+                      ? "⚠️"
+                      : dateRangeWarning.startsWith("ℹ️")
+                        ? "ℹ️"
+                        : "❌"}
                   </div>
                   <div className="flex-1">
-                    <p className={`text-sm leading-relaxed ${
-                      dateRangeWarning.startsWith('⚠️') 
-                        ? 'text-amber-800' 
-                        : dateRangeWarning.startsWith('ℹ️')
-                        ? 'text-blue-800'
-                        : 'text-red-800'
-                    }`}>
-                      {dateRangeWarning.replace(/^[⚠️ℹ️❌]\s*/, '')}
+                    <p
+                      className={`text-sm leading-relaxed ${
+                        dateRangeWarning.startsWith("⚠️")
+                          ? "text-amber-800"
+                          : dateRangeWarning.startsWith("ℹ️")
+                            ? "text-blue-800"
+                            : "text-red-800"
+                      }`}
+                    >
+                      {dateRangeWarning.replace(/^[⚠️ℹ️❌]\s*/, "")}
                     </p>
-                    {dateRangeWarning.includes('60 days') && (
+                    {dateRangeWarning.includes("60 days") && (
                       <button
                         onClick={() => {
-                          const newStartDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                          const newStartDate = new Date(
+                            Date.now() - 30 * 24 * 60 * 60 * 1000,
+                          )
                             .toISOString()
                             .split("T")[0];
-                          setFormData((prev) => ({ ...prev, startDate: newStartDate }));
+                          setFormData((prev) => ({
+                            ...prev,
+                            startDate: newStartDate,
+                          }));
                         }}
                         className="mt-2 text-xs font-semibold text-amber-700 hover:text-amber-800 underline"
                       >

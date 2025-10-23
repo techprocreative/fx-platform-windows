@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import toast from 'react-hot-toast';
+import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import toast from "react-hot-toast";
 import {
   ArrowLeft,
   Server,
@@ -18,10 +18,10 @@ import {
   Pause,
   StopCircle,
   RefreshCw,
-} from 'lucide-react';
+} from "lucide-react";
 
-import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { CardError } from '@/components/ui/ErrorMessage';
+import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
+import { CardError } from "@/components/ui/ErrorMessage";
 
 interface Executor {
   id: string;
@@ -79,35 +79,35 @@ export default function ExecutorDetailPage({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [sendingCommand, setSendingCommand] = useState(false);
-  const [selectedCommand, setSelectedCommand] = useState<string>('');
+  const [selectedCommand, setSelectedCommand] = useState<string>("");
 
   useEffect(() => {
-    if (status === 'unauthenticated') {
-      router.replace('/login');
+    if (status === "unauthenticated") {
+      router.replace("/login");
       return;
     }
-    if (status === 'authenticated') {
+    if (status === "authenticated") {
       fetchExecutorDetails();
 
       // Auto-refresh every 10 seconds
       const interval = setInterval(fetchExecutorDetails, 10000);
       return () => clearInterval(interval);
     }
-  }, [status, params.id]);
+  }, [status, router, params.id]);
 
   const fetchExecutorDetails = async () => {
     try {
       setError(null);
       const response = await fetch(`/api/executor/${params.id}`);
-      
+
       if (response.status === 401) {
-        router.replace('/login');
+        router.replace("/login");
         return;
       }
 
       if (!response.ok) {
         const data = await response.json().catch(() => null);
-        throw new Error(data?.error || 'Failed to fetch executor details');
+        throw new Error(data?.error || "Failed to fetch executor details");
       }
 
       const data = await response.json();
@@ -115,7 +115,8 @@ export default function ExecutorDetailPage({
       setRecentTrades(data.recentTrades || []);
       setRecentCommands(data.recentCommands || []);
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to load executor');
+      const err =
+        error instanceof Error ? error : new Error("Failed to load executor");
       setError(err);
       toast.error(err.message);
     } finally {
@@ -125,32 +126,33 @@ export default function ExecutorDetailPage({
 
   const handleSendCommand = async () => {
     if (!selectedCommand) {
-      toast.error('Please select a command');
+      toast.error("Please select a command");
       return;
     }
 
     setSendingCommand(true);
     try {
       const response = await fetch(`/api/executor/${params.id}/command`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           command: selectedCommand,
-          priority: 'NORMAL',
+          priority: "NORMAL",
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to send command');
+        throw new Error(data.error || "Failed to send command");
       }
 
-      toast.success(data.message || 'Command sent successfully');
-      setSelectedCommand('');
+      toast.success(data.message || "Command sent successfully");
+      setSelectedCommand("");
       fetchExecutorDetails();
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('Failed to send command');
+      const err =
+        error instanceof Error ? error : new Error("Failed to send command");
       toast.error(err.message);
     } finally {
       setSendingCommand(false);
@@ -166,12 +168,14 @@ export default function ExecutorDetailPage({
 
   const getStatusBadge = (status: string) => {
     const styles = {
-      online: 'bg-green-100 text-green-800',
-      offline: 'bg-red-100 text-red-800',
-      error: 'bg-yellow-100 text-yellow-800',
+      online: "bg-green-100 text-green-800",
+      offline: "bg-red-100 text-red-800",
+      error: "bg-yellow-100 text-yellow-800",
     };
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status as keyof typeof styles] || styles.offline}`}>
+      <span
+        className={`px-3 py-1 rounded-full text-sm font-medium ${styles[status as keyof typeof styles] || styles.offline}`}
+      >
         {status.charAt(0).toUpperCase() + status.slice(1)}
       </span>
     );
@@ -179,12 +183,14 @@ export default function ExecutorDetailPage({
 
   const getCommandStatusBadge = (status: string) => {
     const styles = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      executed: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
+      pending: "bg-yellow-100 text-yellow-800",
+      executed: "bg-green-100 text-green-800",
+      failed: "bg-red-100 text-red-800",
     };
     return (
-      <span className={`px-2 py-0.5 rounded text-xs font-medium ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800'}`}>
+      <span
+        className={`px-2 py-0.5 rounded text-xs font-medium ${styles[status as keyof typeof styles] || "bg-gray-100 text-gray-800"}`}
+      >
         {status}
       </span>
     );
@@ -209,7 +215,7 @@ export default function ExecutorDetailPage({
           Back to Executors
         </Link>
         <CardError
-          error={error || new Error('Executor not found')}
+          error={error || new Error("Executor not found")}
           retry={fetchExecutorDetails}
         />
       </div>
@@ -232,14 +238,18 @@ export default function ExecutorDetailPage({
             <div className="mt-1">{getStatusIcon(executor.isConnected)}</div>
             <div>
               <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-neutral-900">{executor.name}</h1>
+                <h1 className="text-3xl font-bold text-neutral-900">
+                  {executor.name}
+                </h1>
                 <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-sm rounded-full font-medium">
                   {executor.platform}
                 </span>
                 {getStatusBadge(executor.status)}
               </div>
               <p className="text-neutral-600">
-                {executor.isConnected ? 'Connected and ready' : 'Disconnected - waiting for heartbeat'}
+                {executor.isConnected
+                  ? "Connected and ready"
+                  : "Disconnected - waiting for heartbeat"}
               </p>
             </div>
           </div>
@@ -250,22 +260,28 @@ export default function ExecutorDetailPage({
       <div className="grid gap-4 md:grid-cols-4">
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <p className="text-sm text-neutral-600 mb-1">Status</p>
-          <p className="text-xl font-bold text-neutral-900 capitalize">{executor.status}</p>
+          <p className="text-xl font-bold text-neutral-900 capitalize">
+            {executor.status}
+          </p>
         </div>
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <p className="text-sm text-neutral-600 mb-1">Total Trades</p>
-          <p className="text-xl font-bold text-neutral-900">{executor._count?.trades || 0}</p>
+          <p className="text-xl font-bold text-neutral-900">
+            {executor._count?.trades || 0}
+          </p>
         </div>
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <p className="text-sm text-neutral-600 mb-1">Commands Sent</p>
-          <p className="text-xl font-bold text-neutral-900">{executor._count?.commands || 0}</p>
+          <p className="text-xl font-bold text-neutral-900">
+            {executor._count?.commands || 0}
+          </p>
         </div>
         <div className="rounded-lg border border-neutral-200 bg-white p-4">
           <p className="text-sm text-neutral-600 mb-1">Last Heartbeat</p>
           <p className="text-sm font-semibold text-neutral-900">
             {executor.lastHeartbeat
               ? new Date(executor.lastHeartbeat).toLocaleString()
-              : 'Never'}
+              : "Never"}
           </p>
         </div>
       </div>
@@ -279,8 +295,9 @@ export default function ExecutorDetailPage({
               Executor Offline
             </h4>
             <p className="text-sm text-yellow-700">
-              This executor hasn't sent a heartbeat in the last 5 minutes. Make sure the
-              executor application is running and has a valid internet connection.
+              This executor hasn't sent a heartbeat in the last 5 minutes. Make
+              sure the executor application is running and has a valid internet
+              connection.
             </p>
           </div>
         </div>
@@ -297,22 +314,30 @@ export default function ExecutorDetailPage({
           <div className="space-y-3 text-sm">
             <div className="flex justify-between py-2 border-b border-neutral-100">
               <span className="text-neutral-600">Executor ID</span>
-              <span className="font-medium text-neutral-900">{executor.id}</span>
+              <span className="font-medium text-neutral-900">
+                {executor.id}
+              </span>
             </div>
             <div className="flex justify-between py-2 border-b border-neutral-100">
               <span className="text-neutral-600">Platform</span>
-              <span className="font-medium text-neutral-900">{executor.platform}</span>
+              <span className="font-medium text-neutral-900">
+                {executor.platform}
+              </span>
             </div>
             {executor.brokerServer && (
               <div className="flex justify-between py-2 border-b border-neutral-100">
                 <span className="text-neutral-600">Broker Server</span>
-                <span className="font-medium text-neutral-900">{executor.brokerServer}</span>
+                <span className="font-medium text-neutral-900">
+                  {executor.brokerServer}
+                </span>
               </div>
             )}
             {executor.accountNumber && (
               <div className="flex justify-between py-2 border-b border-neutral-100">
                 <span className="text-neutral-600">Account Number</span>
-                <span className="font-medium text-neutral-900">{executor.accountNumber}</span>
+                <span className="font-medium text-neutral-900">
+                  {executor.accountNumber}
+                </span>
               </div>
             )}
             <div className="flex justify-between py-2 border-b border-neutral-100">
@@ -351,7 +376,9 @@ export default function ExecutorDetailPage({
             </div>
             <button
               onClick={handleSendCommand}
-              disabled={!selectedCommand || sendingCommand || !executor.isConnected}
+              disabled={
+                !selectedCommand || sendingCommand || !executor.isConnected
+              }
               className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary-600 px-6 py-3 text-white font-semibold hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {sendingCommand ? (
@@ -382,34 +409,55 @@ export default function ExecutorDetailPage({
           Recent Commands
         </h2>
         {recentCommands.length === 0 ? (
-          <p className="text-center text-neutral-600 py-8">No commands sent yet</p>
+          <p className="text-center text-neutral-600 py-8">
+            No commands sent yet
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-neutral-200">
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Command</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Priority</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Created At</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Executed At</th>
+                  <th className="text-left py-3 px-4 font-medium text-neutral-600">
+                    Command
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-neutral-600">
+                    Priority
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-neutral-600">
+                    Status
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-neutral-600">
+                    Created At
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-neutral-600">
+                    Executed At
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {recentCommands.map((command) => (
-                  <tr key={command.id} className="border-b border-neutral-100 hover:bg-neutral-50">
-                    <td className="py-3 px-4 font-medium text-neutral-900">{command.command}</td>
+                  <tr
+                    key={command.id}
+                    className="border-b border-neutral-100 hover:bg-neutral-50"
+                  >
+                    <td className="py-3 px-4 font-medium text-neutral-900">
+                      {command.command}
+                    </td>
                     <td className="py-3 px-4">
                       <span className="text-xs px-2 py-0.5 rounded bg-neutral-100 text-neutral-700">
                         {command.priority}
                       </span>
                     </td>
-                    <td className="py-3 px-4">{getCommandStatusBadge(command.status)}</td>
+                    <td className="py-3 px-4">
+                      {getCommandStatusBadge(command.status)}
+                    </td>
                     <td className="py-3 px-4 text-neutral-600">
                       {new Date(command.createdAt).toLocaleString()}
                     </td>
                     <td className="py-3 px-4 text-neutral-600">
-                      {command.executedAt ? new Date(command.executedAt).toLocaleString() : '-'}
+                      {command.executedAt
+                        ? new Date(command.executedAt).toLocaleString()
+                        : "-"}
                     </td>
                   </tr>
                 ))}
@@ -426,29 +474,54 @@ export default function ExecutorDetailPage({
           Recent Trades
         </h2>
         {recentTrades.length === 0 ? (
-          <p className="text-center text-neutral-600 py-8">No trades executed yet</p>
+          <p className="text-center text-neutral-600 py-8">
+            No trades executed yet
+          </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-neutral-200">
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Symbol</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Type</th>
-                  <th className="text-left py-3 px-4 font-medium text-neutral-600">Strategy</th>
-                  <th className="text-right py-3 px-4 font-medium text-neutral-600">Lots</th>
-                  <th className="text-right py-3 px-4 font-medium text-neutral-600">Open Price</th>
-                  <th className="text-right py-3 px-4 font-medium text-neutral-600">Close Price</th>
-                  <th className="text-right py-3 px-4 font-medium text-neutral-600">Profit</th>
+                  <th className="text-left py-3 px-4 font-medium text-neutral-600">
+                    Symbol
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-neutral-600">
+                    Type
+                  </th>
+                  <th className="text-left py-3 px-4 font-medium text-neutral-600">
+                    Strategy
+                  </th>
+                  <th className="text-right py-3 px-4 font-medium text-neutral-600">
+                    Lots
+                  </th>
+                  <th className="text-right py-3 px-4 font-medium text-neutral-600">
+                    Open Price
+                  </th>
+                  <th className="text-right py-3 px-4 font-medium text-neutral-600">
+                    Close Price
+                  </th>
+                  <th className="text-right py-3 px-4 font-medium text-neutral-600">
+                    Profit
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {recentTrades.map((trade) => (
-                  <tr key={trade.id} className="border-b border-neutral-100 hover:bg-neutral-50">
-                    <td className="py-3 px-4 font-medium text-neutral-900">{trade.symbol}</td>
+                  <tr
+                    key={trade.id}
+                    className="border-b border-neutral-100 hover:bg-neutral-50"
+                  >
+                    <td className="py-3 px-4 font-medium text-neutral-900">
+                      {trade.symbol}
+                    </td>
                     <td className="py-3 px-4">
-                      <span className={`text-xs px-2 py-0.5 rounded ${
-                        trade.type === 'BUY' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
+                      <span
+                        className={`text-xs px-2 py-0.5 rounded ${
+                          trade.type === "BUY"
+                            ? "bg-green-100 text-green-800"
+                            : "bg-red-100 text-red-800"
+                        }`}
+                      >
                         {trade.type}
                       </span>
                     </td>
@@ -460,17 +533,23 @@ export default function ExecutorDetailPage({
                         {trade.strategy.name}
                       </Link>
                     </td>
-                    <td className="py-3 px-4 text-right text-neutral-900">{trade.lots}</td>
+                    <td className="py-3 px-4 text-right text-neutral-900">
+                      {trade.lots}
+                    </td>
                     <td className="py-3 px-4 text-right text-neutral-900">
                       {trade.openPrice.toFixed(5)}
                     </td>
                     <td className="py-3 px-4 text-right text-neutral-900">
-                      {trade.closePrice ? trade.closePrice.toFixed(5) : 'Open'}
+                      {trade.closePrice ? trade.closePrice.toFixed(5) : "Open"}
                     </td>
-                    <td className={`py-3 px-4 text-right font-semibold ${
-                      (trade.profit || 0) >= 0 ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      {trade.profit ? `$${trade.profit.toFixed(2)}` : '-'}
+                    <td
+                      className={`py-3 px-4 text-right font-semibold ${
+                        (trade.profit || 0) >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    >
+                      {trade.profit ? `$${trade.profit.toFixed(2)}` : "-"}
                     </td>
                   </tr>
                 ))}

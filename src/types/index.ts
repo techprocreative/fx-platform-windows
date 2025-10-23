@@ -29,11 +29,11 @@ export interface StrategyRule {
 
 export interface EntryRules {
   conditions: StrategyRule[];
-  logic: 'AND' | 'OR';
+  logic: "AND" | "OR";
 }
 
 export interface ExitLevels {
-  type: 'pips' | 'percentage' | 'atr';
+  type: "pips" | "percentage" | "atr";
   value: number;
 }
 
@@ -47,11 +47,11 @@ export interface DynamicRiskParams {
   // Position sizing based on ATR
   useATRSizing: boolean;
   atrMultiplier: number; // 1-3x ATR for stop loss
-  
+
   // Account-based sizing
   riskPercentage: number; // 1-2% per trade
   autoAdjustLotSize: boolean;
-  
+
   // Volatility adjustment
   reduceInHighVolatility: boolean;
   volatilityThreshold: number;
@@ -69,20 +69,20 @@ export type SizingMethod =
 export interface PositionSizingConfig {
   /** Primary position sizing method */
   method: SizingMethod;
-  
+
   /** Fixed lot size configuration */
   fixedLot?: {
     lotSize: number;
     maxPositions: number;
   };
-  
+
   /** Percentage risk configuration */
   percentageRisk?: {
     riskPercentage: number; // 1-2% per trade
     maxRiskPerTrade: number;
     maxDailyRisk: number;
   };
-  
+
   /** ATR-based configuration */
   atrBased?: {
     atrMultiplier: number; // 1-3x ATR for stop loss
@@ -91,7 +91,7 @@ export interface PositionSizingConfig {
     minATR: number;
     maxATR: number;
   };
-  
+
   /** Volatility-based configuration */
   volatilityBased?: {
     volatilityPeriod: number;
@@ -99,7 +99,7 @@ export interface PositionSizingConfig {
     riskPercentage: number;
     maxVolatilityThreshold: number;
   };
-  
+
   /** Kelly criterion configuration */
   kellyCriterion?: {
     winRate: number; // Historical win rate (0-1)
@@ -108,7 +108,7 @@ export interface PositionSizingConfig {
     kellyFraction: number; // Fraction of Kelly to use (0.25-0.5)
     maxPositionSize: number;
   };
-  
+
   /** Account equity-based configuration */
   accountEquity?: {
     equityPercentage: number; // % of account equity to risk
@@ -116,12 +116,12 @@ export interface PositionSizingConfig {
     maxDrawdown: number;
     equityCurveAdjustment: boolean;
   };
-  
+
   /** Common settings */
   maxPositionSize: number;
   minPositionSize: number;
   positionSizeStep: number;
-  
+
   /** Risk limits */
   maxDailyLoss: number;
   maxDrawdown: number;
@@ -131,34 +131,34 @@ export interface PositionSizingConfig {
 export interface PositionSizingResult {
   /** Calculated position size in lots */
   positionSize: number;
-  
+
   /** Risk amount in account currency */
   riskAmount: number;
-  
+
   /** Risk percentage of account */
   riskPercentage: number;
-  
+
   /** Stop loss distance in pips */
   stopLossPips: number;
-  
+
   /** Stop loss price */
   stopLossPrice: number;
-  
+
   /** Take profit price (if calculated) */
   takeProfitPrice?: number;
-  
+
   /** Risk-reward ratio */
   riskRewardRatio: number;
-  
+
   /** Confidence score (0-100) */
   confidence: number;
-  
+
   /** Warnings and recommendations */
   warnings: string[];
-  
+
   /** Calculation method used */
   method: SizingMethod;
-  
+
   /** Additional metadata */
   metadata: {
     accountBalance: number;
@@ -174,17 +174,17 @@ export interface PositionSizingParams {
   /** Account information */
   accountBalance: number;
   accountEquity?: number;
-  
+
   /** Trade information */
   symbol: string;
   entryPrice: number;
   tradeType: "BUY" | "SELL";
-  
+
   /** Market data */
   currentATR?: number;
   volatility?: number;
   spread?: number;
-  
+
   /** Historical performance (for Kelly criterion) */
   historicalData?: {
     winRate: number;
@@ -192,17 +192,17 @@ export interface PositionSizingParams {
     avgLoss: number;
     totalTrades: number;
   };
-  
+
   /** Current positions */
   openPositions?: Array<{
     symbol: string;
     lotSize: number;
     profit: number;
   }>;
-  
+
   /** Daily performance */
   dailyPnL?: number;
-  
+
   /** Configuration */
   config: PositionSizingConfig;
 }
@@ -210,7 +210,7 @@ export interface PositionSizingParams {
 // Market Session Types
 export interface MarketSessionInfo {
   start: string; // HH:mm format in UTC
-  end: string;   // HH:mm format in UTC
+  end: string; // HH:mm format in UTC
   pairs: string[];
   description: string;
 }
@@ -227,7 +227,7 @@ export interface SessionFilter {
   allowedSessions: Array<keyof MarketSessions>;
   useOptimalPairs: boolean;
   aggressivenessMultiplier: {
-    optimal: number;    // Multiplier when trading optimal session/pair
+    optimal: number; // Multiplier when trading optimal session/pair
     suboptimal: number; // Multiplier when trading suboptimal session/pair
   };
 }
@@ -255,10 +255,10 @@ export interface CorrelationFilter {
   enabled: boolean;
   maxCorrelation: number; // 0.7 = skip if pairs >70% correlated
   checkPairs: string[];
-  
+
   // Don't open EURUSD if already in GBPUSD (high correlation)
   skipHighlyCorrelated: boolean;
-  
+
   // Advanced correlation settings
   timeframes: string[]; // Multiple timeframes for correlation analysis
   lookbackPeriod: number; // Days to look back for correlation calculation
@@ -288,7 +288,7 @@ export interface CorrelationData {
   pValue: number; // Statistical significance
   sampleSize: number; // Number of data points used
   lastUpdated: Date;
-  trend: 'increasing' | 'decreasing' | 'stable';
+  trend: "increasing" | "decreasing" | "stable";
   changeRate: number; // Rate of change in correlation over time
   standardError?: number; // Standard error for confidence intervals
 }
@@ -316,7 +316,7 @@ export interface CorrelationAnalysisResult {
     correlation: number;
     positionSize: number;
   }>;
-  recommendedAction: 'proceed' | 'skip' | 'reduce_size';
+  recommendedAction: "proceed" | "skip" | "reduce_size";
   adjustedPositionSize?: number;
   confidence: number;
 }
@@ -335,7 +335,7 @@ export interface HistoricalCorrelation {
     stdDev: number;
     min: number;
     max: number;
-    trend: 'increasing' | 'decreasing' | 'stable';
+    trend: "increasing" | "decreasing" | "stable";
   };
 }
 
@@ -343,24 +343,24 @@ export interface HistoricalCorrelation {
 export interface SmartExitRules {
   stopLoss: {
     type: "fixed" | "atr" | "support" | "trailing";
-    
+
     // ATR-based stops
     atrMultiplier?: number;
-    
+
     // Structure-based stops
     useSwingPoints?: boolean;
     swingLookback?: number;
-    
+
     // Time-based stops
     maxHoldingHours?: number;
   };
-  
+
   takeProfit: {
     type: "fixed" | "rr_ratio" | "resistance" | "partial";
-    
+
     // Risk-reward based
     rrRatio?: number; // 1:2, 1:3, etc.
-    
+
     // Partial TP
     partialExits?: {
       percentage: number;
@@ -373,7 +373,7 @@ export interface SmartExitRules {
 export interface SwingPoint {
   timestamp: Date;
   price: number;
-  type: 'high' | 'low';
+  type: "high" | "low";
   strength: number; // 1-5, higher is stronger
 }
 
@@ -388,7 +388,7 @@ export interface SwingPointAnalysis {
 // Exit Calculation Types
 export interface ExitCalculationParams {
   entryPrice: number;
-  tradeType: 'BUY' | 'SELL';
+  tradeType: "BUY" | "SELL";
   atr?: number;
   swingPoints?: SwingPoint[];
   currentPrice?: number;
@@ -421,7 +421,7 @@ export interface ExitCalculationResult {
 export interface ExitExecution {
   id: string;
   tradeId: string;
-  type: 'STOP_LOSS' | 'TAKE_PROFIT' | 'PARTIAL' | 'MANUAL';
+  type: "STOP_LOSS" | "TAKE_PROFIT" | "PARTIAL" | "MANUAL";
   price: number;
   quantity: number;
   timestamp: Date;
@@ -432,14 +432,14 @@ export interface ExitExecution {
 export interface ExitRule {
   id: string;
   name: string;
-  type: 'stop_loss' | 'take_profit' | 'partial';
+  type: "stop_loss" | "take_profit" | "partial";
   condition: {
-    type: 'price' | 'time' | 'atr' | 'swing' | 'trailing';
+    type: "price" | "time" | "atr" | "swing" | "trailing";
     value: number;
-    operator: 'gt' | 'lt' | 'eq' | 'gte' | 'lte';
+    operator: "gt" | "lt" | "eq" | "gte" | "lte";
   };
   action: {
-    type: 'close' | 'partial';
+    type: "close" | "partial";
     percentage?: number;
   };
   isActive: boolean;
@@ -454,14 +454,26 @@ export interface Strategy {
   description?: string;
   symbol: string;
   timeframe: string;
-  type: 'manual' | 'ai_generated' | 'imported';
-  status: 'draft' | 'active' | 'paused' | 'archived';
+  type: "manual" | "ai_generated" | "imported";
+  status: "draft" | "active" | "paused" | "archived";
   rules: StrategyRules;
   version: number;
   aiPrompt?: string;
   isPublic: boolean;
   createdAt: Date;
   updatedAt: Date;
+  parameters?: {
+    stopLoss?: number;
+    takeProfit?: number;
+    riskPerTrade?: number;
+    maxPositions?: number;
+    maxDailyLoss?: number;
+    smartExit?: boolean;
+    dynamicRisk?: boolean;
+    sessionFilter?: boolean;
+    correlationFilter?: boolean;
+    regimeDetection?: boolean;
+  };
 }
 
 // Multi-Timeframe Strategy Types
@@ -509,8 +521,8 @@ export interface MTFStrategy {
   symbol: string;
   primaryTimeframe: string;
   confirmationTimeframes: string[];
-  type: 'manual' | 'ai_generated' | 'imported' | 'mtf';
-  status: 'draft' | 'active' | 'paused' | 'archived';
+  type: "manual" | "ai_generated" | "imported" | "mtf";
+  status: "draft" | "active" | "paused" | "archived";
   rules: MTFStrategyRules;
   version: number;
   aiPrompt?: string;
@@ -546,7 +558,7 @@ export interface MTFAnalysisResult {
 }
 
 export interface MTFBacktestConfig extends BacktestConfig {
-  strategyType: 'mtf';
+  strategyType: "mtf";
   primaryTimeframe: string;
   confirmationTimeframes: string[];
 }
@@ -571,7 +583,7 @@ export interface BacktestTrade {
   id: number;
   openTime: Date;
   closeTime: Date;
-  type: 'BUY' | 'SELL';
+  type: "BUY" | "SELL";
   lots: number;
   openPrice: number;
   closePrice: number;
@@ -581,7 +593,7 @@ export interface BacktestTrade {
 
 export interface BacktestResults {
   backtestId: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: "pending" | "running" | "completed" | "failed";
   initialBalance: number;
   finalBalance: number;
   totalReturn: number;
@@ -627,7 +639,7 @@ export interface PaginationParams {
   page: number;
   limit: number;
   sort?: string;
-  order?: 'asc' | 'desc';
+  order?: "asc" | "desc";
 }
 
 export interface PaginatedResponse<T> {
@@ -659,7 +671,7 @@ export interface StrategyScore {
   riskAdjusted: number; // Sharpe/Sortino ratio
   drawdown: number; // Max DD score
   overall: number; // Weighted average
-  
+
   recommendations: string[];
   warnings: string[];
 }
@@ -671,29 +683,29 @@ export interface ScoringMetrics {
   averageWin: number;
   averageLoss: number;
   expectancy: number;
-  
+
   // Consistency metrics
   winRate: number;
   winRateStability: number;
   consecutiveWins: number;
   consecutiveLosses: number;
-  
+
   // Risk-adjusted metrics
   sharpeRatio: number;
   sortinoRatio: number;
   calmarRatio: number;
-  
+
   // Drawdown metrics
   maxDrawdown: number;
   maxDrawdownPercent: number;
   drawdownDuration: number;
   recoveryFactor: number;
-  
+
   // Trading frequency metrics
   totalTrades: number;
   tradesPerMonth: number;
   averageTradeDuration: number;
-  
+
   // Additional metrics for scoring
   var95: number; // Value at Risk 95%
   skewness: number;
@@ -777,7 +789,7 @@ export enum MarketRegime {
   TRENDING_UP = "trending_up",
   TRENDING_DOWN = "trending_down",
   RANGING = "ranging",
-  VOLATILE = "volatile"
+  VOLATILE = "volatile",
 }
 
 export interface RegimeDetectionResult {
@@ -811,7 +823,7 @@ export interface RegimeHistory {
     timestamp: Date;
     regime: MarketRegime;
     confidence: number;
-    metadata: RegimeDetectionResult['metadata'];
+    metadata: RegimeDetectionResult["metadata"];
   }>;
   transitions: RegimeTransition[];
   statistics: {
@@ -823,7 +835,7 @@ export interface RegimeHistory {
 
 export interface RegimeAdapter {
   detectRegime(symbol: string, timeframe: string): Promise<MarketRegime>;
-  
+
   adjustStrategy(regime: MarketRegime): {
     entryThreshold: number; // Stricter in ranging
     positionSize: number; // Smaller in volatile
@@ -833,42 +845,49 @@ export interface RegimeAdapter {
     maxTradesPerDay?: number; // Reduced in volatile
     sessionFilterMultiplier?: number; // Adjust per regime
   };
-  
+
   getRegimeConfidence(symbol: string, timeframe: string): Promise<number>;
-  
-  getRegimeHistory(symbol: string, timeframe: string, days?: number): Promise<RegimeHistory>;
-  
-  detectTransition(symbol: string, timeframe: string): Promise<RegimeTransition | null>;
+
+  getRegimeHistory(
+    symbol: string,
+    timeframe: string,
+    days?: number,
+  ): Promise<RegimeHistory>;
+
+  detectTransition(
+    symbol: string,
+    timeframe: string,
+  ): Promise<RegimeTransition | null>;
 }
 
 export interface RegimeDetectionConfig {
   // Trend detection parameters
   trendPeriod: number;
   trendThreshold: number;
-  
+
   // Volatility detection parameters
   volatilityPeriod: number;
   volatilityThreshold: number;
-  
+
   // Range detection parameters
   rangePeriod: number;
   rangeThreshold: number;
-  
+
   // Multi-timeframe analysis
   enableMTFAnalysis: boolean;
   primaryTimeframe: string;
   confirmationTimeframes: string[];
-  
+
   // Confidence calculation
   minConfidence: number;
   weightTrend: number;
   weightVolatility: number;
   weightRange: number;
-  
+
   // Historical analysis
   lookbackPeriod: number; // days
   minDataPoints: number;
-  
+
   // Real-time updates
   updateFrequency: number; // minutes
   enableTransitionDetection: boolean;
@@ -878,26 +897,29 @@ export interface RegimeAdjustedStrategy {
   originalStrategy: Strategy;
   adjustedStrategy: Strategy;
   currentRegime: MarketRegime;
-  adjustments: RegimeAdapter['adjustStrategy'];
+  adjustments: RegimeAdapter["adjustStrategy"];
   confidence: number;
   timestamp: Date;
 }
 
 export interface RegimeBasedRiskParams {
   // Risk adjustments per regime
-  regimeRiskMultipliers: Record<MarketRegime, {
-    positionSize: number;
-    stopLoss: number;
-    takeProfit: number;
-    maxDrawdown: number;
-    maxDailyLoss: number;
-  }>;
-  
+  regimeRiskMultipliers: Record<
+    MarketRegime,
+    {
+      positionSize: number;
+      stopLoss: number;
+      takeProfit: number;
+      maxDrawdown: number;
+      maxDailyLoss: number;
+    }
+  >;
+
   // Dynamic risk adjustments
   reduceInVolatile: boolean;
   increaseInTrending: boolean;
   useRegimeTransitions: boolean;
-  
+
   // Risk limits
   maxPositionSizePerRegime: Record<MarketRegime, number>;
   maxExposurePerRegime: Record<MarketRegime, number>;
@@ -925,49 +947,49 @@ export interface PartialExitLevel {
   id: string;
   name: string;
   percentage: number; // Percentage of position to close (0-100)
-  triggerType: 'profit' | 'time' | 'price' | 'atr' | 'trailing' | 'regime';
-  
+  triggerType: "profit" | "time" | "price" | "atr" | "trailing" | "regime";
+
   // Profit-based triggers
   profitTarget?: {
-    type: 'pips' | 'percentage' | 'rr_ratio' | 'amount';
+    type: "pips" | "percentage" | "rr_ratio" | "amount";
     value: number;
   };
-  
+
   // Time-based triggers
   timeTarget?: {
-    type: 'duration' | 'specific_time' | 'session_end';
+    type: "duration" | "specific_time" | "session_end";
     value: number; // minutes for duration, HH:mm for specific_time
-    sessionType?: 'sydney' | 'tokyo' | 'london' | 'newyork' | 'any';
+    sessionType?: "sydney" | "tokyo" | "london" | "newyork" | "any";
   };
-  
+
   // Price-based triggers
   priceTarget?: {
-    type: 'absolute' | 'relative' | 'support' | 'resistance';
+    type: "absolute" | "relative" | "support" | "resistance";
     value: number;
     lookback?: number; // for support/resistance
   };
-  
+
   // ATR-based triggers
   atrTarget?: {
     multiplier: number;
-    direction: 'profit' | 'loss';
+    direction: "profit" | "loss";
   };
-  
+
   // Trailing triggers
   trailingTarget?: {
     distance: number;
-    distanceType: 'pips' | 'percentage' | 'atr';
+    distanceType: "pips" | "percentage" | "atr";
     activationPoint: number; // When to start trailing
-    activationType: 'pips' | 'percentage' | 'rr_ratio';
+    activationType: "pips" | "percentage" | "rr_ratio";
   };
-  
+
   // Market regime triggers
   regimeTarget?: {
     regime: MarketRegime;
     confidence: number; // Minimum confidence required
-    action: 'partial_exit' | 'full_exit' | 'skip';
+    action: "partial_exit" | "full_exit" | "skip";
   };
-  
+
   // Advanced settings
   conditions?: {
     requireConfirmation?: boolean;
@@ -976,14 +998,14 @@ export interface PartialExitLevel {
     maxSpread?: number;
     minVolume?: number;
   };
-  
+
   // Dynamic adjustments
   dynamicAdjustments?: {
     volatilityScaling: boolean;
     timeScaling: boolean;
     regimeScaling: boolean;
   };
-  
+
   isActive: boolean;
   priority: number; // Lower number = higher priority
   description?: string;
@@ -991,30 +1013,30 @@ export interface PartialExitLevel {
 
 export interface EnhancedPartialExitConfig {
   enabled: boolean;
-  strategy: 'sequential' | 'parallel' | 'conditional';
-  
+  strategy: "sequential" | "parallel" | "conditional";
+
   // Exit levels configuration
   levels: PartialExitLevel[];
-  
+
   // Global settings
   globalSettings: {
     allowReentry: boolean;
     minRemainingPosition: number; // Minimum position to keep (percentage)
     maxDailyPartialExits: number;
     cooldownPeriod: number; // Minutes between partial exits
-    
+
     // Risk management
     reduceInHighVolatility: boolean;
     volatilityThreshold: number;
     adjustForSpread: boolean;
     maxSpreadPercentage: number;
-    
+
     // Time-based settings
     respectMarketSessions: boolean;
     avoidNewsEvents: boolean;
     newsBufferMinutes: number;
   };
-  
+
   // Performance tracking
   performanceTracking: {
     enabled: boolean;
@@ -1022,7 +1044,7 @@ export interface EnhancedPartialExitConfig {
     optimizeLevels: boolean;
     lookbackPeriod: number; // Days for optimization
   };
-  
+
   // Integration with existing systems
   integration: {
     withSmartExits: boolean;
@@ -1037,19 +1059,19 @@ export interface PartialExitExecution {
   tradeId: string;
   levelId: string;
   levelName: string;
-  
+
   // Execution details
   timestamp: Date;
   price: number;
   quantity: number; // Amount closed
   percentage: number; // Percentage of original position
   remainingQuantity: number;
-  
+
   // Trigger information
-  triggerType: PartialExitLevel['triggerType'];
+  triggerType: PartialExitLevel["triggerType"];
   triggerValue: number;
   triggerReason: string;
-  
+
   // Market context
   marketContext: {
     regime: MarketRegime;
@@ -1057,20 +1079,20 @@ export interface PartialExitExecution {
     spread: number;
     session: string;
   };
-  
+
   // Performance metrics
   realizedProfit: number;
   unrealizedProfit: number;
   totalProfit: number;
   riskReduction: number;
-  
+
   // Execution quality
   executionQuality: {
     slippage: number;
     executionTime: number; // milliseconds
     priceImprovement: number;
   };
-  
+
   // Metadata
   metadata: {
     confidence: number;
@@ -1082,38 +1104,41 @@ export interface PartialExitExecution {
 export interface PartialExitPerformance {
   levelId: string;
   levelName: string;
-  
+
   // Performance metrics
   totalExecutions: number;
   successRate: number;
   averageProfit: number;
   totalProfit: number;
   riskReduction: number;
-  
+
   // Timing metrics
   averageTimeToExecution: number; // minutes
   bestTimeToExecute: string; // session/time
   worstTimeToExecute: string;
-  
+
   // Market context performance
-  performanceByRegime: Record<MarketRegime, {
-    executions: number;
-    successRate: number;
-    avgProfit: number;
-  }>;
-  
+  performanceByRegime: Record<
+    MarketRegime,
+    {
+      executions: number;
+      successRate: number;
+      avgProfit: number;
+    }
+  >;
+
   // Optimization suggestions
   suggestions: Array<{
-    type: 'adjust_percentage' | 'adjust_trigger' | 'adjust_timing' | 'disable';
+    type: "adjust_percentage" | "adjust_trigger" | "adjust_timing" | "disable";
     currentValue: number;
     suggestedValue: number;
     expectedImprovement: number;
     confidence: number;
   }>;
-  
+
   // Historical data
   history: PartialExitExecution[];
-  
+
   // Last updated
   lastUpdated: Date;
 }
@@ -1124,33 +1149,33 @@ export interface PartialExitCalculationParams {
   symbol: string;
   entryPrice: number;
   currentPrice: number;
-  tradeType: 'BUY' | 'SELL';
+  tradeType: "BUY" | "SELL";
   originalQuantity: number;
   remainingQuantity: number;
   entryTime: Date;
-  
+
   // Market data
   atr?: number;
   volatility?: number;
   spread?: number;
   volume?: number;
-  
+
   // Market context
   currentRegime?: MarketRegime;
   regimeConfidence?: number;
   currentSession?: string;
-  
+
   // Historical performance
   historicalPerformance?: PartialExitPerformance[];
-  
+
   // Configuration
   config: EnhancedPartialExitConfig;
-  
+
   // Additional context
   metadata?: {
     newsEvents?: Array<{
       time: Date;
-      impact: 'low' | 'medium' | 'high';
+      impact: "low" | "medium" | "high";
       currency: string;
     }>;
     correlationData?: CorrelationAnalysisResult;
@@ -1169,24 +1194,24 @@ export interface PartialExitCalculationResult {
     price?: number;
     reason: string;
     confidence: number;
-    urgency: 'low' | 'medium' | 'high' | 'immediate';
+    urgency: "low" | "medium" | "high" | "immediate";
   }>;
-  
+
   // Analysis
   analysis: {
     currentProfit: number;
     currentProfitPercentage: number;
     unrealizedProfit: number;
     riskExposure: number;
-    
+
     // Market analysis
     marketConditions: {
       regime: MarketRegime;
-      volatility: 'low' | 'normal' | 'high';
-      trend: 'up' | 'down' | 'sideways';
+      volatility: "low" | "normal" | "high";
+      trend: "up" | "down" | "sideways";
       strength: number;
     };
-    
+
     // Risk analysis
     riskMetrics: {
       currentRisk: number;
@@ -1195,7 +1220,7 @@ export interface PartialExitCalculationResult {
       stopLossDistance: number;
     };
   };
-  
+
   // Performance predictions
   predictions: {
     expectedProfit: number;
@@ -1203,11 +1228,11 @@ export interface PartialExitCalculationResult {
     riskReduction: number;
     optimalExitTiming: Date;
   };
-  
+
   // Warnings and recommendations
   warnings: string[];
   recommendations: string[];
-  
+
   // Metadata
   timestamp: Date;
   calculationTime: number; // milliseconds
@@ -1216,7 +1241,7 @@ export interface PartialExitCalculationResult {
 export interface PartialExitOptimizationResult {
   // Optimized configuration
   optimizedConfig: EnhancedPartialExitConfig;
-  
+
   // Performance comparison
   performanceComparison: {
     before: {
@@ -1238,7 +1263,7 @@ export interface PartialExitOptimizationResult {
       sharpeImprovement: number;
     };
   };
-  
+
   // Optimization details
   optimizationDetails: {
     algorithm: string;
@@ -1246,7 +1271,7 @@ export interface PartialExitOptimizationResult {
     convergenceTime: number;
     parametersOptimized: string[];
   };
-  
+
   // Validation results
   validation: {
     backtestPeriod: {
@@ -1260,15 +1285,15 @@ export interface PartialExitOptimizationResult {
     };
     robustnessScore: number;
   };
-  
+
   // Recommendations
   recommendations: Array<{
-    type: 'configuration' | 'risk_management' | 'timing';
+    type: "configuration" | "risk_management" | "timing";
     description: string;
     expectedImpact: number;
-    implementationComplexity: 'low' | 'medium' | 'high';
+    implementationComplexity: "low" | "medium" | "high";
   }>;
-  
+
   timestamp: Date;
 }
 
@@ -1304,18 +1329,18 @@ export interface AnalyticsWidget {
 }
 
 export type WidgetType =
-  | 'performance_overview'
-  | 'equity_curve'
-  | 'monthly_performance'
-  | 'win_rate_analysis'
-  | 'risk_metrics'
-  | 'strategy_comparison'
-  | 'performance_trends'
-  | 'drawdown_analysis'
-  | 'trade_distribution'
-  | 'symbol_performance'
-  | 'time_analysis'
-  | 'real_time_monitoring';
+  | "performance_overview"
+  | "equity_curve"
+  | "monthly_performance"
+  | "win_rate_analysis"
+  | "risk_metrics"
+  | "strategy_comparison"
+  | "performance_trends"
+  | "drawdown_analysis"
+  | "trade_distribution"
+  | "symbol_performance"
+  | "time_analysis"
+  | "real_time_monitoring";
 
 export interface WidgetPosition {
   x: number;
@@ -1337,20 +1362,20 @@ export interface WidgetConfig {
 }
 
 export type WidgetDataSource =
-  | 'trades'
-  | 'backtests'
-  | 'combined'
-  | 'real_time'
-  | 'custom';
+  | "trades"
+  | "backtests"
+  | "combined"
+  | "real_time"
+  | "custom";
 
-export type TimeFrame = '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | 'ALL';
-export type ChartType = 'line' | 'bar' | 'area' | 'pie' | 'scatter' | 'heatmap';
+export type TimeFrame = "1D" | "1W" | "1M" | "3M" | "6M" | "1Y" | "ALL";
+export type ChartType = "line" | "bar" | "area" | "pie" | "scatter" | "heatmap";
 
 export interface AnalyticsFilters {
   timeFrame: TimeFrame;
   strategies: string[];
   symbols: string[];
-  tradeType?: 'ALL' | 'BUY' | 'SELL';
+  tradeType?: "ALL" | "BUY" | "SELL";
   minProfit?: number;
   maxProfit?: number;
   dateRange?: {
@@ -1367,7 +1392,7 @@ export interface PerformanceMetrics {
   winRate: number;
   totalProfit: number;
   totalProfitPercent: number;
-  
+
   // Risk metrics
   maxDrawdown: number;
   maxDrawdownPercent: number;
@@ -1375,7 +1400,7 @@ export interface PerformanceMetrics {
   sortinoRatio: number;
   calmarRatio: number;
   profitFactor: number;
-  
+
   // Trade metrics
   averageWin: number;
   averageLoss: number;
@@ -1383,7 +1408,7 @@ export interface PerformanceMetrics {
   largestWin: number;
   largestLoss: number;
   averageHoldingTime: number;
-  
+
   // Advanced metrics
   expectancy: number;
   recoveryFactor: number;
@@ -1391,14 +1416,14 @@ export interface PerformanceMetrics {
   cvar95: number; // Conditional Value at Risk 95%
   riskOfRuin: number;
   kellyCriterion: number;
-  
+
   // Consistency metrics
   monthlyWinRate: number;
   quarterlyWinRate: number;
   yearlyWinRate: number;
   winRateStability: number;
   profitConsistency: number;
-  
+
   // Time-based metrics
   tradesPerMonth: number;
   tradesPerWeek: number;
@@ -1489,7 +1514,7 @@ export interface PerformanceTrend {
   value: number;
   change: number;
   changePercent: number;
-  trend: 'up' | 'down' | 'stable';
+  trend: "up" | "down" | "stable";
 }
 
 export interface RealTimePerformanceData {
@@ -1508,7 +1533,7 @@ export interface OpenPositionData {
   tradeId: string;
   strategyId: string;
   symbol: string;
-  direction: 'BUY' | 'SELL';
+  direction: "BUY" | "SELL";
   entryPrice: number;
   currentPrice: number;
   volume: number;
@@ -1523,7 +1548,7 @@ export interface TradeData {
   tradeId: string;
   strategyId: string;
   symbol: string;
-  direction: 'BUY' | 'SELL';
+  direction: "BUY" | "SELL";
   entryPrice: number;
   exitPrice: number;
   volume: number;
@@ -1535,9 +1560,9 @@ export interface TradeData {
 }
 
 export interface MarketStatus {
-  session: 'sydney' | 'tokyo' | 'london' | 'newyork' | 'closed';
+  session: "sydney" | "tokyo" | "london" | "newyork" | "closed";
   isOpen: boolean;
-  volatility: 'low' | 'normal' | 'high';
+  volatility: "low" | "normal" | "high";
   spread: number;
   nextOpen: Date;
   nextClose: Date;
@@ -1546,7 +1571,7 @@ export interface MarketStatus {
 export interface PerformanceAlert {
   id: string;
   type: AlertType;
-  severity: 'low' | 'medium' | 'high' | 'critical';
+  severity: "low" | "medium" | "high" | "critical";
   title: string;
   message: string;
   strategyId?: string;
@@ -1559,19 +1584,19 @@ export interface PerformanceAlert {
 }
 
 export type AlertType =
-  | 'drawdown'
-  | 'win_rate'
-  | 'profit_factor'
-  | 'sharpe_ratio'
-  | 'daily_loss'
-  | 'consecutive_losses'
-  | 'position_size'
-  | 'margin_call'
-  | 'strategy_inactive'
-  | 'market_volatility';
+  | "drawdown"
+  | "win_rate"
+  | "profit_factor"
+  | "sharpe_ratio"
+  | "daily_loss"
+  | "consecutive_losses"
+  | "position_size"
+  | "margin_call"
+  | "strategy_inactive"
+  | "market_volatility";
 
 export interface AnalyticsExportOptions {
-  format: 'pdf' | 'excel' | 'csv' | 'json';
+  format: "pdf" | "excel" | "csv" | "json";
   includeCharts: boolean;
   includeRawData: boolean;
   dateRange: {
@@ -1580,7 +1605,7 @@ export interface AnalyticsExportOptions {
   };
   strategies?: string[];
   metrics?: string[];
-  template?: 'standard' | 'detailed' | 'summary' | 'custom';
+  template?: "standard" | "detailed" | "summary" | "custom";
 }
 
 export interface AnalyticsReport {
@@ -1588,7 +1613,7 @@ export interface AnalyticsReport {
   userId: string;
   title: string;
   description?: string;
-  type: 'performance' | 'strategy' | 'risk' | 'custom';
+  type: "performance" | "strategy" | "risk" | "custom";
   format: string;
   generatedAt: Date;
   period: {
@@ -1598,14 +1623,14 @@ export interface AnalyticsReport {
   data: any;
   fileUrl?: string;
   fileSize?: number;
-  status: 'generating' | 'completed' | 'failed';
+  status: "generating" | "completed" | "failed";
   expiresAt?: Date;
 }
 
 export interface AnalyticsComparison {
   id: string;
   name: string;
-  type: 'strategy' | 'timeframe' | 'symbol' | 'custom';
+  type: "strategy" | "timeframe" | "symbol" | "custom";
   items: ComparisonItem[];
   metrics: string[];
   period: {
@@ -1619,7 +1644,7 @@ export interface AnalyticsComparison {
 export interface ComparisonItem {
   id: string;
   name: string;
-  type: 'strategy' | 'symbol' | 'timeframe';
+  type: "strategy" | "symbol" | "timeframe";
   metadata?: Record<string, any>;
 }
 
@@ -1636,7 +1661,7 @@ export interface ComparisonResult {
 export interface AnalyticsSubscription {
   id: string;
   userId: string;
-  type: 'performance' | 'trades' | 'positions' | 'alerts';
+  type: "performance" | "trades" | "positions" | "alerts";
   filters: AnalyticsFilters;
   active: boolean;
   createdAt: Date;
@@ -1644,7 +1669,7 @@ export interface AnalyticsSubscription {
 }
 
 export interface AnalyticsUpdateMessage {
-  type: 'performance_update' | 'trade_update' | 'position_update' | 'alert';
+  type: "performance_update" | "trade_update" | "position_update" | "alert";
   data: any;
   timestamp: Date;
   subscriptionId: string;

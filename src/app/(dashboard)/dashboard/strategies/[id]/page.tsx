@@ -56,7 +56,7 @@ export default function StrategyDetailPage({
   const [backtestsLoading, setBacktestsLoading] = useState(false);
   const [showActivateDialog, setShowActivateDialog] = useState(false);
   const [activating, setActivating] = useState(false);
-  
+
   // Optimization state
   const [optimizing, setOptimizing] = useState(false);
   const [showOptimizationModal, setShowOptimizationModal] = useState(false);
@@ -115,35 +115,40 @@ export default function StrategyDetailPage({
 
   const handleDeactivate = async () => {
     if (!strategy) {
-      toast.error('Strategy not loaded');
+      toast.error("Strategy not loaded");
       return;
     }
-    if (!confirm('Are you sure you want to deactivate this strategy? All executors will stop executing it.')) {
+    if (
+      !confirm(
+        "Are you sure you want to deactivate this strategy? All executors will stop executing it.",
+      )
+    ) {
       return;
     }
 
     setActivating(true);
     try {
       const response = await fetch(`/api/strategy/${strategy.id}/activate`, {
-        method: 'DELETE',
+        method: "DELETE",
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to deactivate strategy');
+        throw new Error(data.error || "Failed to deactivate strategy");
       }
 
       toast.success(data.message);
-      
+
       // Refresh strategy data
       execute(async () => {
         const response = await fetch(`/api/strategy/${params.id}`);
-        if (!response.ok) throw new Error('Failed to refresh strategy');
+        if (!response.ok) throw new Error("Failed to refresh strategy");
         return response.json();
       });
     } catch (error) {
-      const err = error instanceof Error ? error : new Error('An error occurred');
+      const err =
+        error instanceof Error ? error : new Error("An error occurred");
       toast.error(err.message);
     } finally {
       setActivating(false);
@@ -152,13 +157,13 @@ export default function StrategyDetailPage({
 
   const handleStrategyActivated = () => {
     if (!strategy) {
-      toast.error('Strategy not loaded');
+      toast.error("Strategy not loaded");
       return;
     }
     // Refresh strategy data
     execute(async () => {
       const response = await fetch(`/api/strategy/${params.id}`);
-      if (!response.ok) throw new Error('Failed to refresh strategy');
+      if (!response.ok) throw new Error("Failed to refresh strategy");
       return response.json();
     });
   };
@@ -172,7 +177,7 @@ export default function StrategyDetailPage({
 
   const fetchActiveExecutors = async () => {
     try {
-      const response = await fetch('/api/executor');
+      const response = await fetch("/api/executor");
       if (response.ok) {
         const data = await response.json();
         const onlineExecutors = (data.executors || [])
@@ -181,76 +186,86 @@ export default function StrategyDetailPage({
         setExecutorIds(onlineExecutors);
       }
     } catch (error) {
-      console.error('Failed to fetch executors:', error);
+      console.error("Failed to fetch executors:", error);
     }
   };
 
   const handleOptimize = async () => {
     if (executorIds.length === 0) {
-      toast.error('No online executors available. Please connect an executor first.');
+      toast.error(
+        "No online executors available. Please connect an executor first.",
+      );
       return;
     }
+
+    if (!strategy) return;
 
     if (strategy._count.trades < 20) {
       const confirmed = confirm(
         `This strategy only has ${strategy._count.trades} trades. ` +
-        'AI optimization requires at least 20 trades for reliable analysis. ' +
-        'Continue anyway?'
+          "AI optimization requires at least 20 trades for reliable analysis. " +
+          "Continue anyway?",
       );
       if (!confirmed) return;
     }
 
     setOptimizing(true);
     try {
-      const response = await fetch('/api/supervisor/optimize', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+      const response = await fetch("/api/supervisor/optimize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          strategyId: strategy.id,
+          strategyId: strategy!.id,
           executorIds: executorIds,
-          forceOptimize: strategy._count.trades < 20
-        })
+          forceOptimize: strategy!._count.trades < 20,
+        }),
       });
 
       const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(result.error || 'Optimization failed');
+        throw new Error(result.error || "Optimization failed");
       }
 
-      if (result.status === 'APPROVED') {
-        toast.success('Optimization approved and applied automatically!');
+      if (result.status === "APPROVED") {
+        toast.success("Optimization approved and applied automatically!");
         // Refresh strategy data
         handleStrategyActivated();
-      } else if (result.status === 'REQUIRES_APPROVAL') {
+      } else if (result.status === "REQUIRES_APPROVAL") {
         // Show modal for user approval
         setOptimizationData({
           optimizationId: result.optimizationId,
           strategyName: strategy.name,
           suggestions: result.suggestions,
           overallConfidence: result.confidence,
-          reasoning: result.suggestions?.[0]?.reasoning || 'AI analysis complete'
+          reasoning:
+            result.suggestions?.[0]?.reasoning || "AI analysis complete",
         });
         setShowOptimizationModal(true);
-      } else if (result.status === 'REJECTED') {
-        toast.error(result.error || 'Optimization rejected by AI (low confidence)');
+      } else if (result.status === "REJECTED") {
+        toast.error(
+          result.error || "Optimization rejected by AI (low confidence)",
+        );
       }
     } catch (error: any) {
-      console.error('Optimization error:', error);
-      toast.error(error.message || 'Failed to optimize strategy');
+      console.error("Optimization error:", error);
+      toast.error(error.message || "Failed to optimize strategy");
     } finally {
       setOptimizing(false);
     }
   };
 
   const handleApproveOptimization = async (optimizationId: string) => {
-    const response = await fetch(`/api/supervisor/optimize/${optimizationId}/apply`, {
-      method: 'POST'
-    });
+    const response = await fetch(
+      `/api/supervisor/optimize/${optimizationId}/apply`,
+      {
+        method: "POST",
+      },
+    );
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.error || 'Failed to apply optimization');
+      throw new Error(data.error || "Failed to apply optimization");
     }
 
     // Refresh strategy data
@@ -258,13 +273,16 @@ export default function StrategyDetailPage({
   };
 
   const handleRejectOptimization = async (optimizationId: string) => {
-    const response = await fetch(`/api/supervisor/optimize/${optimizationId}/reject`, {
-      method: 'POST'
-    });
+    const response = await fetch(
+      `/api/supervisor/optimize/${optimizationId}/reject`,
+      {
+        method: "POST",
+      },
+    );
 
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.error || 'Failed to reject optimization');
+      throw new Error(data.error || "Failed to reject optimization");
     }
   };
 
@@ -308,7 +326,7 @@ export default function StrategyDetailPage({
         </div>
 
         <div className="flex gap-2">
-          {strategy.status === 'active' ? (
+          {strategy.status === "active" ? (
             <button
               onClick={handleDeactivate}
               disabled={activating}
@@ -336,12 +354,16 @@ export default function StrategyDetailPage({
               Activate Strategy
             </button>
           )}
-          
+
           {/* AI Optimization Button */}
           <div className="relative group">
             <button
               onClick={handleOptimize}
-              disabled={optimizing || strategy.status !== 'active' || strategy._count.trades < 20}
+              disabled={
+                optimizing ||
+                strategy.status !== "active" ||
+                strategy._count.trades < 20
+              }
               className="inline-flex items-center gap-2 px-4 py-2 text-white bg-gradient-to-r from-purple-600 to-blue-600 rounded-lg hover:from-purple-700 hover:to-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed relative"
             >
               {optimizing ? (
@@ -357,43 +379,50 @@ export default function StrategyDetailPage({
                 </>
               )}
             </button>
-            
+
             {/* Tooltip */}
-            {(strategy.status !== 'active' || strategy._count.trades < 20) && !optimizing && (
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
-                <div className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
-                  {strategy.status !== 'active' ? (
-                    'Activate strategy first'
-                  ) : strategy._count.trades < 20 ? (
-                    <>
-                      Need {20 - strategy._count.trades} more trade{20 - strategy._count.trades !== 1 ? 's' : ''} ({strategy._count.trades}/20)
-                    </>
-                  ) : (
-                    'Ready to optimize'
-                  )}
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
-                    <div className="border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+            {(strategy.status !== "active" || strategy._count.trades < 20) &&
+              !optimizing && (
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-10">
+                  <div className="bg-gray-900 dark:bg-gray-700 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                    {strategy.status !== "active" ? (
+                      "Activate strategy first"
+                    ) : strategy._count.trades < 20 ? (
+                      <>
+                        Need {20 - strategy._count.trades} more trade
+                        {20 - strategy._count.trades !== 1 ? "s" : ""} (
+                        {strategy._count.trades}/20)
+                      </>
+                    ) : (
+                      "Ready to optimize"
+                    )}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1">
+                      <div className="border-4 border-transparent border-t-gray-900 dark:border-t-gray-700"></div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-            
+              )}
+
             {/* Progress Indicator */}
-            {strategy.status === 'active' && strategy._count.trades < 20 && (
+            {strategy.status === "active" && strategy._count.trades < 20 && (
               <div className="absolute -bottom-6 left-0 right-0">
                 <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-400">
                   <div className="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
-                    <div 
+                    <div
                       className="bg-gradient-to-r from-purple-600 to-blue-600 h-full transition-all duration-500"
-                      style={{ width: `${(strategy._count.trades / 20) * 100}%` }}
+                      style={{
+                        width: `${(strategy._count.trades / 20) * 100}%`,
+                      }}
                     ></div>
                   </div>
-                  <span className="font-medium tabular-nums">{strategy._count.trades}/20</span>
+                  <span className="font-medium tabular-nums">
+                    {strategy._count.trades}/20
+                  </span>
                 </div>
               </div>
             )}
           </div>
-          
+
           <Link
             href={`/dashboard/executors`}
             className="inline-flex items-center gap-2 px-4 py-2 text-neutral-700 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
@@ -470,15 +499,21 @@ export default function StrategyDetailPage({
         <div className="p-6">
           {activeTab === "overview" && (
             <div className="space-y-6">
-              <h3 className="text-xl font-bold text-neutral-900">Strategy Overview</h3>
+              <h3 className="text-xl font-bold text-neutral-900">
+                Strategy Overview
+              </h3>
 
               {strategy.description && (
                 <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
                   <div className="flex items-center gap-2 mb-2">
                     <AlertCircle className="h-4 w-4 text-blue-600" />
-                    <p className="text-sm font-semibold text-blue-900">Description</p>
+                    <p className="text-sm font-semibold text-blue-900">
+                      Description
+                    </p>
                   </div>
-                  <p className="text-sm text-blue-800">{strategy.description}</p>
+                  <p className="text-sm text-blue-800">
+                    {strategy.description}
+                  </p>
                 </div>
               )}
 
@@ -487,17 +522,21 @@ export default function StrategyDetailPage({
                 const indicators = new Set<string>();
                 strategy.rules?.entry?.conditions?.forEach((cond: any) => {
                   if (cond.indicator) {
-                    indicators.add(cond.indicator.toUpperCase().replace(/_/g, ' '));
+                    indicators.add(
+                      cond.indicator.toUpperCase().replace(/_/g, " "),
+                    );
                   }
                 });
                 const indicatorList = Array.from(indicators);
-                
+
                 if (indicatorList.length > 0) {
                   return (
                     <div className="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <TrendingUp className="h-4 w-4 text-indigo-600" />
-                        <h4 className="text-sm font-semibold text-indigo-900">Technical Indicators Used</h4>
+                        <h4 className="text-sm font-semibold text-indigo-900">
+                          Technical Indicators Used
+                        </h4>
                       </div>
                       <div className="flex flex-wrap gap-2">
                         {indicatorList.map((indicator, idx) => (
@@ -520,13 +559,15 @@ export default function StrategyDetailPage({
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle className="h-5 w-5 text-green-600" />
                   <h4 className="text-base font-bold text-green-900">
-                    Entry Rules ({strategy.rules?.entry?.logic?.toUpperCase() || 'AND'} Logic)
+                    Entry Rules (
+                    {strategy.rules?.entry?.logic?.toUpperCase() || "AND"}{" "}
+                    Logic)
                   </h4>
                 </div>
                 <p className="text-xs text-green-700 mb-4">
-                  {strategy.rules?.entry?.logic === 'OR' 
-                    ? '✓ At least one condition must be true to enter trade'
-                    : '✓ All conditions must be true to enter trade'}
+                  {strategy.rules?.entry?.logic === "OR"
+                    ? "✓ At least one condition must be true to enter trade"
+                    : "✓ All conditions must be true to enter trade"}
                 </p>
                 <div className="space-y-3">
                   {strategy.rules?.entry?.conditions?.map(
@@ -534,25 +575,25 @@ export default function StrategyDetailPage({
                       // Format condition operator
                       const formatOperator = (op: string) => {
                         const operators: Record<string, string> = {
-                          'greater_than': '>',
-                          'less_than': '<',
-                          'greater_than_or_equal': '≥',
-                          'less_than_or_equal': '≤',
-                          'equal': '=',
-                          'crosses_above': '↗ crosses above',
-                          'crosses_below': '↘ crosses below',
-                          'gt': '>',
-                          'lt': '<',
-                          'gte': '≥',
-                          'lte': '≤',
-                          'eq': '=',
+                          greater_than: ">",
+                          less_than: "<",
+                          greater_than_or_equal: "≥",
+                          less_than_or_equal: "≤",
+                          equal: "=",
+                          crosses_above: "↗ crosses above",
+                          crosses_below: "↘ crosses below",
+                          gt: ">",
+                          lt: "<",
+                          gte: "≥",
+                          lte: "≤",
+                          eq: "=",
                         };
                         return operators[op] || op;
                       };
 
                       // Format indicator name
                       const formatIndicator = (ind: string) => {
-                        return ind.toUpperCase().replace(/_/g, ' ');
+                        return ind.toUpperCase().replace(/_/g, " ");
                       };
 
                       return (
@@ -566,17 +607,28 @@ export default function StrategyDetailPage({
                             </span>
                             <div className="flex-1">
                               <p className="text-sm font-semibold text-green-900">
-                                {formatIndicator(cond.indicator)} {formatOperator(cond.condition)} {cond.value || formatIndicator(cond.compareIndicator || '')}
+                                {formatIndicator(cond.indicator)}{" "}
+                                {formatOperator(cond.condition)}{" "}
+                                {cond.value ||
+                                  formatIndicator(cond.compareIndicator || "")}
                               </p>
                               <p className="text-xs text-green-700 mt-1">
-                                {cond.indicator === 'rsi' && 'Relative Strength Index - measures momentum'}
-                                {cond.indicator === 'cci' && 'Commodity Channel Index - identifies cyclical trends'}
-                                {cond.indicator === 'macd' && 'Moving Average Convergence Divergence - trend and momentum'}
-                                {cond.indicator === 'ema' && 'Exponential Moving Average - price trend'}
-                                {cond.indicator === 'sma' && 'Simple Moving Average - price trend'}
-                                {cond.indicator === 'price' && 'Current market price'}
-                                {cond.indicator.includes('ema_') && `${cond.indicator.split('_')[1]}-period Exponential Moving Average`}
-                                {cond.indicator.includes('sma_') && `${cond.indicator.split('_')[1]}-period Simple Moving Average`}
+                                {cond.indicator === "rsi" &&
+                                  "Relative Strength Index - measures momentum"}
+                                {cond.indicator === "cci" &&
+                                  "Commodity Channel Index - identifies cyclical trends"}
+                                {cond.indicator === "macd" &&
+                                  "Moving Average Convergence Divergence - trend and momentum"}
+                                {cond.indicator === "ema" &&
+                                  "Exponential Moving Average - price trend"}
+                                {cond.indicator === "sma" &&
+                                  "Simple Moving Average - price trend"}
+                                {cond.indicator === "price" &&
+                                  "Current market price"}
+                                {cond.indicator.includes("ema_") &&
+                                  `${cond.indicator.split("_")[1]}-period Exponential Moving Average`}
+                                {cond.indicator.includes("sma_") &&
+                                  `${cond.indicator.split("_")[1]}-period Simple Moving Average`}
                               </p>
                             </div>
                           </div>
@@ -588,35 +640,50 @@ export default function StrategyDetailPage({
               </div>
 
               {/* Risk-Reward Ratio */}
-              {strategy.rules?.exit?.takeProfit?.value && strategy.rules?.exit?.stopLoss?.value && (
-                <div className="rounded-lg bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-5 w-5 text-green-600" />
-                      <span className="text-sm font-semibold text-neutral-700">Risk-Reward Ratio:</span>
+              {strategy.rules?.exit?.takeProfit?.value &&
+                strategy.rules?.exit?.stopLoss?.value && (
+                  <div className="rounded-lg bg-gradient-to-r from-green-50 to-blue-50 border-2 border-green-300 p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-green-600" />
+                        <span className="text-sm font-semibold text-neutral-700">
+                          Risk-Reward Ratio:
+                        </span>
+                      </div>
+                      <span className="text-3xl font-bold text-green-600">
+                        1:
+                        {(
+                          strategy.rules.exit.takeProfit.value /
+                          strategy.rules.exit.stopLoss.value
+                        ).toFixed(2)}
+                      </span>
                     </div>
-                    <span className="text-3xl font-bold text-green-600">
-                      1:{(strategy.rules.exit.takeProfit.value / strategy.rules.exit.stopLoss.value).toFixed(2)}
-                    </span>
+                    <p className="text-xs text-neutral-600 mt-2">
+                      For every ${strategy.rules.exit.stopLoss.value} risked (
+                      {strategy.rules.exit.stopLoss.value}{" "}
+                      {strategy.rules.exit.stopLoss.type}), potential to gain $
+                      {strategy.rules.exit.takeProfit.value} (
+                      {strategy.rules.exit.takeProfit.value}{" "}
+                      {strategy.rules.exit.takeProfit.type})
+                    </p>
                   </div>
-                  <p className="text-xs text-neutral-600 mt-2">
-                    For every ${strategy.rules.exit.stopLoss.value} risked ({strategy.rules.exit.stopLoss.value} {strategy.rules.exit.stopLoss.type}), 
-                    potential to gain ${strategy.rules.exit.takeProfit.value} ({strategy.rules.exit.takeProfit.value} {strategy.rules.exit.takeProfit.type})
-                  </p>
-                </div>
-              )}
+                )}
 
               {/* Exit Rules */}
               <div className="rounded-lg border border-neutral-200 bg-white p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <TrendingUp className="h-5 w-5 text-neutral-600" />
-                  <h4 className="text-base font-bold text-neutral-900">Exit Strategy</h4>
+                  <h4 className="text-base font-bold text-neutral-900">
+                    Exit Strategy
+                  </h4>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="rounded-lg border-2 border-green-300 bg-green-50 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <TrendingUp className="h-4 w-4 text-green-600" />
-                      <p className="text-xs font-semibold text-green-900">TAKE PROFIT</p>
+                      <p className="text-xs font-semibold text-green-900">
+                        TAKE PROFIT
+                      </p>
                     </div>
                     <p className="text-2xl font-bold text-green-700">
                       {strategy.rules?.exit?.takeProfit?.value}{" "}
@@ -629,7 +696,9 @@ export default function StrategyDetailPage({
                   <div className="rounded-lg border-2 border-red-300 bg-red-50 p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <Shield className="h-4 w-4 text-red-600" />
-                      <p className="text-xs font-semibold text-red-900">STOP LOSS</p>
+                      <p className="text-xs font-semibold text-red-900">
+                        STOP LOSS
+                      </p>
                     </div>
                     <p className="text-2xl font-bold text-red-700">
                       {strategy.rules?.exit?.stopLoss?.value}{" "}
@@ -646,23 +715,34 @@ export default function StrategyDetailPage({
               <div className="rounded-lg border border-orange-200 bg-orange-50 p-4">
                 <div className="flex items-center gap-2 mb-3">
                   <Shield className="h-5 w-5 text-orange-600" />
-                  <h4 className="text-base font-bold text-orange-900">Risk Management</h4>
+                  <h4 className="text-base font-bold text-orange-900">
+                    Risk Management
+                  </h4>
                 </div>
                 <div className="grid grid-cols-3 gap-4">
                   <div className="rounded-lg bg-white border border-orange-200 p-3">
-                    <p className="text-xs text-orange-700 mb-1">Position Size</p>
+                    <p className="text-xs text-orange-700 mb-1">
+                      Position Size
+                    </p>
                     <p className="text-lg font-bold text-orange-900">
                       {strategy.rules?.riskManagement?.lotSize} lots
                     </p>
                   </div>
                   <div className="rounded-lg bg-white border border-orange-200 p-3">
-                    <p className="text-xs text-orange-700 mb-1">Max Concurrent</p>
+                    <p className="text-xs text-orange-700 mb-1">
+                      Max Concurrent
+                    </p>
                     <p className="text-lg font-bold text-orange-900">
-                      {strategy.rules?.riskManagement?.maxPositions} {strategy.rules?.riskManagement?.maxPositions === 1 ? 'position' : 'positions'}
+                      {strategy.rules?.riskManagement?.maxPositions}{" "}
+                      {strategy.rules?.riskManagement?.maxPositions === 1
+                        ? "position"
+                        : "positions"}
                     </p>
                   </div>
                   <div className="rounded-lg bg-white border border-orange-200 p-3">
-                    <p className="text-xs text-orange-700 mb-1">Daily Loss Limit</p>
+                    <p className="text-xs text-orange-700 mb-1">
+                      Daily Loss Limit
+                    </p>
                     <p className="text-lg font-bold text-orange-900">
                       ${strategy.rules?.riskManagement?.maxDailyLoss}
                     </p>
@@ -671,19 +751,29 @@ export default function StrategyDetailPage({
               </div>
 
               {/* Advanced Features */}
-              {(strategy.rules?.smartExit || strategy.rules?.dynamicRisk || strategy.rules?.sessionFilter || strategy.rules?.correlationFilter || strategy.rules?.regimeDetection) && (
+              {(strategy.rules?.smartExit ||
+                strategy.rules?.dynamicRisk ||
+                strategy.rules?.sessionFilter ||
+                strategy.rules?.correlationFilter ||
+                strategy.rules?.regimeDetection) && (
                 <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
                   <div className="flex items-center gap-2 mb-3">
                     <Sparkles className="h-5 w-5 text-purple-600" />
-                    <h4 className="text-base font-bold text-purple-900">Advanced Features</h4>
+                    <h4 className="text-base font-bold text-purple-900">
+                      Advanced Features
+                    </h4>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     {strategy.rules?.smartExit && (
                       <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
                         <div className="h-2 w-2 rounded-full bg-green-500" />
                         <div>
-                          <p className="text-sm font-semibold text-purple-900">Smart Exit Rules</p>
-                          <p className="text-xs text-purple-700">ATR-based trailing stop & partial exits</p>
+                          <p className="text-sm font-semibold text-purple-900">
+                            Smart Exit Rules
+                          </p>
+                          <p className="text-xs text-purple-700">
+                            ATR-based trailing stop & partial exits
+                          </p>
                         </div>
                       </div>
                     )}
@@ -691,8 +781,12 @@ export default function StrategyDetailPage({
                       <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
                         <div className="h-2 w-2 rounded-full bg-green-500" />
                         <div>
-                          <p className="text-sm font-semibold text-purple-900">Dynamic Risk</p>
-                          <p className="text-xs text-purple-700">Volatility-adjusted position sizing</p>
+                          <p className="text-sm font-semibold text-purple-900">
+                            Dynamic Risk
+                          </p>
+                          <p className="text-xs text-purple-700">
+                            Volatility-adjusted position sizing
+                          </p>
                         </div>
                       </div>
                     )}
@@ -700,8 +794,12 @@ export default function StrategyDetailPage({
                       <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
                         <div className="h-2 w-2 rounded-full bg-green-500" />
                         <div>
-                          <p className="text-sm font-semibold text-purple-900">Session Filter</p>
-                          <p className="text-xs text-purple-700">Trade only during optimal sessions</p>
+                          <p className="text-sm font-semibold text-purple-900">
+                            Session Filter
+                          </p>
+                          <p className="text-xs text-purple-700">
+                            Trade only during optimal sessions
+                          </p>
                         </div>
                       </div>
                     )}
@@ -709,8 +807,12 @@ export default function StrategyDetailPage({
                       <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
                         <div className="h-2 w-2 rounded-full bg-green-500" />
                         <div>
-                          <p className="text-sm font-semibold text-purple-900">Correlation Filter</p>
-                          <p className="text-xs text-purple-700">Avoid correlated pair exposure</p>
+                          <p className="text-sm font-semibold text-purple-900">
+                            Correlation Filter
+                          </p>
+                          <p className="text-xs text-purple-700">
+                            Avoid correlated pair exposure
+                          </p>
                         </div>
                       </div>
                     )}
@@ -718,8 +820,12 @@ export default function StrategyDetailPage({
                       <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
                         <div className="h-2 w-2 rounded-full bg-green-500" />
                         <div>
-                          <p className="text-sm font-semibold text-purple-900">Regime Detection</p>
-                          <p className="text-xs text-purple-700">Adapt to market conditions</p>
+                          <p className="text-sm font-semibold text-purple-900">
+                            Regime Detection
+                          </p>
+                          <p className="text-xs text-purple-700">
+                            Adapt to market conditions
+                          </p>
                         </div>
                       </div>
                     )}
