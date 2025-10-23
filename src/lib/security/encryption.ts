@@ -1,8 +1,8 @@
-import crypto from 'crypto';
-import { getEnvVar } from './env-validator';
+import crypto from "crypto";
+import { getEnvVar } from "./env-validator";
 
 // Encryption algorithm
-const ALGORITHM = 'aes-256-gcm';
+const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 16; // For AES, this is always 16
 const SALT_LENGTH = 32;
 const TAG_LENGTH = 16; // GCM authentication tag length
@@ -17,7 +17,13 @@ const KEY_DERIVATION_ITERATIONS = 100000;
  * @returns Derived key
  */
 function deriveKey(password: string, salt: Buffer): Buffer {
-  return crypto.pbkdf2Sync(password, salt, KEY_DERIVATION_ITERATIONS, 32, 'sha256');
+  return crypto.pbkdf2Sync(
+    password,
+    salt,
+    KEY_DERIVATION_ITERATIONS,
+    32,
+    "sha256",
+  );
 }
 
 /**
@@ -28,40 +34,40 @@ function deriveKey(password: string, salt: Buffer): Buffer {
  */
 export function encrypt(text: string, customKey?: string): string {
   try {
-    const encryptionKey = customKey || getEnvVar('ENCRYPTION_KEY');
-    
+    const encryptionKey = customKey || getEnvVar("ENCRYPTION_KEY");
+
     // Generate a random salt for each encryption
     const salt = crypto.randomBytes(SALT_LENGTH);
-    
+
     // Derive key from password and salt
     const key = deriveKey(encryptionKey, salt);
-    
+
     // Generate a random IV
     const iv = crypto.randomBytes(IV_LENGTH);
-    
+
     // Create cipher
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-    cipher.setAAD(Buffer.from('nexus-trade', 'utf8'));
-    
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    
+    cipher.setAAD(Buffer.from("nexus-trade", "utf8"));
+
+    let encrypted = cipher.update(text, "utf8", "hex");
+    encrypted += cipher.final("hex");
+
     // Get the authentication tag
     const tag = cipher.getAuthTag();
-    
+
     // Combine salt, iv, tag, and encrypted data
     const combined = Buffer.concat([
       salt,
       iv,
       tag,
-      Buffer.from(encrypted, 'hex')
+      Buffer.from(encrypted, "hex"),
     ]);
-    
+
     // Return as base64
-    return combined.toString('base64');
+    return combined.toString("base64");
   } catch (error) {
-    console.error('Encryption error:', error);
-    throw new Error('Failed to encrypt data');
+    console.error("Encryption error:", error);
+    throw new Error("Failed to encrypt data");
   }
 }
 
@@ -73,32 +79,37 @@ export function encrypt(text: string, customKey?: string): string {
  */
 export function decrypt(encryptedData: string, customKey?: string): string {
   try {
-    const encryptionKey = customKey || getEnvVar('ENCRYPTION_KEY');
-    
+    const encryptionKey = customKey || getEnvVar("ENCRYPTION_KEY");
+
     // Decode from base64
-    const combined = Buffer.from(encryptedData, 'base64');
-    
+    const combined = Buffer.from(encryptedData, "base64");
+
     // Extract components
     const salt = combined.slice(0, SALT_LENGTH);
     const iv = combined.slice(SALT_LENGTH, SALT_LENGTH + IV_LENGTH);
-    const tag = combined.slice(SALT_LENGTH + IV_LENGTH, SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
+    const tag = combined.slice(
+      SALT_LENGTH + IV_LENGTH,
+      SALT_LENGTH + IV_LENGTH + TAG_LENGTH,
+    );
     const encrypted = combined.slice(SALT_LENGTH + IV_LENGTH + TAG_LENGTH);
-    
+
     // Derive key from password and salt
     const key = deriveKey(encryptionKey, salt);
-    
+
     // Create decipher
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
-    decipher.setAAD(Buffer.from('nexus-trade', 'utf8'));
+    decipher.setAAD(Buffer.from("nexus-trade", "utf8"));
     decipher.setAuthTag(tag);
-    
-    let decrypted = decipher.update(encrypted, null, 'utf8');
-    decrypted += decipher.final('utf8');
-    
-    return decrypted;
+
+    const decryptedBuffer = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ]);
+
+    return decryptedBuffer.toString("utf8");
   } catch (error) {
-    console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt data');
+    console.error("Decryption error:", error);
+    throw new Error("Failed to decrypt data");
   }
 }
 
@@ -109,11 +120,11 @@ export function decrypt(encryptedData: string, customKey?: string): string {
  */
 export function encryptApiKey(apiKey: string): string {
   try {
-    const apiKeyEncryptionKey = getEnvVar('API_KEY_ENCRYPTION_KEY');
+    const apiKeyEncryptionKey = getEnvVar("API_KEY_ENCRYPTION_KEY");
     return encrypt(apiKey, apiKeyEncryptionKey);
   } catch (error) {
-    console.error('API key encryption error:', error);
-    throw new Error('Failed to encrypt API key');
+    console.error("API key encryption error:", error);
+    throw new Error("Failed to encrypt API key");
   }
 }
 
@@ -124,11 +135,11 @@ export function encryptApiKey(apiKey: string): string {
  */
 export function decryptApiKey(encryptedApiKey: string): string {
   try {
-    const apiKeyEncryptionKey = getEnvVar('API_KEY_ENCRYPTION_KEY');
+    const apiKeyEncryptionKey = getEnvVar("API_KEY_ENCRYPTION_KEY");
     return decrypt(encryptedApiKey, apiKeyEncryptionKey);
   } catch (error) {
-    console.error('API key decryption error:', error);
-    throw new Error('Failed to decrypt API key');
+    console.error("API key decryption error:", error);
+    throw new Error("Failed to decrypt API key");
   }
 }
 
@@ -138,7 +149,7 @@ export function decryptApiKey(encryptedApiKey: string): string {
  * @returns Secure random string
  */
 export function generateSecureRandom(length: number = 32): string {
-  return crypto.randomBytes(length).toString('hex');
+  return crypto.randomBytes(length).toString("hex");
 }
 
 /**
@@ -148,13 +159,24 @@ export function generateSecureRandom(length: number = 32): string {
  * @param salt - Optional salt (will generate if not provided)
  * @returns Hashed password with salt
  */
-export function hashPassword(password: string, salt?: string): { hash: string; salt: string } {
-  const passwordSalt = salt ? Buffer.from(salt, 'hex') : crypto.randomBytes(SALT_LENGTH);
-  const hash = crypto.pbkdf2Sync(password, passwordSalt, KEY_DERIVATION_ITERATIONS, 64, 'sha512');
-  
+export function hashPassword(
+  password: string,
+  salt?: string,
+): { hash: string; salt: string } {
+  const passwordSalt = salt
+    ? Buffer.from(salt, "hex")
+    : crypto.randomBytes(SALT_LENGTH);
+  const hash = crypto.pbkdf2Sync(
+    password,
+    passwordSalt,
+    KEY_DERIVATION_ITERATIONS,
+    64,
+    "sha512",
+  );
+
   return {
-    hash: hash.toString('hex'),
-    salt: passwordSalt.toString('hex'),
+    hash: hash.toString("hex"),
+    salt: passwordSalt.toString("hex"),
   };
 }
 
@@ -165,12 +187,19 @@ export function hashPassword(password: string, salt?: string): { hash: string; s
  * @param salt - Salt used for the hash
  * @returns Whether the password is valid
  */
-export function verifyPassword(password: string, hash: string, salt: string): boolean {
+export function verifyPassword(
+  password: string,
+  hash: string,
+  salt: string,
+): boolean {
   try {
     const { hash: computedHash } = hashPassword(password, salt);
-    return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(computedHash, 'hex'));
+    return crypto.timingSafeEqual(
+      Buffer.from(hash, "hex"),
+      Buffer.from(computedHash, "hex"),
+    );
   } catch (error) {
-    console.error('Password verification error:', error);
+    console.error("Password verification error:", error);
     return false;
   }
 }
@@ -181,7 +210,7 @@ export function verifyPassword(password: string, hash: string, salt: string): bo
  * @returns SHA-256 hash
  */
 export function sha256(data: string): string {
-  return crypto.createHash('sha256').update(data).digest('hex');
+  return crypto.createHash("sha256").update(data).digest("hex");
 }
 
 /**
@@ -191,26 +220,29 @@ export function sha256(data: string): string {
  * @returns HMAC-SHA256 signature
  */
 export function hmacSha256(data: string, secret: string): string {
-  return crypto.createHmac('sha256', secret).update(data).digest('hex');
+  return crypto.createHmac("sha256", secret).update(data).digest("hex");
 }
 
 /**
  * Generate a key pair for asymmetric encryption
  * @returns RSA key pair
  */
-export function generateRSAKeyPair(): { publicKey: string; privateKey: string } {
-  const { publicKey, privateKey } = crypto.generateKeyPairSync('rsa', {
+export function generateRSAKeyPair(): {
+  publicKey: string;
+  privateKey: string;
+} {
+  const { publicKey, privateKey } = crypto.generateKeyPairSync("rsa", {
     modulusLength: 2048,
     publicKeyEncoding: {
-      type: 'spki',
-      format: 'pem',
+      type: "spki",
+      format: "pem",
     },
     privateKeyEncoding: {
-      type: 'pkcs8',
-      format: 'pem',
+      type: "pkcs8",
+      format: "pem",
     },
   });
-  
+
   return { publicKey, privateKey };
 }
 
@@ -226,15 +258,15 @@ export function rsaEncrypt(data: string, publicKey: string): string {
       {
         key: publicKey,
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256',
+        oaepHash: "sha256",
       },
-      Buffer.from(data, 'utf8')
+      Buffer.from(data, "utf8"),
     );
-    
-    return encrypted.toString('base64');
+
+    return encrypted.toString("base64");
   } catch (error) {
-    console.error('RSA encryption error:', error);
-    throw new Error('Failed to encrypt data with RSA');
+    console.error("RSA encryption error:", error);
+    throw new Error("Failed to encrypt data with RSA");
   }
 }
 
@@ -250,15 +282,15 @@ export function rsaDecrypt(encryptedData: string, privateKey: string): string {
       {
         key: privateKey,
         padding: crypto.constants.RSA_PKCS1_OAEP_PADDING,
-        oaepHash: 'sha256',
+        oaepHash: "sha256",
       },
-      Buffer.from(encryptedData, 'base64')
+      Buffer.from(encryptedData, "base64"),
     );
-    
-    return decrypted.toString('utf8');
+
+    return decrypted.toString("utf8");
   } catch (error) {
-    console.error('RSA decryption error:', error);
-    throw new Error('Failed to decrypt data with RSA');
+    console.error("RSA decryption error:", error);
+    throw new Error("Failed to decrypt data with RSA");
   }
 }
 
