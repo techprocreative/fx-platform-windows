@@ -459,16 +459,15 @@ export default function BacktestPage() {
                 className="w-full rounded-lg border border-neutral-300 px-4 py-2 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20"
               >
                 <option value="">Select a strategy</option>
-                {strategies
-                  .filter((s) => s.status === "draft" || s.status === "active")
-                  .map((strategy) => (
-                    <option key={strategy.id} value={strategy.id}>
-                      {strategy.name} ({strategy.symbol} {strategy.timeframe})
-                    </option>
-                  ))}
+                {strategies.map((strategy) => (
+                  <option key={strategy.id} value={strategy.id}>
+                    {strategy.name} ({strategy.symbol} {strategy.timeframe})
+                    {strategy.status !== 'active' && strategy.status !== 'draft' && ` [${strategy.status}]`}
+                  </option>
+                ))}
               </select>
               <p className="text-xs text-neutral-500 mt-1">
-                Symbol and timeframe will be auto-filled from selected strategy
+                All strategies are shown. Status badge indicates inactive strategies.
               </p>
             </div>
 
