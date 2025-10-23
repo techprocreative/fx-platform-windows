@@ -68,6 +68,9 @@ export function AIStrategyGenerator({ onGenerate }: AIStrategyGeneratorProps) {
   const [loadingContext, setLoadingContext] = useState(false);
   const [contextError, setContextError] = useState<string | null>(null);
   const [enableMarketContext, setEnableMarketContext] = useState(true);
+  
+  // State for generated strategy summary
+  const [generatedStrategy, setGeneratedStrategy] = useState<any | null>(null);
 
   // Fixed model - Grok (from OpenRouter)
   const AI_MODEL = "x-ai/grok-4-fast";
@@ -192,6 +195,9 @@ Please create a strategy that takes this current market situation into account.`
         marketContextUsed: enableMarketContext
       });
       
+      // Store generated strategy for summary display
+      setGeneratedStrategy(strategy);
+      
       onGenerate({
         name: strategy.name,
         description: strategy.description,
@@ -201,7 +207,7 @@ Please create a strategy that takes this current market situation into account.`
         parameters: strategy.parameters, // IMPORTANT: Pass parameters!
       });
 
-      toast.success("Strategy generated! Review and customize it below.");
+      toast.success("Strategy generated! Review the summary below and customize if needed.");
       setPrompt(""); // Clear prompt after successful generation
     } catch (error) {
       console.error("AI Generation error:", error);
@@ -219,6 +225,38 @@ Please create a strategy that takes this current market situation into account.`
 - Key Levels: Support ${context.keyLevels.nearestSupport?.toFixed(5) || 'N/A'}, Resistance ${context.keyLevels.nearestResistance?.toFixed(5) || 'N/A'}
 - Market Sessions: ${context.session.activeSessions.join(', ')} (${context.session.marketCondition} activity)
 - Optimal for ${context.symbol}: ${context.session.isOptimalForPair ? 'YES' : 'NO'}`;
+  };
+
+  // Extract indicators from strategy rules
+  const extractIndicators = (strategy: any): string[] => {
+    const indicators = new Set<string>();
+    
+    if (strategy.rules && Array.isArray(strategy.rules)) {
+      strategy.rules.forEach((rule: any) => {
+        if (rule.conditions && Array.isArray(rule.conditions)) {
+          rule.conditions.forEach((condition: any) => {
+            if (condition.indicator) {
+              indicators.add(condition.indicator.toUpperCase());
+            }
+          });
+        }
+      });
+    }
+    
+    return Array.from(indicators);
+  };
+
+  // Count entry conditions
+  const countConditions = (strategy: any): number => {
+    let count = 0;
+    if (strategy.rules && Array.isArray(strategy.rules)) {
+      strategy.rules.forEach((rule: any) => {
+        if (rule.conditions && Array.isArray(rule.conditions)) {
+          count += rule.conditions.length;
+        }
+      });
+    }
+    return count;
   };
 
   const promptExamples = [
@@ -504,6 +542,194 @@ Please create a strategy that takes this current market situation into account.`
             </ul>
           </div>
         </div>
+
+        {/* Strategy Summary Display */}
+        {generatedStrategy && (
+          <div className="mt-6 space-y-4 rounded-lg border-2 border-green-200 bg-gradient-to-br from-green-50 to-white p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="h-8 w-8 rounded-full bg-green-500 flex items-center justify-center">
+                <Sparkles className="h-4 w-4 text-white" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-green-900">Strategy Generated Successfully!</h3>
+                <p className="text-sm text-green-700">Review the details below and customize as needed</p>
+              </div>
+            </div>
+
+            {/* Strategy Info */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="rounded-lg bg-white border border-green-200 p-4">
+                <div className="text-xs font-semibold text-green-700 mb-1">STRATEGY NAME</div>
+                <div className="text-sm font-bold text-neutral-900">{generatedStrategy.name}</div>
+              </div>
+              <div className="rounded-lg bg-white border border-green-200 p-4">
+                <div className="text-xs font-semibold text-green-700 mb-1">SYMBOL & TIMEFRAME</div>
+                <div className="text-sm font-bold text-neutral-900">
+                  {generatedStrategy.symbol || symbol} • {generatedStrategy.timeframe || timeframe}
+                </div>
+              </div>
+            </div>
+
+            {/* Description */}
+            {generatedStrategy.description && (
+              <div className="rounded-lg bg-white border border-green-200 p-4">
+                <div className="text-xs font-semibold text-green-700 mb-2">DESCRIPTION</div>
+                <div className="text-sm text-neutral-700">{generatedStrategy.description}</div>
+              </div>
+            )}
+
+            {/* Indicators Used */}
+            {extractIndicators(generatedStrategy).length > 0 && (
+              <div className="rounded-lg bg-white border border-green-200 p-4">
+                <div className="text-xs font-semibold text-green-700 mb-3">INDICATORS USED</div>
+                <div className="flex flex-wrap gap-2">
+                  {extractIndicators(generatedStrategy).map((indicator, idx) => (
+                    <span
+                      key={idx}
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-800 text-xs font-semibold"
+                    >
+                      <TrendingUp className="h-3 w-3" />
+                      {indicator}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Entry Conditions Summary */}
+            <div className="rounded-lg bg-white border border-green-200 p-4">
+              <div className="text-xs font-semibold text-green-700 mb-3">ENTRY CONDITIONS</div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-neutral-600">Total Rules:</span>
+                  <span className="font-bold text-neutral-900">
+                    {generatedStrategy.rules?.length || 0}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-neutral-600">Total Conditions:</span>
+                  <span className="font-bold text-neutral-900">
+                    {countConditions(generatedStrategy)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Risk Management Parameters */}
+            {generatedStrategy.parameters && (
+              <div className="rounded-lg bg-white border border-green-200 p-4">
+                <div className="text-xs font-semibold text-green-700 mb-3">RISK MANAGEMENT</div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {generatedStrategy.parameters.stopLoss && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-neutral-600">Stop Loss:</span>
+                      <span className="font-bold text-red-600">
+                        {generatedStrategy.parameters.stopLoss} pips
+                      </span>
+                    </div>
+                  )}
+                  {generatedStrategy.parameters.takeProfit && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-neutral-600">Take Profit:</span>
+                      <span className="font-bold text-green-600">
+                        {generatedStrategy.parameters.takeProfit} pips
+                      </span>
+                    </div>
+                  )}
+                  {generatedStrategy.parameters.riskPerTrade && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-neutral-600">Risk Per Trade:</span>
+                      <span className="font-bold text-neutral-900">
+                        {(generatedStrategy.parameters.riskPerTrade * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  )}
+                  {generatedStrategy.parameters.maxPositions && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-neutral-600">Max Positions:</span>
+                      <span className="font-bold text-neutral-900">
+                        {generatedStrategy.parameters.maxPositions}
+                      </span>
+                    </div>
+                  )}
+                  {generatedStrategy.parameters.maxDailyLoss && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-neutral-600">Max Daily Loss:</span>
+                      <span className="font-bold text-red-600">
+                        {generatedStrategy.parameters.maxDailyLoss} pips
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Risk-Reward Ratio */}
+            {generatedStrategy.parameters?.stopLoss && generatedStrategy.parameters?.takeProfit && (
+              <div className="rounded-lg bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Activity className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-semibold text-neutral-700">Risk-Reward Ratio:</span>
+                  </div>
+                  <span className="text-2xl font-bold text-green-600">
+                    1:{(generatedStrategy.parameters.takeProfit / generatedStrategy.parameters.stopLoss).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Advanced Features Indicator */}
+            <div className="rounded-lg bg-white border border-blue-200 p-4">
+              <div className="text-xs font-semibold text-blue-700 mb-3">ADVANCED FEATURES</div>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${generatedStrategy.parameters?.smartExit ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <span className={generatedStrategy.parameters?.smartExit ? 'text-green-700 font-semibold' : 'text-gray-500'}>
+                    Smart Exit Rules
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${generatedStrategy.parameters?.dynamicRisk ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <span className={generatedStrategy.parameters?.dynamicRisk ? 'text-green-700 font-semibold' : 'text-gray-500'}>
+                    Dynamic Risk
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${generatedStrategy.parameters?.sessionFilter ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <span className={generatedStrategy.parameters?.sessionFilter ? 'text-green-700 font-semibold' : 'text-gray-500'}>
+                    Session Filter
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${generatedStrategy.parameters?.correlationFilter ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <span className={generatedStrategy.parameters?.correlationFilter ? 'text-green-700 font-semibold' : 'text-gray-500'}>
+                    Correlation Filter
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`h-2 w-2 rounded-full ${generatedStrategy.parameters?.regimeDetection ? 'bg-green-500' : 'bg-gray-300'}`} />
+                  <span className={generatedStrategy.parameters?.regimeDetection ? 'text-green-700 font-semibold' : 'text-gray-500'}>
+                    Regime Detection
+                  </span>
+                </div>
+              </div>
+              {!generatedStrategy.parameters?.smartExit && !generatedStrategy.parameters?.dynamicRisk && (
+                <div className="mt-3 text-xs text-blue-600">
+                  💡 You can enable advanced features in the manual form below
+                </div>
+              )}
+            </div>
+
+            {/* Action Hint */}
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200">
+              <Activity className="h-4 w-4 text-blue-600" />
+              <p className="text-xs text-blue-700">
+                <span className="font-semibold">Next Step:</span> Scroll down to review and customize the strategy parameters, then click "Create Strategy" to save.
+              </p>
+            </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

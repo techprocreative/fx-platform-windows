@@ -119,6 +119,126 @@ IMPORTANT - TP/SL VALUES IN PIPS:
 - For GBPUSD: Use 30-60 pips for scalping (e.g., stopLoss: 25, takeProfit: 50)
 - For Indices (US30, NAS100): Use 50-200 pips (e.g., stopLoss: 100, takeProfit: 200)
 - Scale values based on symbol volatility and timeframe
+
+ADVANCED FEATURES (CRITICAL - MUST INCLUDE):
+
+Your response MUST also include these ADVANCED PARAMETERS for professional-grade strategies:
+
+{
+  "name": "Strategy Name",
+  "description": "Brief description",
+  "symbol": "EXTRACTED_SYMBOL",
+  "timeframe": "EXTRACTED_TIMEFRAME",
+  "rules": [...entry rules as above...],
+  "parameters": {
+    "riskPerTrade": 0.01,
+    "maxPositions": 1,
+    "stopLoss": 30,
+    "takeProfit": 50,
+    "maxDailyLoss": 100,
+    
+    "smartExit": {
+      "stopLoss": {
+        "type": "atr",
+        "atrMultiplier": 2.0,
+        "maxHoldingHours": 24
+      },
+      "takeProfit": {
+        "type": "partial",
+        "rrRatio": 2.0,
+        "partialExits": [
+          { "percentage": 50, "atRR": 1.0 },
+          { "percentage": 30, "atRR": 2.0 },
+          { "percentage": 20, "atRR": 3.0 }
+        ]
+      }
+    },
+    
+    "dynamicRisk": {
+      "useATRSizing": true,
+      "atrMultiplier": 1.5,
+      "riskPercentage": 1.0,
+      "autoAdjustLotSize": true,
+      "reduceInHighVolatility": true,
+      "volatilityThreshold": 0.02
+    },
+    
+    "sessionFilter": {
+      "enabled": true,
+      "allowedSessions": ["London", "NewYork"],
+      "useOptimalPairs": true,
+      "aggressivenessMultiplier": {
+        "optimal": 1.0,
+        "suboptimal": 0.5
+      }
+    },
+    
+    "correlationFilter": {
+      "enabled": true,
+      "maxCorrelation": 0.7,
+      "lookbackPeriod": 30,
+      "timeframes": ["H1", "H4", "D1"]
+    },
+    
+    "regimeDetection": {
+      "trendPeriod": 20,
+      "trendThreshold": 0.02,
+      "volatilityPeriod": 14,
+      "volatilityThreshold": 0.015,
+      "enableMTFAnalysis": true,
+      "primaryTimeframe": "H1",
+      "confirmationTimeframes": ["H4", "D1"],
+      "weightTrend": 0.4,
+      "weightVolatility": 0.3,
+      "weightRange": 0.3,
+      "minConfidence": 70,
+      "lookbackPeriod": 30,
+      "updateFrequency": 15,
+      "minDataPoints": 50,
+      "enableTransitionDetection": true
+    }
+  }
+}
+
+ADVANCED FEATURES RULES:
+
+1. **Smart Exit** - ALWAYS INCLUDE:
+   - For XAUUSD, XAGUSD, commodities: Use "atr" stop loss with multiplier 2.5-3.0
+   - For trending strategies: Use "partial" take profit with 3 levels
+   - For scalping strategies: Use "rr_ratio" with ratio 1.5-2.0
+   - For swing trading: Use "resistance" based take profit
+
+2. **Dynamic Risk** - ALWAYS ENABLE:
+   - useATRSizing: true for all commodity symbols (XAUUSD, XAGUSD, USOIL)
+   - atrMultiplier: 1.5 for normal volatility, 2.0 for high volatility symbols
+   - riskPercentage: 1.0% default, 0.5% for aggressive, 2.0% for conservative
+   - reduceInHighVolatility: true always
+
+3. **Session Filter** - ENABLE FOR FOREX:
+   - For EURUSD, GBPUSD: ["London", "NewYork"]
+   - For USDJPY, AUDJPY: ["Tokyo", "London"]
+   - For AUDUSD: ["Sydney", "Tokyo", "London"]
+   - useOptimalPairs: true always
+
+4. **Correlation Filter** - ENABLE ALWAYS:
+   - maxCorrelation: 0.7 (avoid 70%+ correlated trades)
+   - lookbackPeriod: 30 days
+   - timeframes: ["H1", "H4", "D1"] for multi-timeframe check
+
+5. **Regime Detection** - ENABLE FOR ADAPTIVE STRATEGIES:
+   - enableMTFAnalysis: true always
+   - primaryTimeframe: Use the strategy's timeframe
+   - confirmationTimeframes: Add H4 and D1 for confirmation
+   - Use higher weights (0.4-0.5) for trend in trending strategies
+   - Use higher weights (0.4-0.5) for volatility in breakout strategies
+
+MARKET CONTEXT INTEGRATION:
+If market context is provided, adjust advanced parameters:
+- High volatility (ATR > 0.002): Set reduceInHighVolatility: true, riskPercentage: 0.5%
+- Strong trend (strength > 70): Use partial exits with 4 levels
+- Optimal session: Set aggressivenessMultiplier.optimal: 1.5
+- Sideways market: Enable regime detection with higher range weight
+
 }
 
 CRITICAL INSTRUCTIONS:
