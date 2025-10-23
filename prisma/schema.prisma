@@ -195,9 +195,6 @@ model Strategy {
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
-
-  // Add latest score reference
-  latestScoreId   String?   @unique
   
   // New fields for strategy improvement plan
   score           Json?     // Strategy scoring data
@@ -212,7 +209,6 @@ model Strategy {
   parameterOptimizations ParameterOptimization[]
   parameterPerformances ParameterPerformance[]
   scores StrategyScore[]
-  latestScore StrategyScore? @relation("LatestScore", fields: [latestScoreId], references: [id])
   performanceHistory StrategyPerformance[]
   regimeAdjustments RegimeStrategyAdjustment[]
 
@@ -220,7 +216,6 @@ model Strategy {
   @@index([status])
   @@index([symbol])
   @@index([userId, status])
-  @@index([latestScoreId])
 }
 
 model StrategyVersion {
@@ -697,7 +692,6 @@ model StrategyScore {
   strategy         Strategy @relation(fields: [strategyId], references: [id], onDelete: Cascade)
   metrics          StrategyMetrics?
   history          StrategyScoreHistory[]
-  latestForStrategy Strategy? @relation("LatestScore")
   
   @@index([strategyId])
   @@index([userId])
