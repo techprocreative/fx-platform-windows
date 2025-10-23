@@ -39,6 +39,7 @@ import {
   isOptimalTimeForPair,
   getSessionInfo
 } from "@/lib/market/sessions";
+import { TRADING_CONFIG } from "@/lib/config";
 
 type StrategyMode = "ai" | "manual" | "mtf";
 
@@ -244,48 +245,12 @@ const CONDITIONS: ConditionOperator[] = [
   "crosses_below",
 ];
 
-const SYMBOLS = [
-  // Major Forex Pairs
-  "EURUSD",
-  "GBPUSD",
-  "USDJPY",
-  "USDCHF",
-  "AUDUSD",
-  "USDCAD",
-  "NZDUSD",
-
-  // Cross Currency Pairs
-  "EURJPY",
-  "GBPJPY",
-  "EURGBP",
-  "AUDJPY",
-  "EURAUD",
-  "EURCHF",
-  "AUDNZD",
-  "NZDJPY",
-  "GBPAUD",
-  "GBPCAD",
-  "GBPNZD",
-  "AUDCAD",
-
-  // Commodities
-  "XAUUSD", // Gold
-  "XAGUSD", // Silver
-  "USOIL", // WTI Crude Oil
-  "UKOIL", // Brent Crude Oil
-
-  // Indices
-  "US30", // Dow Jones
-  "NAS100", // NASDAQ
-  "SPX500", // S&P 500
-  "UK100", // FTSE 100
-  "GER40", // DAX
-  "JPN225", // Nikkei
-
-  // Crypto (if supported)
-  "BTCUSD",
-  "ETHUSD",
-];
+// Use centralized symbol configuration from TRADING_CONFIG
+// This ensures consistency across the platform and includes all supported symbols:
+// - Major & Minor Forex Pairs
+// - Exotic Forex Pairs
+// - Commodities (Precious Metals, Energy, Base Metals, Agricultural)
+const SYMBOLS = TRADING_CONFIG.SUPPORTED_SYMBOLS;
 
 const TIMEFRAMES = ["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1"];
 
