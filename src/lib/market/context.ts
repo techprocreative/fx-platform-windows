@@ -13,7 +13,7 @@
  */
 
 import { getCurrentSessionContext, getOptimalPairsForCurrentSessions } from './sessions';
-import yahooFinance from 'yahoo-finance2';
+import YahooFinance from 'yahoo-finance2';
 
 export interface OHLCV {
   timestamp: Date;
@@ -71,6 +71,7 @@ export interface MarketContextRequest {
 export class MarketContextProvider {
   private cache: Map<string, { context: MarketContext; timestamp: Date }>;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private yahooFinance = new YahooFinance({ suppressNotices: ['ripHistorical'] });
 
   constructor() {
     this.cache = new Map();
@@ -174,25 +175,25 @@ export class MarketContextProvider {
       
       console.log(`📊 Fetching ${periods} candles for ${yahooSymbol} (${timeframe}) from Yahoo Finance...`);
       
-      // Fetch historical data using yahoo-finance2
-      const result = await yahooFinance.historical(yahooSymbol, {
+      // Fetch historical data using yahoo-finance2 chart method
+      const result = await this.yahooFinance.chart(yahooSymbol, {
         period1,
         period2,
-        interval
+        interval: interval as '1m' | '2m' | '5m' | '15m' | '30m' | '60m' | '90m' | '1h' | '1d' | '5d' | '1wk' | '1mo' | '3mo'
       });
 
-      if (!result || result.length === 0) {
+      if (!result || !result.quotes || result.quotes.length === 0) {
         throw new Error(`No historical data available for ${symbol}`);
       }
 
       // Convert to OHLCV format
-      const ohlcvData: OHLCV[] = result.map(candle => ({
-        timestamp: candle.date,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
-        volume: candle.volume
+      const ohlcvData: OHLCV[] = result.quotes.map(quote => ({
+        timestamp: new Date(quote.date),
+        open: quote.open,
+        high: quote.high,
+        low: quote.low,
+        close: quote.close,
+        volume: quote.volume
       }));
 
       console.log(`✅ Fetched ${ohlcvData.length} real candles for ${symbol} from Yahoo Finance`);
@@ -241,20 +242,20 @@ export class MarketContextProvider {
   /**
    * Calculate date range and interval for Yahoo Finance
    */
-  private calculateDateRange(timeframe: string, periods: number): { period1: Date; period2: Date; interval: any } {
+  private calculateDateRange(timeframe: string, periods: number): { period1: Date; period2: Date; interval: string } {
     const period2 = new Date(); // Current time
     
     // Map timeframes to intervals and calculate period1
-    const timeframeMap: Record<string, { interval: any; durationMs: number }> = {
-      'M1': { interval: '1m' as any, durationMs: 60 * 1000 },
-      'M5': { interval: '5m' as any, durationMs: 5 * 60 * 1000 },
-      'M15': { interval: '15m' as any, durationMs: 15 * 60 * 1000 },
-      'M30': { interval: '30m' as any, durationMs: 30 * 60 * 1000 },
-      'H1': { interval: '1h' as any, durationMs: 60 * 60 * 1000 },
-      'H4': { interval: '1h' as any, durationMs: 4 * 60 * 60 * 1000 }, // Yahoo doesn't have 4h, use 1h
-      'D1': { interval: '1d' as any, durationMs: 24 * 60 * 60 * 1000 },
-      'W1': { interval: '1wk' as any, durationMs: 7 * 24 * 60 * 60 * 1000 },
-      'MN1': { interval: '1mo' as any, durationMs: 30 * 24 * 60 * 60 * 1000 },
+    const timeframeMap: Record<string, { interval: string; durationMs: number }> = {
+      'M1': { interval: '1m', durationMs: 60 * 1000 },
+      'M5': { interval: '5m', durationMs: 5 * 60 * 1000 },
+      'M15': { interval: '15m', durationMs: 15 * 60 * 1000 },
+      'M30': { interval: '30m', durationMs: 30 * 60 * 1000 },
+      'H1': { interval: '1h', durationMs: 60 * 60 * 1000 },
+      'H4': { interval: '1h', durationMs: 4 * 60 * 60 * 1000 }, // Yahoo doesn't have 4h, use 1h
+      'D1': { interval: '1d', durationMs: 24 * 60 * 60 * 1000 },
+      'W1': { interval: '1wk', durationMs: 7 * 24 * 60 * 60 * 1000 },
+      'MN1': { interval: '1mo', durationMs: 30 * 24 * 60 * 60 * 1000 },
     };
 
     const tf = timeframeMap[timeframe] || timeframeMap['H1'];
