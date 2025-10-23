@@ -84,10 +84,16 @@ Replace mock data fallback with:
    - Removed mockRiskAlerts array
    - Added error state management
 
+4. **Market Context Module** - Removed ~30 lines of mock data
+   - Removed mock price generation (random data)
+   - Integrated real Yahoo Finance data via MarketDataService
+   - Added proper API initialization and error handling
+   - Real OHLCV data for ATR, trend, support/resistance calculations
+
 ### Total Impact
-- **~240 lines of mock data removed**
-- **3 dashboard pages cleaned**
-- **All pages now use real Prisma database data**
+- **~270 lines of mock data removed**
+- **3 dashboard pages + 1 market module cleaned**
+- **All pages now use real data (Prisma DB + Yahoo Finance API)**
 - **Proper error handling implemented**
 
 ## Testing Checklist

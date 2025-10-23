@@ -1,15 +1,20 @@
 /**
  * Market Context Provider for Enhanced AI Strategy Generation
  * 
- * This module provides real-time market context data including:
- * - Current volatility (ATR)
- * - Trend direction
- * - Key support/resistance levels
- * - Market session information
- * - Optimal trading conditions
+ * This module provides real-time market context data using Yahoo Finance API including:
+ * - Current volatility (ATR) - calculated from real historical data
+ * - Trend direction - analyzed from real price movements
+ * - Key support/resistance levels - identified from actual price swings
+ * - Market session information - from current time and trading hours
+ * - Optimal trading conditions - based on session analysis
+ * 
+ * Data Source: Yahoo Finance (via RapidAPI)
+ * Cache TTL: 5 minutes
  */
 
 import { getCurrentSessionContext, getOptimalPairsForCurrentSessions } from './sessions';
+import { MarketDataService } from '../market-data/service';
+import type { OHLCV } from '../data-providers/common/types';
 
 export interface MarketContext {
   symbol: string;
@@ -58,9 +63,35 @@ export interface MarketContextRequest {
 export class MarketContextProvider {
   private cache: Map<string, { context: MarketContext; timestamp: Date }>;
   private readonly CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+  private marketDataService: MarketDataService | null = null;
 
   constructor() {
     this.cache = new Map();
+    this.initializeMarketDataService();
+  }
+
+  /**
+   * Initialize market data service with Yahoo Finance
+   */
+  private initializeMarketDataService(): void {
+    try {
+      const yahooApiKey = process.env.YAHOO_FINANCE_API_KEY;
+      const yahooApiHost = process.env.YAHOO_FINANCE_API_HOST;
+
+      if (yahooApiKey && yahooApiHost) {
+        this.marketDataService = new MarketDataService({
+          yahooFinanceApiKey: yahooApiKey,
+          yahooFinanceApiHost: yahooApiHost,
+          preferredProvider: 'yahoo-finance',
+          enableFallback: false
+        });
+        console.log('✅ Market Context: Yahoo Finance data provider initialized');
+      } else {
+        console.warn('⚠️ Market Context: Yahoo Finance API credentials not found');
+      }
+    } catch (error) {
+      console.error('❌ Market Context: Failed to initialize Yahoo Finance provider:', error);
+    }
   }
 
   /**
@@ -97,7 +128,7 @@ export class MarketContextProvider {
   private async buildMarketContext(request: MarketContextRequest): Promise<MarketContext> {
     const { symbol, timeframe, atrPeriod = 14, lookbackPeriods = 100 } = request;
 
-    // Get market data (mock implementation - in production, this would fetch from real data source)
+    // Get real market data from Yahoo Finance
     const marketData = await this.getMarketData(symbol, timeframe, lookbackPeriods);
     
     // Calculate ATR for volatility
@@ -148,33 +179,66 @@ export class MarketContextProvider {
   }
 
   /**
-   * Get market data for analysis (mock implementation)
+   * Get real market data from Yahoo Finance
    */
-  private async getMarketData(symbol: string, timeframe: string, periods: number): Promise<any[]> {
-    // In production, this would fetch from Yahoo Finance, broker API, or other data source
-    // For now, return mock data that looks realistic
-    
-    const basePrice = symbol.includes('JPY') ? 150 : 1.1;
-    const volatility = symbol.includes('JPY') ? 0.5 : 0.01;
-    
-    const data = [];
-    let currentPrice = basePrice;
-    
-    for (let i = 0; i < periods; i++) {
-      const change = (Math.random() - 0.5) * volatility;
-      currentPrice = Math.max(0.0001, currentPrice + change);
-      
-      data.push({
-        timestamp: new Date(Date.now() - (periods - i) * 60 * 60 * 1000), // 1-hour candles
-        open: currentPrice,
-        high: currentPrice * (1 + Math.random() * volatility * 0.5),
-        low: currentPrice * (1 - Math.random() * volatility * 0.5),
-        close: currentPrice,
-        volume: Math.floor(Math.random() * 10000) + 1000
-      });
+  private async getMarketData(symbol: string, timeframe: string, periods: number): Promise<OHLCV[]> {
+    // Check if market data service is available
+    if (!this.marketDataService) {
+      throw new Error('Market data service not initialized. Please configure Yahoo Finance API credentials.');
     }
-    
-    return data;
+
+    try {
+      // Convert timeframe format to match provider expectations
+      const providerTimeframe = this.convertTimeframeFormat(timeframe);
+      
+      // Fetch real historical data from Yahoo Finance
+      const historicalData = await this.marketDataService.getHistoricalData(
+        symbol,
+        providerTimeframe,
+        periods
+      );
+
+      if (!historicalData || !historicalData.data || historicalData.data.length === 0) {
+        throw new Error(`No historical data available for ${symbol} on ${timeframe}`);
+      }
+
+      console.log(`✅ Fetched ${historicalData.data.length} real candles for ${symbol} from Yahoo Finance`);
+      
+      return historicalData.data;
+    } catch (error) {
+      console.error(`❌ Failed to fetch market data for ${symbol}:`, error);
+      throw new Error(`Failed to fetch market data: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Convert timeframe format to provider-compatible format
+   */
+  private convertTimeframeFormat(timeframe: string): string {
+    // Map common timeframe formats to provider format
+    const timeframeMap: Record<string, string> = {
+      'M1': '1min',
+      'M5': '5min',
+      'M15': '15min',
+      'M30': '30min',
+      'H1': '1h',
+      'H4': '4h',
+      'D1': '1day',
+      'W1': '1week',
+      'MN1': '1month',
+      // Also support lowercase versions
+      'm1': '1min',
+      'm5': '5min',
+      'm15': '15min',
+      'm30': '30min',
+      'h1': '1h',
+      'h4': '4h',
+      'd1': '1day',
+      'w1': '1week',
+      'mn1': '1month'
+    };
+
+    return timeframeMap[timeframe] || timeframe;
   }
 
   /**
