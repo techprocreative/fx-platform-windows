@@ -55,3 +55,11 @@ prisma/generated/
 # Vercel
 .vercel
 SAFE_PUSH_CHECKLIST.md
+
+# Windows Executor (separate project)
+windows-executor/node_modules/
+windows-executor/dist/
+windows-executor/.next/
+windows-executor/build/
+windows-executor/logs/
+windows-executor/coverage/

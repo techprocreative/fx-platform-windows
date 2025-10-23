@@ -1,0 +1,36 @@
+# Exclude Windows Executor from Vercel deployment
+# This is a separate desktop application, not part of web platform
+windows-executor/
+
+# Documentation files
+WINDOWS_EXECUTOR_PLAN.md
+WINDOWS_EXECUTOR_STRUCTURE.md
+IMPLEMENTATION_GUIDE.md
+ARCHITECTURE_DIAGRAM.md
+
+# Deployment docs with credentials
+DATABASE_INIT_COMPLETE.md
+DEPLOY_NOW.md
+supervisor/VERCEL_ENV_SETUP.md
+supervisor/DEPLOY_STEPS.md
+SAFE_PUSH_CHECKLIST.md
+
+# Test/seed scripts
+supervisor/seed-demo.js
+supervisor/test-login.js
+
+# Development files
+*.test.ts
+*.spec.ts
+__tests__/
+tests/
+*.md
+!README.md
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite
