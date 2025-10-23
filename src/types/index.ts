@@ -290,6 +290,7 @@ export interface CorrelationData {
   lastUpdated: Date;
   trend: 'increasing' | 'decreasing' | 'stable';
   changeRate: number; // Rate of change in correlation over time
+  standardError?: number; // Standard error for confidence intervals
 }
 
 export interface CorrelationThreshold {

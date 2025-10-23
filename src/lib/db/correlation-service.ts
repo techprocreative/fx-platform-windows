@@ -214,7 +214,7 @@ export class CorrelationService {
       // Create conflicting positions records
       if (result.conflictingPositions.length > 0) {
         await prisma.correlationConflict.createMany({
-          data: result.conflictingPositions.map(conflict => ({
+          data: result.conflictingPositions.map((conflict: any) => ({
             analysisResultId: analysisRecord.id,
             symbol: conflict.symbol,
             correlation: conflict.correlation,
@@ -248,11 +248,11 @@ export class CorrelationService {
         take: limit
       });
 
-      return results.map(result => ({
+      return results.map((result: any) => ({
         symbol: result.symbol,
         shouldSkip: result.shouldSkip,
         reason: result.reason || undefined,
-        conflictingPositions: result.conflictingPositions.map(conflict => ({
+        conflictingPositions: result.conflictingPositions.map((conflict: any) => ({
           symbol: conflict.symbol,
           correlation: conflict.correlation,
           positionSize: conflict.positionSize
@@ -275,7 +275,7 @@ export class CorrelationService {
   ): Promise<void> {
     try {
       await prisma.correlationThreshold.createMany({
-        data: thresholds,
+        data: thresholds as any,
         skipDuplicates: true
       });
 
@@ -325,12 +325,13 @@ export class CorrelationService {
       for (const group of groups) {
         // Create group record
         const groupRecord = await prisma.correlationGroup.upsert({
-          where: { currency: group.currency },
+          where: { id: group.currency }, // Use currency as ID since not unique
           update: {
             averageInternalCorrelation: group.averageInternalCorrelation,
             riskFactor: group.riskFactor
           },
           create: {
+            id: group.currency,
             currency: group.currency,
             averageInternalCorrelation: group.averageInternalCorrelation,
             riskFactor: group.riskFactor
@@ -373,9 +374,9 @@ export class CorrelationService {
         }
       });
 
-      return groups.map(group => ({
+      return groups.map((group: any) => ({
         currency: group.currency,
-        pairs: group.groupMembers.map(member => member.symbol),
+        pairs: group.groupMembers.map((member: any) => member.symbol),
         averageInternalCorrelation: group.averageInternalCorrelation,
         riskFactor: group.riskFactor
       }));
