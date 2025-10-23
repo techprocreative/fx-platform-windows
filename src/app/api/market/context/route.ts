@@ -7,6 +7,33 @@ import { marketContextProvider } from '../../../../lib/market/context';
 import { callLLM } from '../../../../lib/llm/openrouter';
 import { buildMarketAnalysisPrompt, ENHANCED_STRATEGY_PROMPTS } from '../../../../lib/llm/prompts';
 
+// Initialize Redis for caching (Upstash Redis)
+let redis: any = null;
+let isRedisAvailable = false;
+
+async function initializeRedis() {
+  if (redis) return redis;
+  
+  try {
+    if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      const { Redis } = await import('@upstash/redis');
+      redis = new Redis({
+        url: process.env.UPSTASH_REDIS_REST_URL,
+        token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      });
+      isRedisAvailable = true;
+      console.log('✅ Redis cache initialized for market context');
+      return redis;
+    }
+  } catch (error) {
+    console.error('❌ Redis initialization failed:', error);
+  }
+  return null;
+}
+
+// Cache TTL: 15 minutes (900 seconds)
+const CACHE_TTL = 900;
+
 // Request validation schema
 const MarketContextSchema = z.object({
   symbol: z.string().min(1).max(10),
@@ -128,7 +155,38 @@ export async function GET(request: NextRequest) {
       includeAnalysis: searchParams.get('includeAnalysis') === 'true'
     });
 
-    // Get market context data
+    // Initialize Redis
+    const redisClient = await initializeRedis();
+    
+    // Generate cache key
+    const cacheKey = `market-context:${params.symbol}:${params.timeframe}:${params.atrPeriod}:${params.lookbackPeriods}`;
+
+    // Try to get from cache first
+    if (redisClient && isRedisAvailable) {
+      try {
+        const cached = await redisClient.get(cacheKey);
+        if (cached) {
+          const parsedCache = typeof cached === 'string' ? JSON.parse(cached) : cached;
+          console.log(`✅ Cache HIT for ${params.symbol} ${params.timeframe} (Age: ${Math.floor((Date.now() - new Date(parsedCache.timestamp).getTime()) / 1000)}s)`);
+          
+          return NextResponse.json({
+            success: true,
+            data: {
+              marketContext: parsedCache.marketContext,
+              timestamp: parsedCache.timestamp,
+              cached: true,
+              cacheAge: Math.floor((Date.now() - new Date(parsedCache.timestamp).getTime()) / 1000)
+            }
+          });
+        } else {
+          console.log(`💨 Cache MISS for ${params.symbol} ${params.timeframe}`);
+        }
+      } catch (cacheError) {
+        console.error('Cache read error:', cacheError);
+      }
+    }
+
+    // Get fresh market context data
     const marketContext = await marketContextProvider.getMarketContext({
       symbol: params.symbol,
       timeframe: params.timeframe,
@@ -136,11 +194,28 @@ export async function GET(request: NextRequest) {
       lookbackPeriods: params.lookbackPeriods
     });
 
+    const timestamp = new Date().toISOString();
+
+    // Store in cache
+    if (redisClient && isRedisAvailable) {
+      try {
+        const cacheData = {
+          marketContext,
+          timestamp
+        };
+        await redisClient.setex(cacheKey, CACHE_TTL, JSON.stringify(cacheData));
+        console.log(`💾 Cached market context for ${params.symbol} ${params.timeframe} (TTL: ${CACHE_TTL}s)`);
+      } catch (cacheError) {
+        console.error('Cache write error:', cacheError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: {
         marketContext,
-        timestamp: new Date().toISOString()
+        timestamp,
+        cached: false
       }
     });
 

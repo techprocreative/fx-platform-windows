@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Plus,
 } from 'lucide-react';
+import { MarketSessionsWidget } from '@/components/market/MarketSessionsWidget';
 
 interface DashboardStats {
   activeStrategies: number;
@@ -118,6 +119,9 @@ export default function DashboardPage() {
           format="percent"
         />
       </div>
+
+      {/* Market Sessions Widget - NEW */}
+      <MarketSessionsWidget />
 
       {/* Quick Actions */}
       <div className="grid gap-6 md:grid-cols-2">
