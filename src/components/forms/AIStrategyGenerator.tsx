@@ -259,6 +259,91 @@ Please create a strategy that takes this current market situation into account.`
     return count;
   };
 
+  // Get all market sessions with status
+  const getAllSessionsStatus = () => {
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+    const utcMinutes = now.getUTCMinutes();
+    const currentTimeMinutes = utcHours * 60 + utcMinutes;
+
+    const sessions = [
+      {
+        name: 'Sydney',
+        emoji: '🇦🇺',
+        start: 22 * 60, // 22:00 UTC
+        end: 7 * 60,    // 07:00 UTC (next day)
+        volume: 'Low',
+        wibTime: '05:00-14:00 WIB'
+      },
+      {
+        name: 'Tokyo',
+        emoji: '🇯🇵',
+        start: 0 * 60,  // 00:00 UTC
+        end: 9 * 60,    // 09:00 UTC
+        volume: 'Medium',
+        wibTime: '07:00-16:00 WIB'
+      },
+      {
+        name: 'London',
+        emoji: '🇬🇧',
+        start: 8 * 60,  // 08:00 UTC
+        end: 17 * 60,   // 17:00 UTC
+        volume: 'High',
+        wibTime: '15:00-00:00 WIB'
+      },
+      {
+        name: 'NewYork',
+        emoji: '🇺🇸',
+        start: 13 * 60, // 13:00 UTC
+        end: 22 * 60,   // 22:00 UTC
+        volume: 'High',
+        wibTime: '20:00-05:00 WIB'
+      }
+    ];
+
+    return sessions.map(session => {
+      let isActive = false;
+      let minutesRemaining = 0;
+      let minutesToOpen = 0;
+
+      // Check if session is active (handles midnight crossover)
+      if (session.start < session.end) {
+        isActive = currentTimeMinutes >= session.start && currentTimeMinutes < session.end;
+        if (isActive) {
+          minutesRemaining = session.end - currentTimeMinutes;
+        } else if (currentTimeMinutes < session.start) {
+          minutesToOpen = session.start - currentTimeMinutes;
+        } else {
+          minutesToOpen = (24 * 60 - currentTimeMinutes) + session.start;
+        }
+      } else {
+        // Session crosses midnight (Sydney)
+        isActive = currentTimeMinutes >= session.start || currentTimeMinutes < session.end;
+        if (isActive) {
+          if (currentTimeMinutes >= session.start) {
+            minutesRemaining = (24 * 60 - currentTimeMinutes) + session.end;
+          } else {
+            minutesRemaining = session.end - currentTimeMinutes;
+          }
+        } else {
+          minutesToOpen = session.start - currentTimeMinutes;
+        }
+      }
+
+      const hoursRemaining = Math.floor(minutesRemaining / 60);
+      const minsRemaining = minutesRemaining % 60;
+      const hoursToOpen = Math.floor(minutesToOpen / 60);
+      const minsToOpen = minutesToOpen % 60;
+
+      return {
+        ...session,
+        isActive,
+        timeRemaining: isActive ? `${hoursRemaining}h ${minsRemaining}m` : null,
+        opensIn: !isActive ? `${hoursToOpen}h ${minsToOpen}m` : null
+      };
+    });
+  };
+
   const promptExamples = [
     "Create a scalping strategy using RSI and MACD for EURUSD on 5-minute timeframe",
     "Build a trend-following strategy with EMA crossover and ADX filter for GBPUSD daily chart",
@@ -367,7 +452,7 @@ Please create a strategy that takes this current market situation into account.`
                 Failed to load market context: {contextError}
               </div>
             ) : marketContext ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {/* Price and Trend */}
                 <div className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2">
@@ -389,55 +474,148 @@ Please create a strategy that takes this current market situation into account.`
                   </div>
                 </div>
 
-                {/* Volatility and Sessions */}
-                <div className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-neutral-500">Volatility:</span>
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      marketContext.volatility.volatilityLevel === 'high'
-                        ? 'bg-red-100 text-red-700'
-                        : marketContext.volatility.volatilityLevel === 'medium'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-green-100 text-green-700'
-                    }`}>
-                      {marketContext.volatility.volatilityLevel.toUpperCase()}
-                    </span>
-                    <span className="text-xs text-neutral-500">(ATR: {marketContext.volatility.currentATR.toFixed(5)})</span>
+                {/* Volatility */}
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-xs text-neutral-500">Volatility:</span>
+                  <span className={`px-2 py-1 rounded text-xs ${
+                    marketContext.volatility.volatilityLevel === 'high'
+                      ? 'bg-red-100 text-red-700'
+                      : marketContext.volatility.volatilityLevel === 'medium'
+                      ? 'bg-yellow-100 text-yellow-700'
+                      : 'bg-green-100 text-green-700'
+                  }`}>
+                    {marketContext.volatility.volatilityLevel.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-neutral-500">(ATR: {marketContext.volatility.currentATR.toFixed(5)})</span>
+                </div>
+
+                {/* All Market Sessions with Status */}
+                <div className="border-t border-blue-200 pt-2 mt-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-blue-700">MARKET SESSIONS (24/7)</span>
+                    <span className="text-xs text-blue-600">Live Status</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3 text-blue-600" />
-                    <span className="text-xs text-neutral-500">
-                      {marketContext.session.activeSessions.length > 0
-                        ? marketContext.session.activeSessions.join(', ')
-                        : 'No active sessions'}
-                    </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {getAllSessionsStatus().map((session, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-2 rounded border ${
+                          session.isActive
+                            ? 'border-green-300 bg-green-50'
+                            : 'border-gray-200 bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1">
+                            <span className={`text-lg`}>{session.emoji}</span>
+                            <span className={`text-xs font-semibold ${
+                              session.isActive ? 'text-green-700' : 'text-gray-500'
+                            }`}>
+                              {session.name}
+                            </span>
+                          </div>
+                          <div className={`h-2 w-2 rounded-full ${
+                            session.isActive ? 'bg-green-500 animate-pulse' : 'bg-gray-300'
+                          }`} />
+                        </div>
+                        <div className="mt-1 text-xs text-neutral-600">
+                          {session.wibTime}
+                        </div>
+                        <div className="mt-1 flex items-center justify-between">
+                          <span className={`text-xs font-medium ${
+                            session.volume === 'High' ? 'text-red-600' :
+                            session.volume === 'Medium' ? 'text-yellow-600' :
+                            'text-green-600'
+                          }`}>
+                            {session.volume} Vol
+                          </span>
+                          {session.isActive ? (
+                            <span className="text-xs text-green-600">
+                              {session.timeRemaining} left
+                            </span>
+                          ) : (
+                            <span className="text-xs text-gray-500">
+                              Opens in {session.opensIn}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {/* Golden Hour Indicator */}
+                  {(() => {
+                    const sessions = getAllSessionsStatus();
+                    const londonActive = sessions.find(s => s.name === 'London')?.isActive;
+                    const nyActive = sessions.find(s => s.name === 'NewYork')?.isActive;
+                    if (londonActive && nyActive) {
+                      return (
+                        <div className="mt-2 p-2 bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-300 rounded">
+                          <div className="flex items-center gap-2">
+                            <span className="text-lg">⭐</span>
+                            <div className="flex-1">
+                              <div className="text-xs font-bold text-orange-700">GOLDEN HOUR - HIGHEST VOLUME!</div>
+                              <div className="text-xs text-orange-600">London + NewYork Overlap (70% daily volume)</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+                  
+                  {/* Next High Volume Session */}
+                  <div className="mt-2 text-xs text-neutral-600 bg-blue-50 p-2 rounded">
+                    <span className="font-semibold text-blue-700">💡 Best Trading Time:</span> 20:00-00:00 WIB (London+NY Overlap)
                   </div>
                 </div>
 
-                {/* Key Levels */}
+                {/* Key Levels with Explanation */}
                 {(marketContext.keyLevels.nearestSupport || marketContext.keyLevels.nearestResistance) && (
-                  <div className="flex items-center justify-between text-sm">
-                    {marketContext.keyLevels.nearestSupport && (
-                      <span className="text-xs text-green-600">
-                        S: {marketContext.keyLevels.nearestSupport.toFixed(5)}
-                      </span>
-                    )}
-                    {marketContext.keyLevels.nearestResistance && (
-                      <span className="text-xs text-red-600">
-                        R: {marketContext.keyLevels.nearestResistance.toFixed(5)}
-                      </span>
-                    )}
+                  <div className="border-t border-blue-200 pt-2 mt-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-semibold text-blue-700">KEY PRICE LEVELS</span>
+                      <span className="text-xs text-blue-600">Technical Analysis</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {marketContext.keyLevels.nearestSupport && (
+                        <div className="p-2 rounded border border-green-200 bg-green-50">
+                          <div className="text-xs font-semibold text-green-700 mb-1">Support (S)</div>
+                          <div className="text-sm font-bold text-green-600">
+                            {marketContext.keyLevels.nearestSupport.toFixed(5)}
+                          </div>
+                          <div className="text-xs text-green-600 mt-1">Buy zone / Stop loss</div>
+                        </div>
+                      )}
+                      {marketContext.keyLevels.nearestResistance && (
+                        <div className="p-2 rounded border border-red-200 bg-red-50">
+                          <div className="text-xs font-semibold text-red-700 mb-1">Resistance (R)</div>
+                          <div className="text-sm font-bold text-red-600">
+                            {marketContext.keyLevels.nearestResistance.toFixed(5)}
+                          </div>
+                          <div className="text-xs text-red-600 mt-1">Sell zone / Take profit</div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 text-xs text-neutral-600 bg-purple-50 p-2 rounded">
+                      <span className="font-semibold text-purple-700">ℹ️ What is S & R?</span>
+                      <ul className="mt-1 space-y-0.5 text-neutral-600">
+                        <li>• <strong>Support (S):</strong> Level dimana harga cenderung berhenti turun (demand zone)</li>
+                        <li>• <strong>Resistance (R):</strong> Level dimana harga cenderung berhenti naik (supply zone)</li>
+                        <li>• Digunakan untuk menentukan entry/exit points dan stop loss/take profit</li>
+                      </ul>
+                    </div>
                   </div>
                 )}
 
                 {/* Optimal Trading Indicator */}
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-2 text-xs pt-2 border-t border-blue-200">
                   <span className={`px-2 py-1 rounded ${
                     marketContext.session.isOptimalForPair
                       ? 'bg-green-100 text-green-700'
                       : 'bg-gray-100 text-gray-700'
                   }`}>
-                    {marketContext.session.isOptimalForPair ? 'OPTIMAL' : 'SUBOPTIMAL'}
+                    {marketContext.session.isOptimalForPair ? '✅ OPTIMAL' : '⚠️ SUBOPTIMAL'}
                   </span>
                   <span className="text-neutral-500">
                     for {marketContext.symbol} at this time
