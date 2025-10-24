@@ -1,0 +1,30 @@
+# Build output
+dist/
+dist-portable/
+dist-packager/
+
+# Node modules
+node_modules/
+
+# Logs
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Database
+*.db
+*.sqlite
+
+# Config
+executor.db

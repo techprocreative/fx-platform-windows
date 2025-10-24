@@ -9,6 +9,7 @@ import {
 import { ZeroMQService } from './zeromq.service';
 import { PusherService } from './pusher.service';
 import { CommandService } from './command.service';
+import { ApiService } from './api.service';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import * as os from 'os';
@@ -17,6 +18,7 @@ const execAsync = promisify(exec);
 
 export class HeartbeatService {
   private config: AppConfig | null = null;
+  private apiService: ApiService | null = null;
   private zeroMQService: ZeroMQService;
   private pusherService: PusherService;
   private commandService: CommandService;
@@ -42,13 +44,19 @@ export class HeartbeatService {
     zeroMQService: ZeroMQService,
     pusherService: PusherService,
     commandService: CommandService,
-    logger?: (level: string, message: string, metadata?: any) => void
+    logger?: (level: string, message: string, metadata?: any) => void,
+    apiService?: ApiService
   ) {
     this.zeroMQService = zeroMQService;
     this.pusherService = pusherService;
     this.commandService = commandService;
+    this.apiService = apiService || null;
     this.logger = logger || this.defaultLogger;
     this.startTime = new Date();
+  }
+  
+  setApiService(apiService: ApiService): void {
+    this.apiService = apiService;
   }
 
   private log(level: string, message: string, metadata?: any): void {
@@ -144,7 +152,38 @@ export class HeartbeatService {
     try {
       const heartbeatData = await this.createHeartbeatData();
       
-      // Send via Pusher
+      // Send via API Service (primary)
+      if (this.apiService) {
+        try {
+          const response = await this.apiService.sendHeartbeat({
+            status: 'online',
+            metadata: {
+              version: '1.0.0',
+              platform: 'windows',
+              accountBalance: heartbeatData.mt5Status?.accountBalance,
+              accountEquity: heartbeatData.mt5Status?.accountEquity,
+              openPositions: heartbeatData.mt5Status?.openPositions,
+              cpuUsage: this.systemMetrics.cpuUsage,
+              memoryUsage: this.systemMetrics.memoryUsage,
+              timestamp: new Date().toISOString(),
+            },
+          });
+
+          // Check for pending commands
+          if (response.pendingCommands && response.pendingCommands.length > 0) {
+            this.log('info', 'Received pending commands', {
+              count: response.pendingCommands.length,
+            });
+            // TODO: Pass to command service
+          }
+        } catch (apiError) {
+          this.log('warn', 'Failed to send heartbeat via API, falling back to Pusher', {
+            error: (apiError as Error).message,
+          });
+        }
+      }
+      
+      // Send via Pusher (fallback or redundant)
       await this.pusherService.sendCommandResult('heartbeat', {
         type: 'heartbeat',
         data: heartbeatData,

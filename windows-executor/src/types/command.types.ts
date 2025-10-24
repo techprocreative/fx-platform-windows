@@ -110,6 +110,11 @@ export interface HeartbeatData {
   uptime: number;
   connections: ConnectionStatus;
   mt5Info?: MT5Info[];
+  mt5Status?: {
+    accountBalance?: number;
+    accountEquity?: number;
+    openPositions?: number;
+  };
   systemMetrics: SystemMetrics;
   queueStats: QueueStats;
   activeCommands: number;

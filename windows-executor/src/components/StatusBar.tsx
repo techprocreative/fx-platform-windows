@@ -1,8 +1,8 @@
-import React from 'react';
+
 import { useAppStore } from '../stores/app.store';
 import { StatusIndicator } from './StatusIndicator';
 
-export function StatusBar() {
+export function StatusBar({ connectionStatus: propConnectionStatus, onNavigate, currentPage: propCurrentPage }: { connectionStatus?: any; onNavigate?: (page: string) => void; currentPage?: string }) {
   const { 
     connectionStatus, 
     config, 

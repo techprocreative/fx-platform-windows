@@ -1,7 +1,7 @@
 import { EventEmitter } from 'events';
 import { AppConfig, ConnectionStatus, LogEntry } from '../types/config.types';
 import { MT5Info } from '../types/mt5.types';
-import { Command, CommandResult } from '../types/command.types';
+import { Command } from '../types/command.types';
 import { DatabaseConfig } from '../types/security.types';
 import { MT5AutoInstaller } from '../services/mt5-auto-installer.service';
 import { MT5DetectorService } from '../services/mt5-detector.service';
@@ -12,6 +12,8 @@ import { HeartbeatService } from '../services/heartbeat.service';
 import { SafetyService } from '../services/safety.service';
 import { MonitoringService } from '../services/monitoring.service';
 import { SecurityService } from '../services/security.service';
+import { ApiService } from '../services/api.service';
+import { ConnectionManager } from '../services/connection-manager.service';
 import { DatabaseManager } from '../database/manager';
 
 /**
@@ -28,6 +30,8 @@ export class MainController extends EventEmitter {
   // Services
   private mt5Installer!: MT5AutoInstaller;
   private mt5Detector!: MT5DetectorService;
+  private apiService!: ApiService;
+  private connectionManager!: ConnectionManager;
   private pusherService!: PusherService;
   private zeromqService!: ZeroMQService;
   private commandService!: CommandService;
@@ -91,6 +95,13 @@ export class MainController extends EventEmitter {
     // Initialize services with dependency injection
     this.mt5Detector = new MT5DetectorService();
     this.mt5Installer = new MT5AutoInstaller();
+    this.apiService = new ApiService(logger);
+    this.connectionManager = new ConnectionManager({
+      initialDelay: 1000,
+      maxDelay: 60000,
+      maxAttempts: 10,
+      backoffMultiplier: 2,
+    }, logger);
     this.pusherService = new PusherService(logger);
     this.zeromqService = new ZeroMQService(logger);
     this.safetyService = new SafetyService(this.db);
@@ -103,7 +114,8 @@ export class MainController extends EventEmitter {
       this.pusherService,
       this.safetyService.getLimits(),
       this.getRateLimitConfig(),
-      logger
+      logger,
+      this.apiService
     );
     
     // Heartbeat service
@@ -111,7 +123,8 @@ export class MainController extends EventEmitter {
       this.zeromqService,
       this.pusherService,
       this.commandService,
-      logger
+      logger,
+      this.apiService
     );
     
     // Setup service event handlers
@@ -122,10 +135,56 @@ export class MainController extends EventEmitter {
    * Setup event handlers for all services
    */
   private setupServiceEventHandlers(): void {
+    // Connection Manager events
+    this.connectionManager.on('connection-status-changed', (data: any) => {
+      this.addLog('info', 'CONNECTION', `${data.type} status changed: ${data.status}`, data);
+      
+      // Update local connection status
+      if (data.type === 'pusher') this.connectionStatus.pusher = data.status;
+      if (data.type === 'zeromq') this.connectionStatus.zeromq = data.status;
+      if (data.type === 'api') this.connectionStatus.api = data.status;
+      if (data.type === 'mt5') this.connectionStatus.mt5 = data.status;
+      
+      this.emit('connection-status-changed', this.connectionStatus);
+    });
+
+    this.connectionManager.on('reconnect-requested', async (data: any) => {
+      this.addLog('info', 'CONNECTION', `Reconnecting ${data.type}...`, data);
+      
+      // Reconnection will be handled by each service's internal retry logic
+      // This event is mainly for logging and UI notifications
+    });
+
+    this.connectionManager.on('reconnection-struggling', (data: any) => {
+      this.addLog('warn', 'CONNECTION', data.message, data);
+      // Notify user via UI
+      this.emit('show-notification', {
+        type: 'warning',
+        title: 'Connection Issues',
+        message: data.message,
+      });
+    });
+
+    this.connectionManager.on('max-reconnect-attempts-reached', (data: any) => {
+      this.addLog('error', 'CONNECTION', `${data.type} reconnection failed after max attempts`, data);
+      // Notify user
+      this.emit('show-notification', {
+        type: 'error',
+        title: 'Connection Lost',
+        message: `Failed to reconnect to ${data.type}. Please check your connection and restart the application.`,
+      });
+    });
+
     // Pusher service events
     this.pusherService.on('connection-status', (data: any) => {
-      this.connectionStatus.pusher = data.status;
-      this.emit('connection-status-changed', this.connectionStatus);
+      if (data.status === 'connected') {
+        this.connectionManager.setConnected('pusher');
+      } else if (data.status === 'error') {
+        this.connectionManager.setError('pusher', data.error || 'Unknown error');
+      } else {
+        this.connectionManager.setDisconnected('pusher', data.error);
+      }
+      
       this.addLog('info', 'PUSHER', `Connection status: ${data.status}`, data);
     });
 
@@ -213,6 +272,9 @@ export class MainController extends EventEmitter {
       this.addLog('info', 'MAIN', 'Initializing Windows Executor...');
       
       this.config = config;
+      
+      // Configure API service
+      this.apiService.configure(config);
       
       // Step 1: Detect MT5 installations
       this.addLog('info', 'MAIN', 'Detecting MT5 installations...');

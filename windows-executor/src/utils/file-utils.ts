@@ -20,6 +20,24 @@ const execAsync = promisify(exec);
 
 export class FileUtils {
   /**
+   * Simple file copy operation
+   */
+  static async copy(
+    sourcePath: string,
+    destinationPath: string
+  ): Promise<void> {
+    try {
+      // Create destination directory if it doesn't exist
+      await fs.ensureDir(path.dirname(destinationPath));
+      
+      // Copy the file
+      await fs.copy(sourcePath, destinationPath);
+    } catch (error) {
+      throw new Error(`Failed to copy ${sourcePath} to ${destinationPath}: ${(error as Error).message}`);
+    }
+  }
+
+  /**
    * Copy file with backup support
    */
   static async copyWithBackup(

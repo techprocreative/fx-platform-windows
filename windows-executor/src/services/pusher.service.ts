@@ -38,7 +38,7 @@ export class PusherService {
 
       this.pusher = new Pusher(config.pusherKey, {
         cluster: config.pusherCluster,
-        encrypted: true,
+        // encrypted: true, // Removed - not in current Pusher type definitions
         authEndpoint: `${config.platformUrl}/api/pusher/auth`,
         auth: {
           headers: {

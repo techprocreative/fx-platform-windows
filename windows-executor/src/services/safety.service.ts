@@ -93,7 +93,7 @@ export class SafetyService extends EventEmitter {
 
       // Check daily loss limit
       const dailyPnL = currentMetrics.trading.dailyPnL;
-      check.metadata.dailyPnL = dailyPnL;
+      if (check.metadata) check.metadata.dailyPnL = dailyPnL;
       
       if (dailyPnL <= -this.limits.maxDailyLoss) {
         check.passed = false;
@@ -109,7 +109,7 @@ export class SafetyService extends EventEmitter {
 
       // Check maximum positions
       const openPositions = currentMetrics.trading.openPositions;
-      check.metadata.openPositions = openPositions;
+      if (check.metadata) check.metadata.openPositions = openPositions;
       
       if (openPositions >= this.limits.maxPositions) {
         check.passed = false;
@@ -126,7 +126,7 @@ export class SafetyService extends EventEmitter {
 
       // Check drawdown
       const currentDrawdown = await this.calculateCurrentDrawdown(currentMetrics);
-      check.metadata.currentDrawdown = currentDrawdown;
+      if (check.metadata) check.metadata.currentDrawdown = currentDrawdown;
       
       if (currentDrawdown >= this.limits.maxDrawdownPercent) {
         check.passed = false;
@@ -151,7 +151,7 @@ export class SafetyService extends EventEmitter {
 
       // Check account balance
       const accountBalance = currentMetrics.trading.dailyPnL; // This should be actual balance
-      check.metadata.accountBalance = accountBalance;
+      if (check.metadata) check.metadata.accountBalance = accountBalance;
       
       if (accountBalance < this.limits.minAccountBalance) {
         check.passed = false;
@@ -160,7 +160,7 @@ export class SafetyService extends EventEmitter {
 
       // Check risk per trade
       const riskPercentage = this.calculateRiskPercentage(params, currentMetrics);
-      check.metadata.riskPercentage = riskPercentage;
+      if (check.metadata) check.metadata.riskPercentage = riskPercentage;
       
       if (riskPercentage > this.limits.maxRiskPerTrade) {
         check.passed = false;

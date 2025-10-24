@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useLogsStore } from '../../stores/logs.store';
+import { useLogsStore, LogLevel } from '../../stores/logs.store';
 import { useAppStore } from '../../stores/app.store';
 import { StatusIndicator } from '../../components/StatusIndicator';
 
@@ -24,15 +24,15 @@ export function Logs() {
   const logContainerRef = useRef<HTMLDivElement>(null);
 
   // Get unique categories from logs
-  const categories = ['all', ...Array.from(new Set(logs.map(log => log.category)))];
+  const categories = ['all', ...Array.from(new Set(logs.map(log => log.category || 'uncategorized').filter(Boolean)))];
 
   // Filter logs based on search term, log levels, and category
   const filteredLogs = logs.filter(log => {
     const matchesSearch = searchTerm === '' || 
       log.message.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      log.category.toLowerCase().includes(searchTerm.toLowerCase());
+      (log.category && log.category.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesLevel = logLevels.includes(log.level);
+    const matchesLevel = logLevels[log.level] === true;
     const matchesCategory = selectedCategory === 'all' || log.category === selectedCategory;
     
     return matchesSearch && matchesLevel && matchesCategory;
@@ -53,20 +53,20 @@ export function Logs() {
     }
   };
 
-  const handleLogLevelToggle = (level: typeof logLevels[0]) => {
-    if (logLevels.includes(level)) {
-      setLogLevels(logLevels.filter(l => l !== level));
-    } else {
-      setLogLevels([...logLevels, level]);
-    }
+  const handleLogLevelToggle = (level: LogLevel) => {
+    setLogLevels({
+      ...logLevels,
+      [level]: !logLevels[level]
+    });
   };
 
   const handleClearLogs = () => {
     clearLogs();
     addLog({
       level: 'info',
-      category: 'LOGS',
+      source: 'LOGS',
       message: 'Logs cleared by user',
+      category: 'LOGS',
     });
   };
 
@@ -84,12 +84,13 @@ export function Logs() {
     
     addLog({
       level: 'info',
-      category: 'LOGS',
+      source: 'LOGS',
       message: 'Logs exported',
+      category: 'LOGS',
     });
   };
 
-  const getLogLevelColor = (level: typeof logLevels[0]) => {
+  const getLogLevelColor = (level: LogLevel) => {
     switch (level) {
       case 'debug': return 'text-gray-600';
       case 'info': return 'text-blue-600';
@@ -99,7 +100,7 @@ export function Logs() {
     }
   };
 
-  const getLogLevelBgColor = (level: typeof logLevels[0]) => {
+  const getLogLevelBgColor = (level: LogLevel) => {
     switch (level) {
       case 'debug': return 'bg-gray-100';
       case 'info': return 'bg-blue-100';
@@ -237,7 +238,7 @@ export function Logs() {
                     key={level}
                     onClick={() => handleLogLevelToggle(level)}
                     className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${
-                      logLevels.includes(level)
+                      logLevels[level]
                         ? `${getLogLevelBgColor(level)} ${getLogLevelColor(level)}`
                         : 'bg-gray-100 text-gray-600'
                     }`}
@@ -277,11 +278,13 @@ export function Logs() {
                       </div>
                       
                       {/* Category */}
-                      <div className="flex-shrink-0">
-                        <span className="px-2 py-1 text-xs font-medium rounded bg-gray-700 text-gray-300">
-                          {log.category}
-                        </span>
-                      </div>
+                      {log.category && (
+                        <div className="flex-shrink-0">
+                          <span className="px-2 py-1 text-xs font-medium rounded bg-gray-700 text-gray-300">
+                            {log.category}
+                          </span>
+                        </div>
+                      )}
                       
                       {/* Message */}
                       <div className="flex-1 min-w-0">

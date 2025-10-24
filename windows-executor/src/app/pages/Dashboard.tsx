@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/app.store';
 import { StatusIndicator } from '../../components/StatusIndicator';
 import { PerformanceCard } from '../../components/PerformanceCard';
@@ -28,8 +28,10 @@ export function Dashboard() {
     const interval = setInterval(() => {
       // Update heartbeat time
       addRecentActivity({
+        id: `heartbeat-${Date.now()}`,
         type: 'INFO',
         message: 'Heartbeat sent - OK',
+        timestamp: new Date(),
         metadata: { timestamp: new Date() }
       });
     }, 60000); // Every minute
@@ -45,14 +47,18 @@ export function Dashboard() {
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       addRecentActivity({
+        id: `refresh-${Date.now()}`,
         type: 'INFO',
         message: 'Dashboard data refreshed',
+        timestamp: new Date()
       });
     } catch (error) {
       addLog({
-        level: 'error',
-        category: 'DASHBOARD',
+        id: `error-${Date.now()}`,
+        type: 'ERROR',
         message: `Failed to refresh: ${(error as Error).message}`,
+        timestamp: new Date(),
+        metadata: { category: 'DASHBOARD' }
       });
     } finally {
       setRefreshing(false);
@@ -65,22 +71,28 @@ export function Dashboard() {
     setIsTradingEnabled(false);
     
     addRecentActivity({
+      id: `emergency-${Date.now()}`,
       type: 'ERROR',
       message: '🛑 EMERGENCY STOP ACTIVATED',
+      timestamp: new Date()
     });
     
     addLog({
-      level: 'warn',
-      category: 'SAFETY',
+      id: `emergency-log-${Date.now()}`,
+      type: 'ERROR',
       message: 'Emergency stop activated by user',
+      timestamp: new Date(),
+      metadata: { category: 'SAFETY' }
     });
     
     // Reset after 30 seconds
     setTimeout(() => {
       setIsEmergencyStopActive(false);
       addRecentActivity({
+        id: `emergency-deactivate-${Date.now()}`,
         type: 'INFO',
         message: 'Emergency stop deactivated',
+        timestamp: new Date()
       });
     }, 30000);
   };
@@ -278,27 +290,27 @@ export function Dashboard() {
                       <div className="flex items-center space-x-3">
                         <StatusIndicator 
                           status={
-                            strategy.status === 'ACTIVE' ? 'online' : 
-                            strategy.status === 'PAUSED' ? 'warning' : 'offline'
+                            strategy.status === 'active' ? 'online' : 
+                            strategy.status === 'paused' ? 'warning' : 'offline'
                           } 
                         />
                         <div>
                           <div className="font-medium text-gray-900">{strategy.name}</div>
                           <div className="text-xs text-gray-500">
-                            Pairs: {strategy.pairs.join(', ')}
+                            Pairs: {strategy.pairs?.join(', ') || 'N/A'}
                           </div>
                         </div>
                       </div>
                       
                       <div className="text-right">
                         <div className={`text-xs font-medium ${
-                          strategy.status === 'ACTIVE' 
+                          strategy.status === 'active' 
                             ? 'text-success-600' 
-                            : strategy.status === 'PAUSED' 
+                            : strategy.status === 'paused' 
                             ? 'text-warning-600' 
                             : 'text-gray-600'
                         }`}>
-                          {strategy.status}
+                          {strategy.status.toUpperCase()}
                         </div>
                         {strategy.lastSignal && (
                           <div className="text-xs text-gray-500">

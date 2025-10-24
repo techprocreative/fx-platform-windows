@@ -13,10 +13,12 @@ import {
 import { PriorityQueue, PRIORITIES } from '../utils/priority-queue';
 import { ZeroMQService } from './zeromq.service';
 import { PusherService } from './pusher.service';
+import { ApiService } from './api.service';
 
 export class CommandService {
   private commandQueue: PriorityQueue<Command>;
   private processing = false;
+  private apiService: ApiService | null = null;
   private zeroMQService: ZeroMQService;
   private pusherService: PusherService;
   private safetyLimits: SafetyLimits;
@@ -38,17 +40,23 @@ export class CommandService {
     pusherService: PusherService,
     safetyLimits: SafetyLimits,
     rateLimitConfig: RateLimitConfig,
-    logger?: (level: string, message: string, metadata?: any) => void
+    logger?: (level: string, message: string, metadata?: any) => void,
+    apiService?: ApiService
   ) {
     this.commandQueue = new PriorityQueue(1000);
     this.zeroMQService = zeroMQService;
     this.pusherService = pusherService;
+    this.apiService = apiService || null;
     this.safetyLimits = safetyLimits;
     this.rateLimitConfig = rateLimitConfig;
     this.logger = logger || this.defaultLogger;
     
     // Start processing commands
     this.startProcessing();
+  }
+  
+  setApiService(apiService: ApiService): void {
+    this.apiService = apiService;
   }
 
   private log(level: string, message: string, metadata?: any): void {
@@ -698,6 +706,16 @@ export class CommandService {
    */
   private async reportCommandResult(commandId: string, result: CommandResult): Promise<void> {
     try {
+      // Send via API Service (primary)
+      if (this.apiService) {
+        await this.apiService.reportCommandResult(
+          commandId,
+          result.success ? 'executed' : 'failed',
+          result
+        );
+      }
+      
+      // Send via Pusher (fallback/redundant)
       await this.pusherService.sendCommandResult(commandId, result);
     } catch (error) {
       this.log('error', 'Failed to report command result', {

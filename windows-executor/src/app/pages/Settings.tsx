@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useConfigStore } from '../../stores/config.store';
 import { useAppStore } from '../../stores/app.store';
 import { useLogsStore } from '../../stores/logs.store';
@@ -6,19 +6,16 @@ import { StatusIndicator } from '../../components/StatusIndicator';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 export function Settings() {
-  const { config, updateConfig, isConfigured } = useConfigStore();
+  const { config, updateConfig } = useConfigStore();
   const { 
-    connectionStatus, 
     setIsSetupComplete,
     addLog,
-    mt5Installations,
-    setMt5Installations
+    mt5Installations
   } = useAppStore();
   const { clearLogs, exportLogs } = useLogsStore();
   
   const [activeTab, setActiveTab] = useState<'general' | 'mt5' | 'safety' | 'logs'>('general');
   const [isSaving, setIsSaving] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
   const [testResult, setTestResult] = useState<'idle' | 'success' | 'error'>('idle');
   const [showResetDialog, setShowResetDialog] = useState(false);
   const [showClearLogsDialog, setShowClearLogsDialog] = useState(false);
@@ -41,12 +38,11 @@ export function Settings() {
       setSuccessMessage('');
       
       // Save to Electron store
-      await window.electronAPI?.saveConfig(config);
+      await window.electronAPI?.updateConfig(config);
       
       // Test connection if API credentials are provided
-      if (config.apiKey && config.apiSecret && config.executorId) {
-        setIsTesting(true);
-        const result = await window.electronAPI?.startServices(config);
+      if (config?.apiKey && config?.apiSecret && config?.executorId) {
+        const result = await window.electronAPI?.updateConfig(config);
         
         if (result?.success) {
           setTestResult('success');
@@ -55,24 +51,27 @@ export function Settings() {
           setTestResult('error');
           setErrors([result?.error || 'Connection test failed']);
         }
-        setIsTesting(false);
       } else {
         setSuccessMessage('Configuration saved');
       }
       
       addLog({
-        level: 'info',
-        category: 'SETTINGS',
+        id: `config-save-${Date.now()}`,
+        type: 'INFO',
         message: 'Configuration updated',
+        timestamp: new Date(),
+        metadata: { category: 'SETTINGS' }
       });
       
     } catch (error) {
       const errorMsg = (error as Error).message;
       setErrors([errorMsg]);
       addLog({
-        level: 'error',
-        category: 'SETTINGS',
+        id: `config-error-${Date.now()}`,
+        type: 'ERROR',
         message: `Failed to save config: ${errorMsg}`,
+        timestamp: new Date(),
+        metadata: { category: 'SETTINGS' }
       });
     } finally {
       setIsSaving(false);
@@ -99,9 +98,11 @@ export function Settings() {
       setShowResetDialog(false);
       
       addLog({
-        level: 'info',
-        category: 'SETTINGS',
+        id: `config-reset-${Date.now()}`,
+        type: 'INFO',
         message: 'Configuration reset to defaults',
+        timestamp: new Date(),
+        metadata: { category: 'SETTINGS' }
       });
       
     } catch (error) {
@@ -135,7 +136,6 @@ export function Settings() {
   const handleRedetectMT5 = async () => {
     try {
       const installations = await window.electronAPI?.getMT5Installations() || [];
-      setMt5Installations(installations);
       setSuccessMessage(`Found ${installations.length} MT5 installation(s)`);
     } catch (error) {
       const errorMsg = (error as Error).message;
@@ -146,7 +146,7 @@ export function Settings() {
   // Handle complete setup reset
   const handleResetSetup = async () => {
     try {
-      await window.electronAPI?.completeSetup();
+      await window.electronAPI?.setupComplete(config);
       setIsSetupComplete(false);
       setSuccessMessage('Setup reset. You will need to go through the setup process again.');
     } catch (error) {
@@ -244,7 +244,7 @@ export function Settings() {
                   <input
                     id="executorId"
                     type="text"
-                    value={config.executorId || ''}
+                    value={config?.executorId || ''}
                     onChange={(e) => updateConfig({ executorId: e.target.value })}
                     className="input mt-1"
                     placeholder="Enter your executor ID"
@@ -256,7 +256,7 @@ export function Settings() {
                   <input
                     id="platformUrl"
                     type="text"
-                    value={config.platformUrl || ''}
+                    value={config?.platformUrl || ''}
                     onChange={(e) => updateConfig({ platformUrl: e.target.value })}
                     className="input mt-1"
                     placeholder="https://platform.com"
@@ -268,7 +268,7 @@ export function Settings() {
                   <input
                     id="apiKey"
                     type="text"
-                    value={config.apiKey || ''}
+                    value={config?.apiKey || ''}
                     onChange={(e) => updateConfig({ apiKey: e.target.value })}
                     className="input mt-1"
                     placeholder="Enter your API key"
@@ -280,7 +280,7 @@ export function Settings() {
                   <input
                     id="apiSecret"
                     type="password"
-                    value={config.apiSecret || ''}
+                    value={config?.apiSecret || ''}
                     onChange={(e) => updateConfig({ apiSecret: e.target.value })}
                     className="input mt-1"
                     placeholder="Enter your API secret"
@@ -292,7 +292,7 @@ export function Settings() {
                   <input
                     id="pusherKey"
                     type="text"
-                    value={config.pusherKey || ''}
+                    value={config?.pusherKey || ''}
                     onChange={(e) => updateConfig({ pusherKey: e.target.value })}
                     className="input mt-1"
                     placeholder="Enter your Pusher key"
@@ -304,7 +304,7 @@ export function Settings() {
                   <input
                     id="pusherCluster"
                     type="text"
-                    value={config.pusherCluster || ''}
+                    value={config?.pusherCluster || ''}
                     onChange={(e) => updateConfig({ pusherCluster: e.target.value })}
                     className="input mt-1"
                     placeholder="mt1"
@@ -356,7 +356,7 @@ export function Settings() {
                   <input
                     id="zmqHost"
                     type="text"
-                    value={config.zmqHost || ''}
+                    value={config?.zmqHost || ''}
                     onChange={(e) => updateConfig({ zmqHost: e.target.value })}
                     className="input mt-1"
                     placeholder="tcp://localhost"
@@ -368,7 +368,7 @@ export function Settings() {
                   <input
                     id="zmqPort"
                     type="number"
-                    value={config.zmqPort || ''}
+                    value={config?.zmqPort || ''}
                     onChange={(e) => updateConfig({ zmqPort: parseInt(e.target.value) })}
                     className="input mt-1"
                     placeholder="5555"
@@ -380,7 +380,7 @@ export function Settings() {
                   <input
                     id="heartbeatInterval"
                     type="number"
-                    value={config.heartbeatInterval || ''}
+                    value={config?.heartbeatInterval || ''}
                     onChange={(e) => updateConfig({ heartbeatInterval: parseInt(e.target.value) })}
                     className="input mt-1"
                     placeholder="60"
@@ -391,7 +391,7 @@ export function Settings() {
                   <input
                     id="autoReconnect"
                     type="checkbox"
-                    checked={config.autoReconnect || false}
+                    checked={config?.autoReconnect || false}
                     onChange={(e) => updateConfig({ autoReconnect: e.target.checked })}
                     className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
                   />

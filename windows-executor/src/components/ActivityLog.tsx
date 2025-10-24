@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 
 interface Activity {
   id: string;
@@ -14,7 +14,7 @@ interface ActivityLogProps {
   className?: string;
 }
 
-export function ActivityLog({ activities, maxHeight = '400px', className = '' }: ActivityLogProps) {
+export function ActivityLog({ activities, maxHeight = '400px', className = '', limit }: ActivityLogProps & { limit?: number }) {
   const [autoScroll, setAutoScroll] = useState(true);
   const logContainerRef = useRef<HTMLDivElement>(null);
 

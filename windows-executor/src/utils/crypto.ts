@@ -188,7 +188,7 @@ export class CryptoUtils {
       }
     }
     
-    return result;
+    return result as any; // Type casting to satisfy generic constraint
   }
 
   /**

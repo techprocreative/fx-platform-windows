@@ -29,7 +29,7 @@ function createWindow(): void {
     height: 800,
     minWidth: 800,
     minHeight: 600,
-    icon: path.join(__dirname, '../../resources/icons/icon.png'),
+    icon: path.join(__dirname, '../../resources/icons/icon.ico'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -43,9 +43,15 @@ function createWindow(): void {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {
+    // In production, main.js is in dist/electron/electron/main.js
+    // index.html is in dist/index.html
+    // So we need to go up 2 levels: ../../index.html
+    const indexPath = path.join(__dirname, '../../index.html');
+    console.log('Loading index.html from:', indexPath);
+    
     mainWindow.loadURL(
       url.format({
-        pathname: path.join(__dirname, '../index.html'),
+        pathname: indexPath,
         protocol: 'file:',
         slashes: true,
       })
@@ -55,6 +61,7 @@ function createWindow(): void {
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     if (mainWindow) {
+      console.log('Window ready to show');
       mainWindow.show();
       
       // If it's the first run, center the window
@@ -62,6 +69,24 @@ function createWindow(): void {
         mainWindow.center();
         store.set('isFirstRun', false);
       }
+    }
+  });
+
+  // Log errors
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription) => {
+    console.error('Failed to load:', errorCode, errorDescription);
+  });
+
+  // Log when page finishes loading
+  mainWindow.webContents.on('did-finish-load', () => {
+    console.log('Page finished loading');
+  });
+
+  // Open DevTools on Ctrl+Shift+I (even in production)
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+      mainWindow?.webContents.toggleDevTools();
+      event.preventDefault();
     }
   });
 
@@ -146,7 +171,19 @@ async function initializeMainController(): Promise<void> {
     // Get stored configuration
     const config: AppConfig = getStoredConfig();
     
-    // Initialize the controller
+    // Check if this is first run (no config)
+    const isFirstRun = !config.executorId || !config.apiKey;
+    
+    if (isFirstRun) {
+      console.log('First run detected, skipping controller initialization');
+      // Let the UI show setup wizard
+      if (mainWindow) {
+        mainWindow.webContents.send('show-setup-wizard');
+      }
+      return;
+    }
+    
+    // Initialize the controller only if configured
     const initialized = await mainController.initialize(config);
     
     if (initialized) {
@@ -159,25 +196,17 @@ async function initializeMainController(): Promise<void> {
       }
     } else {
       // Show error dialog
+      console.error('Controller initialization returned false');
       if (mainWindow) {
-        dialog.showMessageBox(mainWindow, {
-          type: 'error',
-          title: 'Initialization Failed',
-          message: 'Failed to initialize the executor. Please check your configuration.',
-          buttons: ['OK'],
-        });
+        mainWindow.webContents.send('show-setup-wizard');
       }
     }
   } catch (error) {
     console.error('Failed to initialize main controller:', error);
     
+    // Don't show error on first run, just show setup
     if (mainWindow) {
-      dialog.showMessageBox(mainWindow, {
-        type: 'error',
-        title: 'Initialization Error',
-        message: `An error occurred during initialization: ${(error as Error).message}`,
-        buttons: ['OK'],
-      });
+      mainWindow.webContents.send('show-setup-wizard');
     }
   }
 }
@@ -250,8 +279,28 @@ function setupIpcHandlers(): void {
   });
   
   // Get MT5 installations
-  ipcMain.handle('get-mt5-installations', () => {
-    return mainController?.getMT5Installations();
+  ipcMain.handle('get-mt5-installations', async () => {
+    console.log('IPC: get-mt5-installations called');
+    
+    try {
+      // If controller not initialized or no installations cached, detect now
+      if (!mainController || !mainController.getMT5Installations() || mainController.getMT5Installations().length === 0) {
+        console.log('Detecting MT5 installations directly...');
+        // Path from dist/electron/electron/main.js to dist/electron/src/services/
+        const { MT5DetectorService } = require('../src/services/mt5-detector.service');
+        const detector = new MT5DetectorService();
+        const installations = await detector.detectAllInstallations();
+        console.log('MT5 detection result:', installations);
+        return installations;
+      }
+      
+      const installations = mainController.getMT5Installations();
+      console.log('MT5 installations from controller:', installations);
+      return installations;
+    } catch (error) {
+      console.error('Error getting MT5 installations:', error);
+      return [];
+    }
   });
   
   // Get performance metrics
@@ -422,8 +471,8 @@ app.whenReady().then(() => {
   // Initialize main controller
   initializeMainController();
   
-  // Setup auto-updater
-  setupAutoUpdater();
+  // Setup auto-updater (disabled for local builds)
+  // setupAutoUpdater();
 });
 
 // Quit when all windows are closed

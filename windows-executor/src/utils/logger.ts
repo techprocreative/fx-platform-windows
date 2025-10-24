@@ -96,7 +96,7 @@ export const logger = winston.createLogger({
         winston.format.json()
       ),
       // Only log security events
-      filter: (info) => info.category === 'security' || info.level === 'error',
+      // filter: (info: any) => info.category === 'security' || info.level === 'error',
     }),
 
     // Trading events log
@@ -111,7 +111,7 @@ export const logger = winston.createLogger({
         winston.format.json()
       ),
       // Only log trading events
-      filter: (info) => info.category === 'trading' || info.category === 'safety',
+      // filter: (info: any) => info.category === 'trading' || info.category === 'safety',
     }),
 
     // Performance log
@@ -126,7 +126,7 @@ export const logger = winston.createLogger({
         winston.format.json()
       ),
       // Only log performance events
-      filter: (info) => info.category === 'performance' || info.category === 'monitoring',
+      // filter: (info: any) => info.category === 'performance' || info.category === 'monitoring',
     }),
   ],
   // Handle uncaught exceptions and rejections

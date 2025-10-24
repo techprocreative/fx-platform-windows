@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAppStore } from '../stores/app.store';
@@ -6,13 +6,13 @@ import { Setup } from './pages/Setup';
 import { Dashboard } from './pages/Dashboard';
 import { Settings } from './pages/Settings';
 import { Logs } from './pages/Logs';
-import { StatusBar } from './components/StatusBar';
-import { ActivityLog } from './components/ActivityLog';
-import { LoadingScreen } from './components/LoadingScreen';
-import { NotificationContainer } from './components/NotificationContainer';
+import { StatusBar } from '../components/StatusBar';
+import { ActivityLog } from '../components/ActivityLog';
+import LoadingScreen from '../components/LoadingScreen';
+import NotificationContainer from '../components/NotificationContainer';
 
 function App() {
-  const [isInitialized, setIsInitialized] = useState(false);
+  const [, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('setup');
   
@@ -30,11 +30,18 @@ function App() {
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        console.log('Initializing app...');
+        
         // Check if app is configured
         const config = await window.electronAPI?.getConfig();
+        console.log('Config loaded:', config ? 'Yes' : 'No');
+        
         if (config && config.apiKey && config.apiSecret) {
+          console.log('App is configured, showing dashboard');
           setIsConfigured(true);
           setCurrentPage('dashboard');
+        } else {
+          console.log('App not configured, showing setup wizard');
         }
 
         // Set up event listeners
@@ -47,6 +54,7 @@ function App() {
         }
 
         setIsLoading(false);
+        console.log('App initialization complete');
       } catch (error) {
         console.error('Failed to initialize app:', error);
         setIsLoading(false);
@@ -163,17 +171,21 @@ function App() {
 
   // Show loading screen while initializing
   if (isLoading) {
-    return <LoadingScreen />;
+    console.log('Rendering loading screen');
+    return <LoadingScreen message="Initializing FX Executor..." />;
   }
 
   // Show setup wizard if not configured
   if (!isConfigured) {
+    console.log('Rendering setup wizard');
     return (
       <div className="min-h-screen bg-gray-100">
-        <Setup onSetupComplete={() => setIsConfigured(true)} />
+        <Setup />
       </div>
     );
   }
+
+  console.log('Rendering main app interface');
 
   // Main app interface
   return (
@@ -235,7 +247,7 @@ function App() {
                 <h3 className="text-sm font-medium text-gray-900">Recent Activity</h3>
               </div>
               <div className="px-4 pb-4">
-                <ActivityLog limit={5} />
+                <ActivityLog activities={[]} limit={5} />
               </div>
             </div>
           </div>
@@ -252,7 +264,7 @@ function App() {
         </div>
         
         {/* Notification Container */}
-        <NotificationContainer />
+        <NotificationContainer notifications={[]} onDismiss={() => {}} />
         
         {/* Toast Container */}
         <Toaster
