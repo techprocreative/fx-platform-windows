@@ -17,11 +17,54 @@ export function Dashboard() {
     recentActivity,
     addRecentActivity,
     addLog,
-    setIsEmergencyStopActive
+    setIsEmergencyStopActive,
+    setConnectionStatus,
+    setMT5Installations
   } = useAppStore();
 
   const [refreshing, setRefreshing] = useState(false);
   const [selectedTimeframe, setSelectedTimeframe] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Load initial data from backend
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      try {
+        console.log('[Dashboard] Loading data from backend...');
+        
+        // Get connection status
+        const status = await window.electronAPI?.getConnectionStatus();
+        if (status) {
+          console.log('[Dashboard] Connection status:', status);
+          setConnectionStatus(status);
+        }
+        
+        // Get MT5 installations
+        const mt5Installations = await window.electronAPI?.getMT5Installations();
+        if (mt5Installations) {
+          console.log('[Dashboard] MT5 installations:', mt5Installations);
+          setMT5Installations(mt5Installations);
+        }
+        
+        // Get config
+        const appConfig = await window.electronAPI?.getConfig();
+        if (appConfig) {
+          console.log('[Dashboard] Config loaded:', {
+            executorId: appConfig.executorId,
+            platformUrl: appConfig.platformUrl
+          });
+        }
+        
+        setIsLoading(false);
+        console.log('[Dashboard] Data loaded successfully');
+      } catch (error) {
+        console.error('[Dashboard] Failed to load data:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    loadDashboardData();
+  }, []);
 
   // Simulate real-time updates
   useEffect(() => {
@@ -105,9 +148,33 @@ export function Dashboard() {
     }).format(amount);
   };
 
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="flex-1 overflow-auto bg-gray-50 p-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-center h-64">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading dashboard...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-auto bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
+        {/* Debug Info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-4 text-xs">
+          <p><strong>Executor ID:</strong> {config?.executorId || 'Not set'}</p>
+          <p><strong>Platform:</strong> {config?.platformUrl || 'Not set'}</p>
+          <p><strong>Pusher:</strong> {connectionStatus.pusher}</p>
+          <p><strong>MT5:</strong> {connectionStatus.mt5}</p>
+        </div>
+        
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           <div>

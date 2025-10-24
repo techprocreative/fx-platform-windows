@@ -1,6 +1,9 @@
 import * as crypto from 'crypto';
 import { EncryptionResult, DecryptionResult } from '../types/security.types';
 
+// Browser-only globals
+declare const window: any;
+
 export class CryptoUtils {
   private static readonly ALGORITHM = 'aes-256-gcm';
   private static readonly KEY_LENGTH = 32; // 256 bits
@@ -188,7 +191,10 @@ export class CryptoUtils {
       }
     }
     
-    return result as any; // Type casting to satisfy generic constraint
+    return {
+      success: result.success,
+      error: result.error
+    };
   }
 
   /**
@@ -331,7 +337,9 @@ export class SecureStorage {
         };
         
         // In a real implementation, store this securely
-        localStorage.setItem(`secure_${key}`, JSON.stringify(storageData));
+        if (typeof window !== 'undefined' && (window as any).localStorage) {
+          (window as any).localStorage.setItem(`secure_${key}`, JSON.stringify(storageData));
+        }
         
         return true;
       }
@@ -348,7 +356,8 @@ export class SecureStorage {
    */
   get(key: string): string | null {
     try {
-      const storedData = localStorage.getItem(`secure_${key}`);
+      if (typeof window === 'undefined' || !(window as any).localStorage) return null;
+      const storedData = (window as any).localStorage.getItem(`secure_${key}`);
       if (!storedData) {
         return null;
       }
@@ -373,7 +382,9 @@ export class SecureStorage {
    */
   remove(key: string): boolean {
     try {
-      localStorage.removeItem(`secure_${key}`);
+      if (typeof window !== 'undefined' && (window as any).localStorage) {
+        (window as any).localStorage.removeItem(`secure_${key}`);
+      }
       this.salts.delete(key);
       return true;
     } catch (error) {
@@ -386,7 +397,8 @@ export class SecureStorage {
    * Check if key exists
    */
   has(key: string): boolean {
-    return localStorage.getItem(`secure_${key}`) !== null;
+    if (typeof window === 'undefined' || !(window as any).localStorage) return false;
+    return (window as any).localStorage.getItem(`secure_${key}`) !== null;
   }
 }
 

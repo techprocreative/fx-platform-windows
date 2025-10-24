@@ -4,6 +4,7 @@
  */
 
 import * as path from "path";
+import { execSync } from "child_process";
 import {
   MT5Info,
   InstallProgress,
@@ -26,15 +27,41 @@ export class MT5AutoInstaller {
 
   /**
    * Get resources path for both development and production
+   * Works correctly in both asar and unpacked scenarios
    */
   private getResourcesPath(): string {
-    // In production (packaged Electron app)
-    if ((process as any).resourcesPath) {
-      return (process as any).resourcesPath;
+    // Check if running from asar or not
+    const isAsar = __dirname.includes('app.asar');
+    
+    console.log('[MT5AutoInstaller] __dirname:', __dirname);
+    console.log('[MT5AutoInstaller] isAsar:', isAsar);
+    
+    if (isAsar) {
+      // In production (packaged as asar)
+      // __dirname = /path/to/app.asar/dist/electron/src/services
+      // We need: /path/to/resources (sibling of app.asar)
+      
+      // Go up to app.asar root
+      const asarPath = __dirname.split('app.asar')[0] + 'app.asar';
+      // Get parent directory (resources folder)
+      const resourcesPath = path.dirname(asarPath);
+      console.log('[MT5AutoInstaller] Resources path (asar):', resourcesPath);
+      return resourcesPath;
+    } else if (process.env.NODE_ENV === 'production' && __dirname.includes('app.asar.unpacked')) {
+      // Unpacked production
+      // __dirname = /path/to/resources/app.asar.unpacked/dist/electron/src/services
+      const unpackedBase = __dirname.split('app.asar.unpacked')[0];
+      const resourcesPath = unpackedBase.replace(/\/+$/, ''); // Remove trailing slashes
+      console.log('[MT5AutoInstaller] Resources path (unpacked):', resourcesPath);
+      return resourcesPath;
+    } else {
+      // Development mode
+      // __dirname = /project-root/dist/electron/src/services
+      // We need: /project-root/resources
+      const resourcesPath = path.join(__dirname, '..', '..', '..', '..', 'resources');
+      console.log('[MT5AutoInstaller] Resources path (dev):', resourcesPath);
+      return resourcesPath;
     }
-
-    // In development
-    return path.join(__dirname, "..", "..", "resources");
   }
 
   constructor(
@@ -231,14 +258,29 @@ export class MT5AutoInstaller {
       const libName = is64bit ? "libzmq-x64.dll" : "libzmq-x86.dll";
 
       // Source path would be from resources in production
-      // For now, we'll use a placeholder
-      const libzmqSource = path.join(this.getResourcesPath(), "libs", libName);
+      const resourcesPath = this.getResourcesPath();
+      const libzmqSource = path.join(resourcesPath, "libs", libName);
       result.sourcePath = libzmqSource;
 
+      console.log('[MT5AutoInstaller] Installing libzmq...');
+      console.log('[MT5AutoInstaller] - Resources path:', resourcesPath);
+      console.log('[MT5AutoInstaller] - Looking for:', libzmqSource);
+      console.log('[MT5AutoInstaller] - Target MT5:', mt5.path);
+
       // Check if source exists (in development, it might not)
-      if (!(await FileUtils.pathExists(libzmqSource))) {
+      const sourceExists = await FileUtils.pathExists(libzmqSource);
+      console.log('[MT5AutoInstaller] - Source exists:', sourceExists);
+
+      if (!sourceExists) {
         throw new Error(
           `libzmq library not found at ${libzmqSource}. Please ensure resources are available.`,
+        );
+      }
+
+      const verified = await this.verifyLibzmqCompatibility(libzmqSource);
+      if (!verified) {
+        throw new Error(
+          "libzmq.dll failed compatibility verification. Run npm run fix:libzmq before installing.",
         );
       }
 
@@ -278,6 +320,36 @@ export class MT5AutoInstaller {
     return result;
   }
 
+  private async verifyLibzmqCompatibility(dllPath: string): Promise<boolean> {
+    try {
+      const scriptCandidates = [
+        path.join(process.cwd(), "verify-libzmq-dll.js"),
+        path.join(this.getResourcesPath(), "..", "verify-libzmq-dll.js"),
+      ];
+
+      for (const candidate of scriptCandidates) {
+        if (await FileUtils.pathExists(candidate)) {
+          execSync(`node "${candidate}" --dll "${dllPath}"`, {
+            stdio: "pipe",
+            cwd: path.dirname(candidate),
+          });
+          return true;
+        }
+      }
+
+      console.warn(
+        "[MT5AutoInstaller] verify-libzmq-dll.js not found. Skipping DLL export verification.",
+      );
+      return true;
+    } catch (error) {
+      console.error(
+        "[MT5AutoInstaller] libzmq.dll verification failed:",
+        (error as Error).message,
+      );
+      return false;
+    }
+  }
+
   /**
    * Install Expert Advisor to MT5 Experts folder
    */
@@ -290,15 +362,39 @@ export class MT5AutoInstaller {
 
     try {
       // Source path would be from resources in production
-      const eaSource = path.join(
-        this.getResourcesPath(),
+      const resourcesPath = this.getResourcesPath();
+      
+      // Try to find compiled .ex5 first, fallback to .mq5 source
+      let eaSource = path.join(
+        resourcesPath,
         "experts",
         "FX_Platform_Bridge.ex5",
       );
+      
+      console.log('[MT5AutoInstaller] Installing Expert Advisor...');
+      console.log('[MT5AutoInstaller] - Trying compiled version:', eaSource);
+      
+      let sourceExists = await FileUtils.pathExists(eaSource);
+      console.log('[MT5AutoInstaller] - Compiled .ex5 exists:', sourceExists);
+      
+      // If .ex5 not found, try .mq5 source file
+      if (!sourceExists) {
+        eaSource = path.join(
+          resourcesPath,
+          "experts",
+          "FX_Platform_Bridge.mq5",
+        );
+        console.log('[MT5AutoInstaller] - Trying source version:', eaSource);
+        sourceExists = await FileUtils.pathExists(eaSource);
+        console.log('[MT5AutoInstaller] - Source .mq5 exists:', sourceExists);
+        
+        // Update destination to .mq5 if using source
+        result.destinationPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.mq5");
+      }
+      
       result.sourcePath = eaSource;
 
-      // Check if source exists
-      if (!(await FileUtils.pathExists(eaSource))) {
+      if (!sourceExists) {
         throw new Error(
           `Expert Advisor not found at ${eaSource}. Please ensure resources are available.`,
         );
@@ -327,16 +423,20 @@ export class MT5AutoInstaller {
       if (result.success) {
         console.log(`✓ Expert Advisor installed to ${result.destinationPath}`);
 
-        // Also copy source file (.mq5) if available for user reference
-        const mq5Source = path.join(
-          this.getResourcesPath(),
-          "experts",
-          "FX_Platform_Bridge.mq5",
-        );
-        if (await FileUtils.pathExists(mq5Source)) {
-          const mq5Dest = path.join(mt5.expertsPath, "FX_Platform_Bridge.mq5");
-          await FileUtils.copyWithBackup(mq5Source, mq5Dest, false);
-          console.log(`✓ EA source file (.mq5) also copied`);
+        // If we installed .ex5, also copy source file (.mq5) if available for user reference
+        if (result.destinationPath.endsWith('.ex5')) {
+          const mq5Source = path.join(
+            this.getResourcesPath(),
+            "experts",
+            "FX_Platform_Bridge.mq5",
+          );
+          if (await FileUtils.pathExists(mq5Source)) {
+            const mq5Dest = path.join(mt5.expertsPath, "FX_Platform_Bridge.mq5");
+            await FileUtils.copyWithBackup(mq5Source, mq5Dest, false);
+            console.log(`✓ EA source file (.mq5) also copied for reference`);
+          }
+        } else {
+          console.log(`ℹ Source file (.mq5) installed - user needs to compile in MT5 to create .ex5`);
         }
       }
     } catch (error) {
@@ -549,12 +649,18 @@ void OnStart()
         result.errors.push(`libzmq.dll not found in ${mt5.libraryPath}`);
       }
 
-      // Check Expert Advisor
-      const eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.ex5");
-      if (await FileUtils.pathExists(eaPath)) {
+      // Check Expert Advisor (.ex5 or .mq5)
+      let eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.ex5");
+      let eaExists = await FileUtils.pathExists(eaPath);
+      if (!eaExists) {
+        eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.mq5");
+        eaExists = await FileUtils.pathExists(eaPath);
+      }
+      
+      if (eaExists) {
         result.componentsInstalled.expertAdvisor = true;
       } else {
-        result.errors.push(`Expert Advisor not found in ${mt5.expertsPath}`);
+        result.errors.push(`Expert Advisor not found in ${mt5.expertsPath} (neither .ex5 nor .mq5)`);
       }
 
       // Check configuration file
@@ -597,12 +703,20 @@ void OnStart()
     configExists: boolean;
   }> {
     const libzmqPath = path.join(mt5.libraryPath, "libzmq.dll");
-    const eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.ex5");
+    
+    // Check for EA (.ex5 compiled or .mq5 source)
+    let eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.ex5");
+    let eaExists = await FileUtils.pathExists(eaPath);
+    if (!eaExists) {
+      eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.mq5");
+      eaExists = await FileUtils.pathExists(eaPath);
+    }
+    
     const configPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.json");
 
     return {
       libzmqInstalled: await FileUtils.pathExists(libzmqPath),
-      eaInstalled: await FileUtils.pathExists(eaPath),
+      eaInstalled: eaExists,
       configExists: await FileUtils.pathExists(configPath),
     };
   }
@@ -657,7 +771,11 @@ void OnStart()
         }
 
         // Backup Expert Advisor
-        const eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.ex5");
+        // Check for EA (.ex5 or .mq5)
+        let eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.ex5");
+        if (!(await FileUtils.pathExists(eaPath))) {
+          eaPath = path.join(mt5.expertsPath, "FX_Platform_Bridge.mq5");
+        }
         if (await FileUtils.pathExists(eaPath)) {
           const backupPath = await FileUtils.createBackup(eaPath);
           const fileHash = await FileUtils.calculateFileHash(eaPath);

@@ -6,6 +6,7 @@ import { MainController } from '../src/app/main-controller';
 import { AppConfig } from '../src/types/config.types';
 import Store from 'electron-store';
 import { safeStorage } from 'electron';
+import { existsSync } from 'fs';
 
 // Initialize secure store
 const store = new Store({
@@ -44,18 +45,27 @@ function createWindow(): void {
     mainWindow.webContents.openDevTools();
   } else {
     // In production, main.js is in dist/electron/electron/main.js
-    // index.html is in dist/index.html
-    // So we need to go up 2 levels: ../../index.html
-    const indexPath = path.join(__dirname, '../../index.html');
+    // index.html is in dist-app/index.html
+    // Use absolute path to avoid confusion
+    const indexPath = path.resolve(__dirname, '../../../dist-app/index.html');
     console.log('Loading index.html from:', indexPath);
-    
-    mainWindow.loadURL(
-      url.format({
-        pathname: indexPath,
-        protocol: 'file:',
-        slashes: true,
-      })
-    );
+
+    if (existsSync(indexPath)) {
+      mainWindow.loadFile(indexPath).catch((error) => {
+        console.error('Failed to load index.html via loadFile:', error);
+      });
+    } else {
+      const fallbackPath = path.join(process.resourcesPath, 'dist-app', 'index.html');
+      console.warn('Primary index.html not found, attempting fallback path:', fallbackPath);
+
+      mainWindow.loadURL(
+        url.format({
+          pathname: fallbackPath,
+          protocol: 'file:',
+          slashes: true,
+        })
+      );
+    }
   }
 
   // Show window when ready to prevent visual flash
@@ -217,17 +227,20 @@ function getStoredConfig(): AppConfig {
     executorId: '',
     apiKey: '',
     apiSecret: '',
-    platformUrl: 'https://platform.com',
+    platformUrl: 'https://fx.nusanexus.com',
     pusherKey: '',
-    pusherCluster: 'mt1',
+    pusherCluster: 'ap1', // Changed from 'mt1' to 'ap1'
     zmqPort: 5555,
     zmqHost: 'tcp://localhost',
     heartbeatInterval: 60,
     autoReconnect: true,
   };
   
-  // Try to get stored config
+  // Try to get stored config - prioritize stored values over defaults
   let storedConfig = store.get('config') as Partial<AppConfig> || {};
+  
+  // IMPORTANT: Don't override saved config with defaults
+  // Only use defaults for missing keys
   
   // Decrypt API secret if it exists
   if (storedConfig.apiSecret) {
@@ -303,6 +316,40 @@ function setupIpcHandlers(): void {
     }
   });
   
+  // Trigger MT5 auto-installation
+  ipcMain.handle('auto-install-mt5', async () => {
+    if (!mainController) {
+      return {
+        success: false,
+        mt5Installations: [],
+        componentsInstalled: {
+          libzmq: false,
+          expertAdvisor: false,
+          configFile: false,
+        },
+        errors: ['Main controller not initialized'],
+        warnings: [],
+      };
+    }
+
+    try {
+      return await mainController.autoInstallMT5();
+    } catch (error) {
+      console.error('Auto-install IPC error:', error);
+      return {
+        success: false,
+        mt5Installations: [],
+        componentsInstalled: {
+          libzmq: false,
+          expertAdvisor: false,
+          configFile: false,
+        },
+        errors: [(error as Error).message || 'Auto-installation failed'],
+        warnings: [],
+      };
+    }
+  });
+  
   // Get performance metrics
   ipcMain.handle('get-performance-metrics', () => {
     return mainController?.getPerformanceMetrics();
@@ -358,20 +405,46 @@ function setupIpcHandlers(): void {
   // Setup wizard events
   ipcMain.handle('setup-complete', async (event, config) => {
     try {
+      console.log('[setup-complete] Starting setup with config:', {
+        executorId: config.executorId,
+        platformUrl: config.platformUrl,
+        hasPusherKey: !!config.pusherKey
+      });
+      
       // Save config
       saveConfig(config);
+      console.log('[setup-complete] Config saved');
       
       // Reinitialize controller with new config
-      if (mainController) {
-        await mainController.stop();
-        const initialized = await mainController.initialize(config);
-        if (initialized) {
-          await mainController.start();
-          return { success: true };
-        }
+      if (!mainController) {
+        console.error('[setup-complete] Main controller not initialized!');
+        return { success: false, error: 'Main controller not initialized' };
       }
-      return { success: false, error: 'Failed to reinitialize controller' };
+      
+      console.log('[setup-complete] Stopping controller...');
+      try {
+        await mainController.stop();
+        console.log('[setup-complete] Controller stopped successfully');
+      } catch (stopError) {
+        console.warn('[setup-complete] Stop failed (may not be running):', stopError);
+        // Continue anyway - it's OK if controller wasn't running
+      }
+      
+      console.log('[setup-complete] Initializing with new config...');
+      const initialized = await mainController.initialize(config);
+      
+      if (!initialized) {
+        console.error('[setup-complete] Controller initialization failed');
+        return { success: false, error: 'Controller initialization failed' };
+      }
+      
+      console.log('[setup-complete] Starting controller...');
+      await mainController.start();
+      
+      console.log('[setup-complete] Setup complete successfully!');
+      return { success: true };
     } catch (error) {
+      console.error('[setup-complete] Error:', error);
       return { success: false, error: (error as Error).message };
     }
   });

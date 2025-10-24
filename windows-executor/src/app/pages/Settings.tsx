@@ -86,7 +86,7 @@ export function Settings() {
         executorId: '',
         apiKey: '',
         apiSecret: '',
-        platformUrl: 'https://platform.com',
+        platformUrl: 'https://fx.nusanexus.com',
         pusherCluster: 'mt1',
         zmqPort: 5555,
         zmqHost: 'tcp://localhost',
@@ -259,7 +259,7 @@ export function Settings() {
                     value={config?.platformUrl || ''}
                     onChange={(e) => updateConfig({ platformUrl: e.target.value })}
                     className="input mt-1"
-                    placeholder="https://platform.com"
+                    placeholder="https://fx.nusanexus.com"
                   />
                 </div>
                 

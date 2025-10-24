@@ -13,7 +13,7 @@
 #include <Trade\AccountInfo.mqh>
 #include <Trade\SymbolInfo.mqh>
 
-// ZeroMQ imports - Use proper function pointers
+// ZeroMQ imports - Use proper function pointers without namespace
 #import "libzmq.dll"
 void* zmq_ctx_new(void);
 void* zmq_socket(void*, int);
@@ -58,7 +58,7 @@ CSymbolInfo symbol;
 int g_context = 0;
 int g_socket = 0;
 datetime g_lastHeartbeat = 0;
-bool g_isConnected = false;
+bool g isConnected = false;
 string g_configFile = "";
 
 //+------------------------------------------------------------------+
@@ -69,7 +69,7 @@ int OnInit() {
 
     // Initialize trading objects
     trade.SetExpertMagicNumber(InpMagicNumber);
-    trade.SetDeviationInPoints(InpSlippage);
+    trade.SetSlippage(InpSlippage);
     trade.SetTypeFilling(ORDER_FILLING_IOC);
 
     // Load configuration
@@ -92,7 +92,7 @@ int OnInit() {
 
     Print("[ZeroMQ Bridge] Successfully connected to server: ", InpServerAddress);
     g_lastHeartbeat = TimeCurrent();
-    g_isConnected = true;
+    g isConnected = true;
 
     // Send initial status
     SendStatusMessage("connected");
@@ -107,7 +107,7 @@ void OnDeinit(const int reason) {
     Print("[ZeroMQ Bridge] Deinitializing...");
 
     // Send disconnect status
-    if (g_isConnected) {
+    if (g isConnected) {
         SendStatusMessage("disconnected");
     }
 
@@ -122,7 +122,7 @@ void OnDeinit(const int reason) {
 //+------------------------------------------------------------------+
 void OnTick() {
     // Check connection
-    if (!g_isConnected) {
+    if (!g isConnected) {
         if (!ConnectToServer()) {
             return;
         }
@@ -182,7 +182,7 @@ bool ConnectToServer() {
         return false;
     }
 
-    g_isConnected = true;
+    g isConnected = true;
     return true;
 }
 
@@ -200,7 +200,7 @@ void CleanupZeroMQ() {
         g_context = 0;
     }
 
-    g_isConnected = false;
+    g isConnected = false;
 }
 
 //+------------------------------------------------------------------+
@@ -271,14 +271,14 @@ string ProcessCommand(string command) {
 //| Process open trade command                                       |
 //+------------------------------------------------------------------+
 string ProcessOpenTrade(string command) {
-    string symbolName = ExtractJsonValue(command, "symbol");
+    string symbol = ExtractJsonValue(command, "symbol");
     double lots = StringToDouble(ExtractJsonValue(command, "lots"));
     double stopLoss = StringToDouble(ExtractJsonValue(command, "stopLoss"));
     double takeProfit = StringToDouble(ExtractJsonValue(command, "takeProfit"));
     string orderType = ExtractJsonValue(command, "orderType"); // "buy" or "sell"
 
     // Validate inputs
-    if (StringLen(symbolName) == 0) {
+    if (StringLen(symbol) == 0) {
         return CreateResponse("", "error", "Symbol is required");
     }
 
@@ -287,8 +287,8 @@ string ProcessOpenTrade(string command) {
     }
 
     // Check position limits
-    if (!CheckPositionLimits(symbolName)) {
-        return CreateResponse("", "error", "Position limit exceeded for " + symbolName);
+    if (!CheckPositionLimits(symbol)) {
+        return CreateResponse("", "error", "Position limit exceeded for " + symbol);
     }
 
     // Check account safety
@@ -297,8 +297,8 @@ string ProcessOpenTrade(string command) {
     }
 
     // Set symbol info
-    if (!symbol.Name(symbolName)) {
-        return CreateResponse("", "error", "Invalid symbol: " + symbolName);
+    if (!symbol.Name(symbol)) {
+        return CreateResponse("", "error", "Invalid symbol: " + symbol);
     }
 
     // Calculate prices
@@ -318,9 +318,9 @@ string ProcessOpenTrade(string command) {
     string errorInfo = "";
 
     if (orderType == "sell") {
-        result = trade.Sell(lots, symbolName, bid, stopLoss, takeProfit, "ZeroMQ Bridge");
+        result = trade.Sell(lots, symbol, bid, stopLoss, takeProfit, "ZeroMQ Bridge");
     } else {
-        result = trade.Buy(lots, symbolName, ask, stopLoss, takeProfit, "ZeroMQ Bridge");
+        result = trade.Buy(lots, symbol, ask, stopLoss, takeProfit, "ZeroMQ Bridge");
     }
 
     if (result) {
@@ -330,7 +330,7 @@ string ProcessOpenTrade(string command) {
         response += "\"ticket\":" + IntegerToString(trade.ResultOrder()) + ",";
         response += "\"price\":" + DoubleToString(trade.ResultPrice(), symbol.Digits()) + ",";
         response += "\"volume\":" + DoubleToString(trade.ResultVolume(), 2) + ",";
-        response += "\"symbol\":\"" + symbolName + "\"";
+        response += "\"symbol\":\"" + symbol + "\"";
         response += "}";
         return response;
     } else {
@@ -355,7 +355,7 @@ string ProcessCloseTrade(string command) {
             response += "\"status\":\"success\",";
             response += "\"ticket\":" + IntegerToString(ticket) + ",";
             response += "\"profit\":" + DoubleToString(position.Profit(), 2) + ",";
-            response += "\"closedPrice\":" + DoubleToString(trade.ResultPrice(), (int)SymbolInfoInteger(position.Symbol(), SYMBOL_DIGITS));
+            response += "\"closedPrice\":" + DoubleToString(trade.ResultPrice(), position.Symbol().Digits());
             response += "}";
             return response;
         } else {
@@ -446,12 +446,11 @@ string GetPositions() {
             response += "\"symbol\":\"" + position.Symbol() + "\",";
             response += "\"type\":\"" + (position.PositionType() == POSITION_TYPE_BUY ? "buy" : "sell") + "\",";
             response += "\"volume\":" + DoubleToString(position.Volume(), 2) + ",";
-            int digits = (int)SymbolInfoInteger(position.Symbol(), SYMBOL_DIGITS);
-            response += "\"priceOpen\":" + DoubleToString(position.PriceOpen(), digits) + ",";
-            response += "\"priceCurrent\":" + DoubleToString(position.PriceCurrent(), digits) + ",";
+            response += "\"priceOpen\":" + DoubleToString(position.PriceOpen(), position.Symbol().Digits()) + ",";
+            response += "\"priceCurrent\":" + DoubleToString(position.PriceCurrent(), position.Symbol().Digits()) + ",";
             response += "\"profit\":" + DoubleToString(position.Profit(), 2) + ",";
-            response += "\"stopLoss\":" + DoubleToString(position.StopLoss(), digits) + ",";
-            response += "\"takeProfit\":" + DoubleToString(position.TakeProfit(), digits) + ",";
+            response += "\"stopLoss\":" + DoubleToString(position.StopLoss(), position.Symbol().Digits()) + ",";
+            response += "\"takeProfit\":" + DoubleToString(position.TakeProfit(), position.Symbol().Digits()) + ",";
             response += "\"swap\":" + DoubleToString(position.Swap(), 2) + ",";
             response += "\"commission\":" + DoubleToString(position.Commission(), 2) + ",";
             response += "\"time\":" + IntegerToString(position.Time()) + "";
@@ -486,7 +485,7 @@ string GetMarketData(string command) {
     response += "\"spread\":" + IntegerToString(symbol.Spread()) + ",";
     response += "\"point\":" + DoubleToString(symbol.Point(), symbol.Digits()) + ",";
     response += "\"digits\":" + IntegerToString(symbol.Digits()) + ",";
-    response += "\"volume\":" + IntegerToString((int)symbol.Volume()) + ",";
+    response += "\"volume\":" + IntegerToString(symbol.VolumeLong()) + ",";
     response += "\"time\":" + IntegerToString(symbol.Time()) + "";
     response += "}";
     return response;
@@ -504,8 +503,7 @@ string GetSymbols() {
     bool first = true;
     for (int i = 0; i < SymbolsTotal(false); i++) {
         string symbolName = SymbolName(i, false);
-        if (SymbolSelect(symbolName, true)) {
-            symbol.Name(symbolName);
+        if (symbol.Select(symbolName)) {
             if (!first) response += ",";
             first = false;
 
@@ -608,9 +606,15 @@ bool LoadConfiguration() {
             FileClose(handle);
 
             // Parse config (simplified)
-            // Note: Input parameters are constants and cannot be modified at runtime
-            // Configuration values from file would need to be stored in separate variables
-            // For now, we'll use the input parameters as default values
+            string serverAddr = ExtractJsonValue(config, "serverAddress");
+            if (StringLen(serverAddr) > 0) {
+                InpServerAddress = serverAddr;
+            }
+
+            int timeout = StringToInteger(ExtractJsonValue(config, "timeout"));
+            if (timeout > 0) {
+                InpTimeoutMs = timeout;
+            }
 
             Print("[ZeroMQ Bridge] Configuration loaded from file");
             return true;
@@ -686,3 +690,4 @@ string ExtractJsonValue(string json, string key) {
     return "";
 }
 //+------------------------------------------------------------------+
+```

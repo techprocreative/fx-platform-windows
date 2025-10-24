@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAppStore } from '../stores/app.store';
 import { Setup } from './pages/Setup';
@@ -12,6 +12,11 @@ import LoadingScreen from '../components/LoadingScreen';
 import NotificationContainer from '../components/NotificationContainer';
 
 function App() {
+  console.clear();
+  console.log("╔═══════════════════════════════════════════════════════════════════════════════╗");
+  console.log("║ 🚀🚀🚀 APP.TSX LOADED! React is running!                                      ║");
+  console.log("╚═══════════════════════════════════════════════════════════════════════════════╝");
+
   const [, setIsInitialized] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState('setup');
@@ -28,6 +33,9 @@ function App() {
 
   // Initialize app
   useEffect(() => {
+    console.log("🔄 App useEffect triggered - initializing...");
+    console.log("📍 isConfigured:", isConfigured);
+    console.log("📍 currentPage:", currentPage);
     const initializeApp = async () => {
       try {
         console.log('Initializing app...');
@@ -164,9 +172,10 @@ function App() {
     };
   };
 
-  // Handle page navigation
+  // Handle page navigation (not needed with React Router, but kept for StatusBar compatibility)
   const handleNavigation = (page: string) => {
     setCurrentPage(page);
+    // Note: React Router navigation is handled by Link/useNavigate
   };
 
   // Show loading screen while initializing
@@ -187,15 +196,29 @@ function App() {
 
   console.log('Rendering main app interface');
 
-  // Main app interface
+  // Main app interface (wrapped in Router context)
   return (
     <Router>
+      <AppContent />
+    </Router>
+  );
+}
+
+// Separate component to use useLocation inside Router context
+function AppContent() {
+  const location = useLocation();
+  const { 
+    connectionStatus,
+    addRecentActivity,
+  } = useAppStore();
+
+  return (
       <div className="min-h-screen bg-gray-100 flex flex-col">
         {/* Status Bar */}
         <StatusBar 
           connectionStatus={connectionStatus}
-          onNavigate={handleNavigation}
-          currentPage={currentPage}
+          onNavigate={() => {}} // Not used with Router
+          currentPage={location.pathname.substring(1) || 'dashboard'}
         />
         
         {/* Main Content */}
@@ -209,34 +232,34 @@ function App() {
             <nav className="mt-4">
               <ul>
                 <li>
-                  <button
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
-                      currentPage === 'dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                  <Link
+                    to="/dashboard"
+                    className={`block w-full text-left px-4 py-2 hover:bg-gray-100 ${
+                      location.pathname === '/dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                     }`}
-                    onClick={() => handleNavigation('dashboard')}
                   >
                     Dashboard
-                  </button>
+                  </Link>
                 </li>
                 <li>
-                  <button
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
-                      currentPage === 'settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                  <Link
+                    to="/settings"
+                    className={`block w-full text-left px-4 py-2 hover:bg-gray-100 ${
+                      location.pathname === '/settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                     }`}
-                    onClick={() => handleNavigation('settings')}
                   >
                     Settings
-                  </button>
+                  </Link>
                 </li>
                 <li>
-                  <button
-                    className={`w-full text-left px-4 py-2 hover:bg-gray-100 ${
-                      currentPage === 'logs' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
+                  <Link
+                    to="/logs"
+                    className={`block w-full text-left px-4 py-2 hover:bg-gray-100 ${
+                      location.pathname === '/logs' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
                     }`}
-                    onClick={() => handleNavigation('logs')}
                   >
                     Logs
-                  </button>
+                  </Link>
                 </li>
               </ul>
             </nav>
@@ -292,7 +315,6 @@ function App() {
           }}
         />
       </div>
-    </Router>
   );
 }
 

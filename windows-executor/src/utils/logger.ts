@@ -1,9 +1,13 @@
 import winston from 'winston';
 import path from 'path';
 import fs from 'fs';
+import { app } from 'electron';
 
-// Ensure logs directory exists
-const logsDir = path.join(process.cwd(), 'logs');
+// Ensure logs directory exists in user data folder (not in Program Files)
+const logsDir = app.isPackaged 
+  ? path.join(app.getPath('userData'), 'logs')
+  : path.join(process.cwd(), 'logs');
+
 if (!fs.existsSync(logsDir)) {
   fs.mkdirSync(logsDir, { recursive: true });
 }

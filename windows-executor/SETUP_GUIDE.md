@@ -23,7 +23,7 @@ Saat pertama kali jalan, aplikasi akan menampilkan **Setup Wizard** yang meminta
 - **API Secret**: Secret key untuk authentication
 
 #### B. Platform Connection
-- **Platform URL**: URL FX Platform (default: `https://platform.com`)
+- **Platform URL**: URL FX Platform (default: `https://fx.nusanexus.com`)
 - **Pusher Key**: Pusher app key untuk real-time communication
 - **Pusher Cluster**: Pusher cluster (default: `mt1`)
 
@@ -44,7 +44,7 @@ Saat pertama kali jalan, aplikasi akan menampilkan **Setup Wizard** yang meminta
   "executorId": "executor-001",
   "apiKey": "your-api-key-here",
   "apiSecret": "your-secret-key-here",
-  "platformUrl": "https://your-platform.com",
+  "platformUrl": "https://your-fx.nusanexus.com",
   "pusherKey": "your-pusher-key",
   "pusherCluster": "mt1",
   "zmqPort": 5555,

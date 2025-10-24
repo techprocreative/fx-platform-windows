@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { AppConfig, ConnectionStatus, LogEntry } from '../src/types/config.types';
-import { MT5Info } from '../src/types/mt5.types';
+import { MT5Info, InstallResult } from '../src/types/mt5.types';
 import { Command, CommandResult } from '../src/types/command.types';
 
 // Define the API that will be exposed to the renderer process
@@ -12,6 +12,7 @@ const electronAPI = {
   getMT5Installations: () => ipcRenderer.invoke('get-mt5-installations'),
   getPerformanceMetrics: () => ipcRenderer.invoke('get-performance-metrics'),
   getServiceStats: () => ipcRenderer.invoke('get-service-stats'),
+  autoInstallMT5: (): Promise<InstallResult> => ipcRenderer.invoke('auto-install-mt5'),
   
   // Configuration
   getConfig: () => ipcRenderer.invoke('get-config'),

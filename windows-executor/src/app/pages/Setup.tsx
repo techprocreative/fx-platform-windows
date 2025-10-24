@@ -3,6 +3,7 @@ import { useConfigStore } from "../../stores/config.store";
 import { useAppStore } from "../../stores/app.store";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { StatusIndicator } from "../../components/StatusIndicator";
+import { InstallResult } from "../../types/mt5.types";
 
 export function Setup() {
   const {
@@ -16,7 +17,7 @@ export function Setup() {
     setIsSetupComplete,
     addLog,
     mt5Installations,
-    setMt5Installations,
+    setMT5Installations,
     setIsLoading,
   } = useAppStore();
 
@@ -32,21 +33,46 @@ export function Setup() {
   >("idle");
   const [errors, setErrors] = useState<string[]>([]);
 
-  // Form state for credentials input
+  // Form state for credentials input  
   const [platformUrl, setPlatformUrl] = useState(
-    config.platformUrl || "https://platform.com",
+    "https://fx.nusanexus.com", // Always default to correct URL
   );
   const [apiKey, setApiKey] = useState(config.apiKey || "");
   const [apiSecret, setApiSecret] = useState(config.apiSecret || "");
 
   // Auto-detect MT5 installations on mount
   useEffect(() => {
+    // DEBUG: Log on mount ONLY
+    console.clear(); // Clear console for visibility
+    console.log("=".repeat(80));
+    console.log("🔍🔍🔍 [Setup.tsx] COMPONENT MOUNTED!");
+    console.log("🔍 platformUrl state:", platformUrl);
+    console.log("🔍 config.platformUrl:", config.platformUrl);
+    console.log("🔍 config.apiKey:", config.apiKey?.substring(0, 10) + "...");
+    console.log("=".repeat(80));
+  }, []); // Empty deps = run once on mount
+
+  // MT5 detection
+  useEffect(() => {
     const detectMT5 = async () => {
       try {
+        console.log('=== Setup.tsx: Starting MT5 detection ===');
+        console.log('electronAPI available?', !!(window as any).electronAPI);
+        console.log('getMT5Installations available?', typeof (window as any).electronAPI?.getMT5Installations);
+        
         setIsLoading(true);
         const installations =
           (await (window as any).electronAPI?.getMT5Installations?.()) || [];
-        setMt5Installations(installations);
+        
+        console.log('=== MT5 Detection Result ===');
+        console.log('Installations count:', installations.length);
+        console.log('Installations data:', installations);
+        console.log('Current mt5Installations state:', mt5Installations);
+        
+        setMT5Installations(installations);
+        
+        console.log('setMT5Installations called with:', installations);
+        
         addLog({
           level: "info",
           category: "SETUP",
@@ -54,6 +80,7 @@ export function Setup() {
           metadata: { installations },
         });
       } catch (error) {
+        console.error('=== MT5 Detection ERROR ===', error);
         addLog({
           level: "error",
           category: "SETUP",
@@ -65,7 +92,7 @@ export function Setup() {
     };
 
     detectMT5();
-  }, [addLog, setMt5Installations, setIsLoading]);
+  }, [addLog, setMT5Installations, setIsLoading]);
 
   // Handle auto-installation
   const handleAutoInstall = async () => {
@@ -78,7 +105,12 @@ export function Setup() {
         message: "Starting auto-installation...",
       });
 
-      const result = await (window as any).electronAPI?.autoInstallMT5?.();
+      const result: InstallResult | undefined =
+        await (window as any).electronAPI?.autoInstallMT5?.();
+
+      if (result?.mt5Installations) {
+        setMT5Installations(result.mt5Installations);
+      }
 
       if (result?.success) {
         addLog({
@@ -89,12 +121,16 @@ export function Setup() {
         });
         setCurrentStep(2);
       } else {
-        const errorMsg = result?.error || "Auto-installation failed";
-        setErrors([errorMsg]);
+        const errorMessages =
+          result?.errors && result.errors.length > 0
+            ? result.errors
+            : ["Auto-installation failed"];
+        setErrors(errorMessages);
         addLog({
           level: "error",
           category: "SETUP",
-          message: errorMsg,
+          message: errorMessages.join("; "),
+          metadata: result,
         });
       }
     } catch (error) {
@@ -117,16 +153,23 @@ export function Setup() {
    * 3. Test connection to all services
    */
   const handleConnectAndFetchConfig = async () => {
+    console.log("🚀 [Setup.tsx] handleConnectAndFetchConfig CALLED!");
+    console.log("[Setup.tsx] Inputs:", { platformUrl, apiKey: apiKey?.substring(0, 10) + "...", apiSecret: "***" });
+    
     // Validate inputs
     if (!platformUrl || !apiKey || !apiSecret) {
+      console.error("[Setup.tsx] Validation failed: missing credentials");
       setErrors(["Please fill in all credentials"]);
       return;
     }
 
     if (!apiKey.startsWith("exe_")) {
+      console.error("[Setup.tsx] Validation failed: API key format");
       setErrors(['API Key must start with "exe_"']);
       return;
     }
+
+    console.log("[Setup.tsx] Validation passed, starting connection...");
 
     try {
       setIsConnecting(true);
@@ -140,13 +183,16 @@ export function Setup() {
       });
 
       // CRITICAL: Fetch config from platform using API credentials
+      console.log("[Setup.tsx] Calling fetchConfigFromPlatform...");
       const configFetched = await fetchConfigFromPlatform(
         apiKey,
         apiSecret,
         platformUrl,
       );
+      console.log("[Setup.tsx] fetchConfigFromPlatform result:", configFetched);
 
       if (!configFetched) {
+        console.error("[Setup.tsx] Config fetch failed!");
         setConnectionTestResult("error");
         setErrors([
           configError || "Failed to fetch configuration from platform",
@@ -158,6 +204,8 @@ export function Setup() {
         });
         return;
       }
+      
+      console.log("[Setup.tsx] Config fetch SUCCESS! Current config:", config);
 
       addLog({
         level: "info",
@@ -171,13 +219,23 @@ export function Setup() {
       });
 
       // Now test connection to services with fetched config
+      console.log("[Setup.tsx] Config fetch successful, calling setupComplete...");
+      console.log("[Setup.tsx] Config to send:", {
+        executorId: config.executorId,
+        platformUrl: config.platformUrl,
+        hasPusherKey: !!config.pusherKey
+      });
+      
       addLog({
         level: "info",
         category: "SETUP",
         message: "Testing connection to services...",
       });
 
-      const result = await (window as any).electronAPI?.startServices?.(config);
+      // Call setupComplete to initialize services
+      console.log("[Setup.tsx] Calling window.electronAPI.setupComplete...");
+      const result = await window.electronAPI?.setupComplete(config);
+      console.log("[Setup.tsx] setupComplete result:", result);
 
       if (result?.success) {
         setConnectionTestResult("success");
@@ -214,12 +272,48 @@ export function Setup() {
   // Handle setup completion
   const handleCompleteSetup = async () => {
     try {
-      // Save configuration to local storage
-      await (window as any).electronAPI?.saveConfig?.(config);
+      console.log('[Setup.tsx] handleCompleteSetup called');
+      console.log('[Setup.tsx] Current config:', config);
+      
+      // Check if electronAPI is available
+      if (!window.electronAPI) {
+        const error = 'electronAPI not available - check preload script';
+        console.error('[Setup.tsx]', error);
+        setErrors([error]);
+        return;
+      }
+      
+      if (!window.electronAPI.setupComplete) {
+        const error = 'setupComplete function not found in electronAPI';
+        console.error('[Setup.tsx]', error);
+        setErrors([error]);
+        return;
+      }
+      
+      // Set loading state
+      setIsConnecting(true);
+      setErrors([]);
+      
+      // Call setupComplete with config (this will initialize controller)
+      console.log('[Setup.tsx] Calling setupComplete with config:', {
+        executorId: config.executorId,
+        platformUrl: config.platformUrl,
+        hasPusherKey: !!config.pusherKey,
+        pusherCluster: config.pusherCluster
+      });
+      
+      const result = await window.electronAPI.setupComplete(config);
+      console.log('[Setup.tsx] setupComplete result:', result);
 
-      // Mark setup as completed
-      await (window as any).electronAPI?.completeSetup?.();
+      if (!result?.success) {
+        const error = result?.error || 'Setup completion failed';
+        console.error('[Setup.tsx] Setup failed:', error);
+        setErrors([error]);
+        setIsConnecting(false);
+        return;
+      }
 
+      console.log('[Setup.tsx] Setup completed successfully! Reloading app...');
       setIsSetupComplete(true);
 
       addLog({
@@ -227,14 +321,24 @@ export function Setup() {
         category: "SETUP",
         message: "Setup completed successfully",
       });
+      
+      // Force reload to re-initialize app with new config
+      console.log('[Setup.tsx] Reloading window to apply configuration...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
-      const errorMsg = (error as Error).message;
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      console.error('[Setup.tsx] Setup error caught:', error);
+      console.error('[Setup.tsx] Error stack:', error instanceof Error ? error.stack : 'No stack');
       setErrors([errorMsg]);
       addLog({
         level: "error",
         category: "SETUP",
         message: `Setup completion error: ${errorMsg}`,
       });
+    } finally {
+      setIsConnecting(false);
     }
   };
 
@@ -260,6 +364,13 @@ export function Setup() {
               Step 1/3: Auto-Install Components
             </h3>
 
+            {(() => {
+              console.log('=== RENDER: mt5Installations ===', mt5Installations);
+              console.log('Length:', mt5Installations.length);
+              console.log('Is Array?', Array.isArray(mt5Installations));
+              return null;
+            })()}
+            
             {mt5Installations.length > 0 ? (
               <div className="space-y-2">
                 <div className="flex items-center space-x-2">
@@ -368,7 +479,7 @@ export function Setup() {
                 value={platformUrl}
                 onChange={(e) => setPlatformUrl(e.target.value)}
                 className="input mt-1"
-                placeholder="https://yourplatform.com"
+                placeholder="https://fx.nusanexus.com"
               />
               <p className="text-xs text-gray-500 mt-1">
                 Leave default if using our platform
@@ -480,7 +591,10 @@ export function Setup() {
                 ← Back
               </button>
               <button
-                onClick={handleConnectAndFetchConfig}
+                onClick={() => {
+                  console.log("🔘 [Setup.tsx] Button clicked!");
+                  handleConnectAndFetchConfig();
+                }}
                 disabled={
                   isConnecting || configLoading || !apiKey || !apiSecret
                 }
@@ -644,11 +758,48 @@ export function Setup() {
 
             {/* Start Button */}
             <button
-              onClick={handleCompleteSetup}
-              className="w-full btn btn-primary btn-lg font-semibold"
+              onClick={() => {
+                console.log('🔘 Start Executor button clicked!');
+                console.log('electronAPI available?', !!window.electronAPI);
+                console.log('setupComplete available?', typeof window.electronAPI?.setupComplete);
+                handleCompleteSetup();
+              }}
+              disabled={isConnecting}
+              className="w-full btn btn-primary btn-lg font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
             >
-              🚀 Start Executor
+              {isConnecting ? (
+                <>
+                  <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <span>Starting...</span>
+                </>
+              ) : (
+                <span>🚀 Start Executor</span>
+              )}
             </button>
+            
+            {/* Error Display */}
+            {errors.length > 0 && (
+              <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">Setup Error</h3>
+                    <div className="mt-2 text-sm text-red-700 space-y-1">
+                      {errors.map((err, idx) => (
+                        <p key={idx}>• {err}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -657,3 +808,5 @@ export function Setup() {
 
   return null;
 }
+
+// Build: 141953

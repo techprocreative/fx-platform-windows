@@ -41,7 +41,7 @@ describe('MainController Integration Tests', () => {
       executorId: 'test-executor',
       apiKey: 'test-api-key',
       apiSecret: 'test-api-secret',
-      platformUrl: 'https://test.platform.com',
+      platformUrl: 'https://test.fx.nusanexus.com',
       pusherKey: 'test-pusher-key',
       pusherCluster: 'mt1',
       zmqPort: 5555,

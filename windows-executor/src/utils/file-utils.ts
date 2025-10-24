@@ -20,24 +20,6 @@ const execAsync = promisify(exec);
 
 export class FileUtils {
   /**
-   * Simple file copy operation
-   */
-  static async copy(
-    sourcePath: string,
-    destinationPath: string
-  ): Promise<void> {
-    try {
-      // Create destination directory if it doesn't exist
-      await fs.ensureDir(path.dirname(destinationPath));
-      
-      // Copy the file
-      await fs.copy(sourcePath, destinationPath);
-    } catch (error) {
-      throw new Error(`Failed to copy ${sourcePath} to ${destinationPath}: ${(error as Error).message}`);
-    }
-  }
-
-  /**
    * Copy file with backup support
    */
   static async copyWithBackup(
@@ -83,17 +65,18 @@ export class FileUtils {
   }
 
   /**
-   * Copy file from source to destination
+   * Simple file copy operation (returns boolean for backward compatibility)
    */
   static async copy(
     sourcePath: string,
-    destinationPath: string,
+    destinationPath: string
   ): Promise<boolean> {
     try {
       await fs.ensureDir(path.dirname(destinationPath));
       await fs.copy(sourcePath, destinationPath);
       return true;
     } catch (error) {
+      console.error(`Failed to copy ${sourcePath} to ${destinationPath}:`, error);
       return false;
     }
   }
@@ -207,8 +190,8 @@ export class FileUtils {
         return "Unknown";
       }
 
-      // Use PowerShell to get file version
-      const command = `Get-ItemProperty "${filePath}" | Select-Object -ExpandProperty VersionInfo | Select-Object -ExpandProperty FileVersion`;
+      // Use PowerShell to get file version (using single quotes to avoid path issues)
+      const command = `(Get-ItemProperty '${filePath}').VersionInfo.FileVersion`;
       const { stdout: versionOutput } = await execAsync(
         `powershell -Command "${command}"`,
         {
@@ -219,7 +202,18 @@ export class FileUtils {
       const version = versionOutput.trim();
       return version || "Unknown";
     } catch (error) {
-      return "Unknown";
+      // Fallback to WMIC
+      try {
+        const wmicPath = filePath.replace(/\\/g, '\\\\');
+        const { stdout } = await execAsync(
+          `wmic datafile where name="${wmicPath}" get Version /value`,
+          { timeout: 5000 }
+        );
+        const match = stdout.match(/Version=(.+)/);
+        return match ? match[1].trim() : "Unknown";
+      } catch {
+        return "Unknown";
+      }
     }
   }
 
@@ -232,8 +226,8 @@ export class FileUtils {
         return "Unknown";
       }
 
-      // Use PowerShell to get product version
-      const command = `Get-ItemProperty "${filePath}" | Select-Object -ExpandProperty VersionInfo | Select-Object -ExpandProperty ProductVersion`;
+      // Use PowerShell to get product version (using single quotes to avoid path issues)
+      const command = `(Get-ItemProperty '${filePath}').VersionInfo.ProductVersion`;
       const { stdout } = await execAsync(`powershell -Command "${command}"`, {
         timeout: 5000,
       });
@@ -401,11 +395,26 @@ export class FileUtils {
   }
 
   /**
-   * Read file content as string
+   * Read file content as string (auto-detects UTF-16 encoding)
    */
   static async readFile(filePath: string): Promise<string> {
     try {
-      return await fs.readFile(filePath, "utf-8");
+      // Read as buffer first to detect encoding
+      const buffer = await fs.readFile(filePath);
+      
+      // Check for UTF-16 BOM (FF FE for UTF-16LE, FE FF for UTF-16BE)
+      if (buffer.length >= 2) {
+        if (buffer[0] === 0xFF && buffer[1] === 0xFE) {
+          // UTF-16LE
+          return buffer.toString('utf16le');
+        } else if (buffer[0] === 0xFE && buffer[1] === 0xFF) {
+          // UTF-16BE  
+          return buffer.toString('utf16le').split('').reverse().join('');
+        }
+      }
+      
+      // Default to UTF-8
+      return buffer.toString('utf8');
     } catch (error) {
       throw new Error(
         `Failed to read file ${filePath}: ${(error as Error).message}`,

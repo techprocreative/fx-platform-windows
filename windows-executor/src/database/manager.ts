@@ -185,6 +185,20 @@ export class DatabaseManager {
       
       await this.saveConfig('safetyLimits', defaultLimits);
       
+      // Load default security config
+      const defaultSecurityConfig = {
+        sessionTimeout: 60,
+        maxLoginAttempts: 5,
+        ipWhitelist: [],
+        rateLimits: {
+          apiCallsPerMinute: 60,
+          tradesPerMinute: 10,
+          commandsPerSecond: 5,
+        },
+      };
+      
+      await this.saveConfig('securityConfig', defaultSecurityConfig);
+      
       logger.info('Initial data loaded');
     } catch (error) {
       logger.error('Failed to load initial data', { error });
@@ -325,6 +339,7 @@ export class DatabaseManager {
       const result = stmt.get([key]);
       
       if (!result) {
+        logger.debug('Configuration key not found', { key });
         return null;
       }
       
@@ -346,7 +361,9 @@ export class DatabaseManager {
         }
       }
       
-      return JSON.parse(dataToParse);
+      const parsed = JSON.parse(dataToParse);
+      logger.debug('Configuration retrieved', { key });
+      return parsed;
     } catch (error) {
       logger.error('Failed to get configuration', { error, key });
       return null;
@@ -584,6 +601,14 @@ export class DatabaseManager {
    */
   private mockExecute(query: string, params?: any): any {
     logger.debug('Mock execute', { query, params });
+    
+    // Handle INSERT OR REPLACE for config table
+    if (query.includes('INSERT OR REPLACE INTO config') && params) {
+      const [key, value, encrypted] = params;
+      this.db.data.set(`config:${key}`, { key, value, encrypted });
+      return { changes: 1, lastInsertRowid: Date.now() };
+    }
+    
     return { changes: 1, lastInsertRowid: Date.now() };
   }
 
@@ -592,6 +617,14 @@ export class DatabaseManager {
    */
   private mockGet(query: string, params?: any): any {
     logger.debug('Mock get', { query, params });
+    
+    // Handle SELECT from config table
+    if (query.includes('SELECT') && query.includes('FROM config') && params) {
+      const [key] = params;
+      const data = this.db.data.get(`config:${key}`);
+      return data || null;
+    }
+    
     return null;
   }
 

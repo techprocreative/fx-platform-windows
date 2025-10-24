@@ -1,41 +1,40 @@
 module.exports = {
   appId: "com.fxplatform.executor",
   productName: "FX Platform Executor",
-  copyright: "Copyright © 2025 FX Platform",
 
   directories: {
-    output: "dist-electron",
+    output: "dist-build",
     buildResources: "resources",
   },
 
   files: [
-    "electron/**/*",
     "dist/**/*",
+    "dist/electron/**/*",
     "node_modules/**/*",
+    "resources/**/*",
     "package.json",
-    "!node_modules/*/{CHANGELOG.md,README.md,README,readme.md,readme}",
-    "!node_modules/*/{test,__tests__,tests,powered-test,example,examples}",
-    "!node_modules/*.d.ts",
-    "!node_modules/.bin",
+    "!node_modules/**/{CHANGELOG.md,README.md,README,readme.md,readme}",
+    "!node_modules/**/{test,__tests__,tests,powered-test,example,examples}/**/*",
     "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
-    "!.editorconfig",
-    "!**/._*",
-    "!**/{.DS_Store,.git,.hg,.svn,CVS,RCS,SCCS,.gitignore,.gitattributes}",
-    "!**/{__pycache__,thumbs.db,.flowconfig,.idea,.vs,.nyc_output}",
     "!**/{appveyor.yml,.travis.yml,circle.yml}",
     "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
   ],
 
   extraResources: [
     {
-      from: "resources",
-      to: "resources",
-      filter: ["**/*"],
+      from: "resources/libs",
+      to: "resources/libs",
+      filter: ["libzmq-x64.dll", "libzmq-x86.dll"],
     },
     {
-      from: "node_modules/zeromq/build",
-      to: "zeromq-build",
-      filter: ["**/*.node"],
+      from: "resources/experts",
+      to: "resources/experts",
+      filter: ["*.mq5", "*.ex5"],
+    },
+    {
+      from: "node_modules/zeromq/build/Release",
+      to: "resources/native",
+      filter: ["*.node"],
     },
   ],
 
@@ -52,59 +51,20 @@ module.exports = {
         arch: ["x64"],
       },
     ],
+    requestedExecutionLevel: "requireAdministrator",
     icon: "resources/icons/icon.ico",
-    requestedExecutionLevel: "asInvoker",
     publisherName: "FX Platform",
   },
 
   nsis: {
     oneClick: false,
-    perMachine: false,
     allowElevation: true,
     allowToChangeInstallationDirectory: true,
     createDesktopShortcut: true,
     createStartMenuShortcut: true,
+    perMachine: true,
     shortcutName: "FX Platform Executor",
-    installerIcon: "resources/icons/icon.ico",
-    uninstallerIcon: "resources/icons/icon.ico",
-    deleteAppDataOnUninstall: false,
     artifactName: "${productName}-Setup-${version}.${ext}",
-    license: "LICENSE",
-    runAfterFinish: true,
-    menuCategory: true,
-    displayLanguageSelector: false,
-    installerLanguages: ["en_US"],
-    language: "1033",
-  },
-
-  mac: {
-    target: [
-      {
-        target: "dmg",
-        arch: ["x64", "arm64"],
-      },
-    ],
-    icon: "resources/icons/icon.icns",
-    category: "public.app-category.finance",
-    entitlements: "entitlements.mac.plist",
-    entitlementsInherit: "entitlements.mac.plist",
-    hardenedRuntime: true,
-    gatekeeperAssess: false,
-  },
-
-  linux: {
-    target: [
-      {
-        target: "AppImage",
-        arch: ["x64"],
-      },
-      {
-        target: "deb",
-        arch: ["x64"],
-      },
-    ],
-    icon: "resources/icons/icon.png",
-    category: "Office",
   },
 
   publish: {

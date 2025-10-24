@@ -117,13 +117,14 @@ INSERT INTO config (key, value, encrypted) VALUES
 ('executor_id', '', FALSE),
 ('api_key', '', TRUE),
 ('api_secret', '', TRUE),
-('platform_url', 'https://platform.com', FALSE),
+('platform_url', 'https://fx.nusanexus.com', FALSE),
 ('pusher_key', '', FALSE),
 ('pusher_cluster', 'mt1', FALSE),
 ('zmq_port', 5555, FALSE),
 ('zmq_host', 'tcp://localhost', FALSE),
 ('heartbeat_interval', 60, FALSE),
-('auto_reconnect', 'true', FALSE);
+('auto_reconnect', 'true', FALSE),
+('securityConfig', '{"sessionTimeout":60,"maxLoginAttempts":5,"ipWhitelist":[],"rateLimits":{"apiCallsPerMinute":60,"tradesPerMinute":10,"commandsPerSecond":5}}', FALSE);
 
 -- Create triggers for updated_at timestamps
 CREATE TRIGGER config_updated_at AFTER UPDATE ON config

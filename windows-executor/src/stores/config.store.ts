@@ -23,7 +23,7 @@ interface ConfigState {
 }
 
 const defaultConfig: Partial<AppConfig> = {
-  platformUrl: "https://platform.com",
+  platformUrl: "https://fx.nusanexus.com",
   pusherCluster: "mt1",
   zmqPort: 5555,
   zmqHost: "tcp://localhost",

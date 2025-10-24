@@ -1,6 +1,6 @@
 import { EventEmitter } from 'events';
 import { AppConfig, ConnectionStatus, LogEntry } from '../types/config.types';
-import { MT5Info } from '../types/mt5.types';
+import { MT5Info, InstallResult } from '../types/mt5.types';
 import { Command } from '../types/command.types';
 import { DatabaseConfig } from '../types/security.types';
 import { MT5AutoInstaller } from '../services/mt5-auto-installer.service';
@@ -265,6 +265,64 @@ export class MainController extends EventEmitter {
   }
 
   /**
+   * Handle auto-install result by updating state, logging, and emitting events
+   */
+  private handleAutoInstallResult(
+    installResult: InstallResult,
+    options: { emitDetectionEvent?: boolean } = {},
+  ): void {
+    const { emitDetectionEvent = true } = options;
+
+    this.mt5Installations = installResult.mt5Installations || [];
+
+    if (emitDetectionEvent) {
+      if (this.mt5Installations.length > 0) {
+        this.emit('mt5-detected', this.mt5Installations);
+      } else {
+        this.emit('mt5-not-found');
+      }
+    }
+
+    if (!installResult.success) {
+      this.addLog('error', 'MAIN', 'Auto-installation failed', installResult.errors);
+      this.emit('auto-install-failed', installResult);
+    } else {
+      this.addLog('info', 'MAIN', 'Auto-installation completed successfully');
+      this.emit('auto-install-completed', installResult);
+    }
+  }
+
+  /**
+   * Trigger MT5 auto-installation outside of full initialization
+   */
+  async autoInstallMT5(): Promise<InstallResult> {
+    try {
+      this.addLog('info', 'MAIN', 'Manual auto-installation requested');
+
+      const installResult = await this.mt5Installer.autoInstallEverything();
+      this.handleAutoInstallResult(installResult);
+      return installResult;
+    } catch (error) {
+      const message = (error as Error).message || 'Unknown auto-installation error';
+      const fallbackResult: InstallResult = {
+        success: false,
+        mt5Installations: [],
+        componentsInstalled: {
+          libzmq: false,
+          expertAdvisor: false,
+          configFile: false,
+        },
+        errors: [message],
+        warnings: [],
+      };
+
+      this.addLog('error', 'MAIN', `Auto-installation error: ${message}`, { error });
+      this.emit('auto-install-failed', fallbackResult);
+      return fallbackResult;
+    }
+  }
+
+  /**
    * Initialize the application
    */
   async initialize(config: AppConfig): Promise<boolean> {
@@ -272,6 +330,15 @@ export class MainController extends EventEmitter {
       this.addLog('info', 'MAIN', 'Initializing Windows Executor...');
       
       this.config = config;
+      
+      // Step 0: Initialize database FIRST
+      this.addLog('info', 'MAIN', 'Initializing database...');
+      const dbInitialized = await this.db.initialize();
+      if (!dbInitialized) {
+        this.addLog('error', 'MAIN', 'Failed to initialize database');
+        return false;
+      }
+      this.addLog('info', 'MAIN', 'Database initialized successfully');
       
       // Configure API service
       this.apiService.configure(config);
@@ -291,34 +358,40 @@ export class MainController extends EventEmitter {
       
       // Step 2: Auto-install components if needed
       const installResult = await this.mt5Installer.autoInstallEverything();
+      this.handleAutoInstallResult(installResult, { emitDetectionEvent: false });
       if (!installResult.success) {
-        this.addLog('error', 'MAIN', 'Auto-installation failed', installResult.errors);
-        this.emit('auto-install-failed', installResult);
         return false;
       }
       
-      this.addLog('info', 'MAIN', 'Auto-installation completed successfully');
-      this.emit('auto-install-completed', installResult);
-      
       // Step 3: Initialize security service
+      this.addLog('info', 'MAIN', 'Step 3: Initializing security service...');
       await this.securityService.initialize();
       this.connectionStatus.api = 'connected';
+      this.addLog('info', 'MAIN', 'Security service initialized');
       
       // Step 4: Connect to Pusher
-      this.addLog('info', 'MAIN', 'Connecting to Pusher...');
-      // Connect to Pusher
+      this.addLog('info', 'MAIN', 'Step 4: Connecting to Pusher...');
+      this.addLog('debug', 'MAIN', 'Pusher config:', { 
+        key: config.pusherKey ? '***' : 'missing',
+        cluster: config.pusherCluster 
+      });
       const pusherConnected = await this.pusherService.connect(config as any);
       if (!pusherConnected) {
-        this.addLog('error', 'MAIN', 'Failed to connect to Pusher');
-        return false;
+        this.addLog('warn', 'MAIN', 'Failed to connect to Pusher - continuing without real-time updates');
+        // Don't fail initialization, just log warning
+        // Real-time updates will be disabled but app can still function
+      } else {
+        this.addLog('info', 'MAIN', 'Pusher connected successfully');
       }
       
       // Step 5: Connect to ZeroMQ
-      this.addLog('info', 'MAIN', 'Connecting to ZeroMQ...');
+      this.addLog('info', 'MAIN', 'Step 5: Connecting to ZeroMQ...');
       const zeromqConnected = await this.zeromqService.connect(config as any);
       if (!zeromqConnected) {
-        this.addLog('error', 'MAIN', 'Failed to connect to ZeroMQ');
-        return false;
+        this.addLog('warn', 'MAIN', 'Failed to connect to ZeroMQ - MT5 communication will be unavailable');
+        // Don't fail initialization, just log warning
+      } else {
+        this.addLog('info', 'MAIN', 'ZeroMQ connected successfully');
       }
       
       // Step 6: Start heartbeat service
@@ -503,6 +576,18 @@ export class MainController extends EventEmitter {
     if (this.logs.length > 1000) {
       this.logs = this.logs.slice(0, 1000);
     }
+    
+    // Output to console for debugging
+    const timestamp = new Date().toISOString().substring(11, 23);
+    const levelColors: Record<string, string> = {
+      debug: '\x1b[36m', // cyan
+      info: '\x1b[32m',  // green
+      warn: '\x1b[33m',  // yellow
+      error: '\x1b[31m', // red
+    };
+    const color = levelColors[level] || '';
+    const reset = '\x1b[0m';
+    console.log(`${timestamp} [${color}${level}${reset}] [${category}]: ${message}`, metadata || '');
     
     // Emit log event
     this.emit('log-added', logEntry);

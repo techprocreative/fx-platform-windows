@@ -234,10 +234,10 @@ The application includes automatic update capabilities:
 ## 📞 Support
 
 ### Getting Help
-- **Documentation**: [FX Platform Docs](https://docs.fxplatform.com)
-- **Support Portal**: [support.fxplatform.com](https://support.fxplatform.com)
-- **Community Forum**: [forum.fxplatform.com](https://forum.fxplatform.com)
-- **Email Support**: support@fxplatform.com
+- **Documentation**: [FX Platform Docs](https://docs.fxfx.nusanexus.com)
+- **Support Portal**: [support.fxfx.nusanexus.com](https://support.fxfx.nusanexus.com)
+- **Community Forum**: [forum.fxfx.nusanexus.com](https://forum.fxfx.nusanexus.com)
+- **Email Support**: support@fxfx.nusanexus.com
 
 ### Reporting Issues
 When reporting issues, please include:

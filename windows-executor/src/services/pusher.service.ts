@@ -44,8 +44,8 @@ export class PusherService {
           headers: {
             'X-API-Key': config.apiKey,
             'X-API-Secret': config.apiSecret,
-            'Content-Type': 'application/json',
           },
+          // Pusher will use application/x-www-form-urlencoded by default
         },
         forceTLS: true,
         disableStats: true,
@@ -71,7 +71,13 @@ export class PusherService {
         return false;
       }
     } catch (error) {
-      this.log('error', 'Failed to connect to Pusher', { error: (error as Error).message });
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      this.log('error', 'Failed to connect to Pusher', { 
+        error: errorMessage,
+        stack: errorStack,
+        type: error?.constructor?.name 
+      });
       this.connectionStatus = 'error';
       this.scheduleReconnect();
       return false;
@@ -136,10 +142,12 @@ export class PusherService {
         return;
       }
 
-      // Add metadata to command
+      // Add metadata to command and fill in missing optional fields
       const enrichedCommand: Command = {
         ...data,
         executorId: this.config?.executorId,
+        priority: data.priority || 'NORMAL', // Default to NORMAL if not specified
+        createdAt: data.createdAt || new Date().toISOString(), // Use current time if not specified
       };
 
       // Emit command to event handlers
@@ -187,14 +195,22 @@ export class PusherService {
       }
 
       // Trigger client event (if supported by your backend)
-      this.channel.trigger('client-command-result', {
-        commandId,
-        result,
-        executorId: this.config?.executorId,
-        timestamp: new Date().toISOString(),
-      });
+      // Note: Client events must be enabled in Pusher dashboard
+      try {
+        this.channel.trigger('client-command-result', {
+          commandId,
+          result,
+          executorId: this.config?.executorId,
+          timestamp: new Date().toISOString(),
+        });
+        this.log('info', 'Command result sent via Pusher', { commandId });
+      } catch (clientEventError) {
+        // Client events not enabled - this is OK, results will be sent via API
+        this.log('debug', 'Client events not available, will use API fallback', { 
+          commandId 
+        });
+      }
 
-      this.log('info', 'Command result sent', { commandId });
       return true;
     } catch (error) {
       this.log('error', 'Failed to send command result', { 
@@ -209,13 +225,13 @@ export class PusherService {
    * Validate command structure
    */
   private validateCommand(command: any): boolean {
-    return (
-      command &&
-      typeof command.id === 'string' &&
-      typeof command.command === 'string' &&
-      ['LOW', 'NORMAL', 'HIGH', 'URGENT'].includes(command.priority) &&
-      typeof command.createdAt === 'string'
-    );
+    // Basic validation - only require essential fields
+    if (!command || typeof command.id !== 'string' || typeof command.command !== 'string') {
+      return false;
+    }
+    
+    // Priority and createdAt are optional - will be added if missing
+    return true;
   }
 
   /**
