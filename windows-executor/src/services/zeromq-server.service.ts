@@ -54,8 +54,8 @@ export class ZeroMQServerService {
   async start(config: AppConfig): Promise<boolean> {
     try {
       this.config = config;
-      // Use 127.0.0.1 instead of * for localhost binding (Windows compatibility)
-      const bindAddress = `tcp://127.0.0.1:${config.zmqPort || 5555}`;
+      // Bind to all interfaces (0.0.0.0) to accept both localhost and 127.0.0.1
+      const bindAddress = `tcp://0.0.0.0:${config.zmqPort || 5555}`;
       
       this.log("info", "Starting ZeroMQ Server...", { bindAddress });
 
@@ -101,9 +101,12 @@ export class ZeroMQServerService {
         try {
           // Parse request
           const requestStr = msg.toString();
-          this.log("debug", "Received request from MT5", { request: requestStr });
-
           const request: ZMQRequest = JSON.parse(requestStr);
+          
+          // Log only non-market-data requests at debug level
+          if (request.action !== 'market_data') {
+            this.log("debug", `📨 Received: ${request.action}`, { preview: requestStr.substring(0, 100) });
+          }
           
           // Process request
           const response = await this.processRequest(request);
@@ -111,8 +114,6 @@ export class ZeroMQServerService {
           // Send response
           const responseStr = JSON.stringify(response);
           await this.socket.send(responseStr);
-          
-          this.log("debug", "Sent response to MT5", { response });
         } catch (error) {
           // Send error response
           const errorResponse: ZMQResponse = {
@@ -152,8 +153,12 @@ export class ZeroMQServerService {
         case "get_account_info":
           return this.handleGetAccountInfo();
         
+        case "account_info":  // Handle from EA (alias for update_account_info)
         case "update_account_info":
           return this.handleUpdateAccountInfo(request.data);
+        
+        case "market_data":  // Handle market data from EA
+          return this.handleMarketData(request.data);
         
         case "get_positions":
           return this.handleGetPositions();
@@ -230,13 +235,26 @@ export class ZeroMQServerService {
    */
   private handleUpdateAccountInfo(data: any): ZMQResponse {
     this.accountInfo = data;
-    this.log("info", "Account info updated from MT5", { 
-      balance: data.balance,
-      equity: data.equity 
-    });
+    this.log("info", `💰 Account Info: Balance=$${data.balance?.toFixed(2)}, Equity=$${data.equity?.toFixed(2)}, Profit=$${data.profit?.toFixed(2)}`);
     return {
       success: true,
       data: { message: "Account info updated" }
+    };
+  }
+  
+  /**
+   * Handle market data from MT5
+   */
+  private handleMarketData(data: any): ZMQResponse {
+    // Log at debug level to avoid spam (comes every second)
+    this.log("debug", `📊 Market: ${data.symbol} Bid=${data.bid} Ask=${data.ask} Spread=${data.spread || 'N/A'}`);
+    
+    // Store or broadcast market data as needed
+    // Could emit event for other services to consume
+    
+    return {
+      success: true,
+      data: { message: "Market data received" }
     };
   }
 

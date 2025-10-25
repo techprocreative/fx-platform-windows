@@ -149,6 +149,8 @@ export const TRADING_CONFIG = {
     "COFFEE",
     "SUGAR",
     "COTTON",
+    // Cryptocurrency
+    "BTCUSD", // Bitcoin
   ],
 
   // Timeframes

@@ -13,7 +13,7 @@ import LoadingScreen from '../components/LoadingScreen';
 import NotificationContainer from '../components/NotificationContainer';
 
 function App() {
-  console.clear();
+  // console.clear(); // Commented out to preserve debug logs
   console.log("╔═══════════════════════════════════════════════════════════════════════════════╗");
   console.log("║ 🚀🚀🚀 APP.TSX LOADED! React is running!                                      ║");
   console.log("╚═══════════════════════════════════════════════════════════════════════════════╝");
@@ -45,10 +45,7 @@ function App() {
         const config = await window.electronAPI?.getConfig();
         console.log('Config loaded:', config ? 'Yes' : 'No', config);
         
-        // Set config to store
-        if (config) {
-          setConfig(config);
-        }
+        // Config is loaded, no need to store locally since we check validity directly
         
         // More thorough validation - check all required fields
         const isValidConfig = config && 

@@ -17,6 +17,10 @@ const electronAPI = {
     getRecentSignals: (limit) => electron_1.ipcRenderer.invoke('get-recent-signals', limit),
     getActiveStrategies: () => electron_1.ipcRenderer.invoke('get-active-strategies'),
     getRecentActivity: (limit) => electron_1.ipcRenderer.invoke('get-recent-activity', limit),
+    // EA Attachment tracking
+    notifyEAAttached: (info) => electron_1.ipcRenderer.invoke('notify-ea-attached', info),
+    notifyEADetached: (info) => electron_1.ipcRenderer.invoke('notify-ea-detached', info),
+    getEAAttachments: () => electron_1.ipcRenderer.invoke('get-ea-attachments'),
     // Configuration
     getConfig: () => electron_1.ipcRenderer.invoke('get-config'),
     updateConfig: (newConfig) => electron_1.ipcRenderer.invoke('update-config', newConfig),

@@ -41,14 +41,18 @@ export class ZeroMQService {
 
   /**
    * Connect to MT5 via ZeroMQ with connection pooling
+   * Using port 5556 for client-to-MT5 requests (different from server port 5555)
    */
   async connect(config: AppConfig): Promise<boolean> {
     try {
-      this.config = config;
+      // Use port 5556 for client requests (server uses 5555)
+      const clientPort = 5556;
+      this.config = { ...config, zmqPort: clientPort };
       this.connectionStatus = "connecting";
-      this.log("info", "Connecting to ZeroMQ...", {
+      this.log("info", "Connecting to ZeroMQ client socket...", {
         host: config.zmqHost,
-        port: config.zmqPort,
+        port: clientPort,
+        note: "Using port 5556 for client-to-MT5 requests"
       });
 
       // Clear any existing reconnect timeout

@@ -44,7 +44,7 @@ export function Setup() {
   // Auto-detect MT5 installations on mount
   useEffect(() => {
     // DEBUG: Log on mount ONLY
-    console.clear(); // Clear console for visibility
+    // console.clear(); // Commented out to preserve debug logs
     console.log("=".repeat(80));
     console.log("🔍🔍🔍 [Setup.tsx] COMPONENT MOUNTED!");
     console.log("🔍 platformUrl state:", platformUrl);

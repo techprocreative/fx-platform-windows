@@ -22,6 +22,11 @@ export interface ElectronAPI {
   getRecentSignals: (limit?: number) => Promise<any>;
   getActiveStrategies: () => Promise<any>;
   getRecentActivity: (limit?: number) => Promise<any>;
+  
+  // EA Attachment tracking
+  notifyEAAttached: (info: { symbol: string; timeframe: string; accountNumber: string; chartId?: string }) => Promise<{ success: boolean }>;
+  notifyEADetached: (info: { symbol: string; timeframe: string; accountNumber: string }) => Promise<{ success: boolean }>;
+  getEAAttachments: () => Promise<any[]>;
 
   // Configuration
   getConfig: () => Promise<AppConfig | null>;

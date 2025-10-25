@@ -11,8 +11,8 @@ import { TRADING_CONFIG } from "@/lib/config";
 export interface SymbolMetadata {
   symbol: string;
   name: string;
-  type: 'forex' | 'commodity';
-  category: 'major' | 'minor' | 'exotic' | 'precious-metals' | 'energy' | 'base-metals' | 'agricultural';
+  type: 'forex' | 'commodity' | 'crypto';
+  category: 'major' | 'minor' | 'exotic' | 'precious-metals' | 'energy' | 'base-metals' | 'agricultural' | 'cryptocurrency';
   description: string;
   pipSize?: number;
   tickSize?: number;
@@ -276,6 +276,20 @@ export const SYMBOL_METADATA: Record<string, SymbolMetadata> = {
     maxLotSize: 50,
     lotStep: 0.01,
   },
+
+  // Cryptocurrency
+  BTCUSD: {
+    symbol: 'BTCUSD',
+    name: 'Bitcoin vs US Dollar',
+    type: 'crypto',
+    category: 'cryptocurrency',
+    description: 'Bitcoin spot price in USD - leading cryptocurrency',
+    pipSize: 0.01,
+    tickSize: 0.01,
+    minLotSize: 0.01,
+    maxLotSize: 10,
+    lotStep: 0.01,
+  },
 };
 
 /**
@@ -288,7 +302,7 @@ export const getAllSymbols = (): string[] => {
 /**
  * Get symbols by type
  */
-export const getSymbolsByType = (type: 'forex' | 'commodity'): string[] => {
+export const getSymbolsByType = (type: 'forex' | 'commodity' | 'crypto'): string[] => {
   return Object.values(SYMBOL_METADATA)
     .filter(meta => meta.type === type)
     .map(meta => meta.symbol);
@@ -349,6 +363,9 @@ export const getCategorizedSymbols = () => {
       energy: getSymbolsByCategory('energy'),
       baseMetals: getSymbolsByCategory('base-metals'),
       agricultural: getSymbolsByCategory('agricultural'),
+    },
+    crypto: {
+      cryptocurrency: getSymbolsByCategory('cryptocurrency'),
     },
   };
 };

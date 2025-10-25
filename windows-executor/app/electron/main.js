@@ -81,7 +81,7 @@ function createWindow() {
         // In production, main.js is in dist/electron/electron/main.js
         // index.html is in dist-app/index.html
         // Use absolute path to avoid confusion
-        const indexPath = path.join(__dirname, '../dist-app/index.html');
+        const indexPath = path.join(__dirname, '../../dist-app/index.html');
         console.log('Loading index.html from:', indexPath);
         console.log('__dirname:', __dirname);
         if ((0, fs_1.existsSync)(indexPath)) {
@@ -418,6 +418,20 @@ function setupIpcHandlers() {
     // Get configuration
     electron_1.ipcMain.handle('get-config', () => {
         return mainController?.getConfig();
+    });
+    // Notify EA attached
+    electron_1.ipcMain.handle('notify-ea-attached', (event, info) => {
+        mainController?.notifyEAAttached(info);
+        return { success: true };
+    });
+    // Notify EA detached
+    electron_1.ipcMain.handle('notify-ea-detached', (event, info) => {
+        mainController?.notifyEADetached(info);
+        return { success: true };
+    });
+    // Get EA attachments
+    electron_1.ipcMain.handle('get-ea-attachments', () => {
+        return mainController?.getEAAttachments() || [];
     });
     // Setup wizard events
     electron_1.ipcMain.handle('setup-complete', async (event, config) => {

@@ -37,6 +37,7 @@ export class MarketDataService {
         }
       };
       
+      // Send request to MT5 via ZeroMQ client (port 5556)
       const response = await this.zeromqService.sendRequest(request, 5000);
       
       if (!response || response.status !== 'OK') {

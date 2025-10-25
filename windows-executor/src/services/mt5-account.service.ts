@@ -5,6 +5,7 @@
 
 import { logger } from '../utils/logger';
 import { StrategyPosition } from '../types/strategy.types';
+import { ZeroMQServerService } from './zeromq-server.service';
 
 export interface MT5AccountInfo {
   balance: number;
@@ -38,12 +39,17 @@ export interface MT5Position {
 }
 
 export class MT5AccountService {
+  private zeromqServer: ZeroMQServerService;
   private cachedAccountInfo: MT5AccountInfo | null = null;
   private cacheExpiry: number = 0;
   private cacheLifetime: number = 5000; // 5 seconds
 
   private cachedPositions: MT5Position[] = [];
   private positionsCacheExpiry: number = 0;
+
+  constructor(zeromqServer: ZeroMQServerService) {
+    this.zeromqServer = zeromqServer;
+  }
 
   /**
    * Get current account information from MT5
@@ -274,16 +280,32 @@ export class MT5AccountService {
    * Fetch account info from MT5 (to be implemented with ZMQ/bridge)
    */
   private async fetchAccountInfoFromMT5(): Promise<MT5AccountInfo> {
-    // TODO: Implement actual MT5 communication
-    // This is where you'd call your ZMQ bridge or MT5 native API
+    // Get account info from ZeroMQ Server (which receives it from EA)
+    const accountData = this.zeromqServer.getAccountInfo();
     
-    // Placeholder implementation
-    // In production, this should send ZMQ request to MT5 Expert Advisor
+    if (!accountData) {
+      logger.debug('[MT5AccountService] No account info available from MT5 EA yet');
+      return null as any;
+    }
     
-    // TODO: Get real data from MT5 via ZMQ
-    // Return null to avoid showing fake balance - user must connect to MT5 first
-    logger.debug('[MT5AccountService] getAccountInfo called - returning null (MT5 not connected)');
-    return null;
+    // Transform ZeroMQ data to MT5AccountInfo format
+    const accountInfo: MT5AccountInfo = {
+      balance: accountData.balance || 0,
+      equity: accountData.equity || 0,
+      margin: accountData.margin || 0,
+      freeMargin: accountData.freeMargin || 0,
+      marginLevel: accountData.marginLevel || 0,
+      profit: accountData.profit || 0,
+      currency: accountData.currency || 'USD',
+      leverage: accountData.leverage || 100,
+      accountNumber: accountData.accountNumber || '0',
+      server: accountData.server || 'Unknown',
+      company: accountData.company || 'Unknown'
+    };
+    
+    logger.debug('[MT5AccountService] Fetched from ZeroMQ Server', { balance: accountInfo.balance, equity: accountInfo.equity });
+    
+    return accountInfo;
   }
 
   /**

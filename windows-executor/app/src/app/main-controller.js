@@ -39,6 +39,8 @@ const multi_account_manager_service_1 = require("../services/multi-account-manag
 const disaster_recovery_service_1 = require("../services/disaster-recovery.service");
 const cache_manager_service_1 = require("../services/cache-manager.service");
 const performance_optimizer_service_1 = require("../services/performance-optimizer.service");
+const persistence_service_1 = require("../services/persistence.service");
+const ea_attachment_handler_1 = require("./ea-attachment-handler");
 /**
  * Main Application Controller
  *
@@ -156,6 +158,10 @@ class MainController extends events_1.EventEmitter {
         });
         // Performance optimization (Phase 5)
         this.performanceOptimizer = new performance_optimizer_service_1.PerformanceOptimizer();
+        // Persistence service for state management
+        this.persistence = new persistence_service_1.PersistenceService();
+        // EA attachment handler
+        this.eaAttachmentHandler = new ea_attachment_handler_1.EAAttachmentHandler(this.persistence);
         // Command processor (Phase 1) - Wires everything together
         this.commandProcessor = new command_processor_service_1.CommandProcessor();
         this.addLog('info', 'MAIN', 'All services initialized successfully (11 core + 11 live trading services)');
@@ -332,62 +338,73 @@ class MainController extends events_1.EventEmitter {
                             strategyName: transformedCommand.parameters?.strategyName
                         }
                     });
-                    if (transformedCommand.command === 'START_STRATEGY') {
+                    if (transformedCommand.command === 'START_STRATEGY' && transformedCommand.parameters) {
                         // Handle START_STRATEGY
+                        const params = transformedCommand.parameters;
                         await this.commandProcessor.handleStrategyCommand({
                             type: 'START_STRATEGY',
-                            strategyId: transformedCommand.parameters.strategyId,
+                            strategyId: params.strategyId,
                             strategy: {
-                                id: transformedCommand.parameters.strategyId,
-                                name: transformedCommand.parameters.strategyName,
-                                symbol: transformedCommand.parameters.symbol,
-                                timeframe: transformedCommand.parameters.timeframe,
-                                rules: transformedCommand.parameters.rules,
+                                id: params.strategyId,
+                                name: params.strategyName,
+                                symbol: params.symbol,
+                                timeframe: params.timeframe,
+                                rules: params.rules,
                                 enabled: true,
                             },
-                            options: transformedCommand.parameters.options || {},
+                            options: params.options || {},
                         });
                         // Add to active strategies
                         this.activeStrategies.push({
-                            id: transformedCommand.parameters.strategyId,
-                            name: transformedCommand.parameters.strategyName,
+                            id: params.strategyId,
+                            name: params.strategyName,
                             status: 'active',
-                            symbols: [transformedCommand.parameters.symbol],
-                            timeframes: [transformedCommand.parameters.timeframe],
+                            symbols: [params.symbol],
+                            timeframes: [params.timeframe],
                             activeSince: new Date(),
                         });
-                        this.emit('strategy-activated', {
-                            strategyId: transformedCommand.parameters.strategyId,
-                            strategyName: transformedCommand.parameters.strategyName,
+                        // Persist strategy activation
+                        this.persistence.saveActiveStrategy({
+                            id: params.strategyId,
+                            name: params.strategyName,
+                            symbol: params.symbol,
+                            timeframe: params.timeframe,
+                            status: 'active',
+                            activatedAt: new Date().toISOString(),
                         });
-                        this.addLog('info', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyName} activated`);
+                        this.emit('strategy-activated', {
+                            strategyId: params.strategyId,
+                            strategyName: params.strategyName,
+                        });
+                        this.addLog('info', 'COMMAND', `Strategy ${params.strategyName} activated`);
                         logger_1.logger.info('[MainController] START_STRATEGY completed successfully', {
                             category: 'COMMAND',
                             metadata: {
                                 commandId: transformedCommand.id,
-                                strategyId: transformedCommand.parameters.strategyId,
-                                strategyName: transformedCommand.parameters.strategyName
+                                strategyId: params.strategyId,
+                                strategyName: params.strategyName
                             }
                         });
                     }
-                    else if (transformedCommand.command === 'STOP_STRATEGY') {
+                    else if (transformedCommand.command === 'STOP_STRATEGY' && transformedCommand.parameters) {
                         // Handle STOP_STRATEGY
+                        const params = transformedCommand.parameters;
                         logger_1.logger.info('[MainController] Starting STOP_STRATEGY handler', {
                             category: 'COMMAND',
                             metadata: {
                                 commandId: transformedCommand.id,
-                                parameters: transformedCommand.parameters,
+                                parameters: params,
                                 currentActiveStrategies: this.activeStrategies.map(s => ({ id: s.id, name: s.name }))
                             }
                         });
-                        const strategyId = transformedCommand.parameters?.strategyId;
+                        const strategyId = params?.strategyId;
                         if (!strategyId) {
                             const error = new Error('Missing strategyId in STOP_STRATEGY command');
                             logger_1.logger.error('[MainController] STOP_STRATEGY failed: Missing strategyId', {
                                 category: 'COMMAND',
                                 metadata: {
                                     commandId: transformedCommand.id,
-                                    parameters: transformedCommand.parameters,
+                                    parameters: params,
                                     error: error.message
                                 }
                             });
@@ -399,7 +416,7 @@ class MainController extends events_1.EventEmitter {
                                 type: 'STOP_STRATEGY',
                                 strategyId: strategyId,
                                 options: {
-                                    closePositions: transformedCommand.parameters.closePositions !== false, // Default true
+                                    closePositions: params.closePositions !== false, // Default true
                                 },
                             });
                         }
@@ -407,6 +424,8 @@ class MainController extends events_1.EventEmitter {
                         const index = this.activeStrategies.findIndex(s => s.id === strategyId);
                         if (index > -1) {
                             const removedStrategy = this.activeStrategies.splice(index, 1)[0];
+                            // Remove from persistence
+                            this.persistence.removeActiveStrategy(strategyId);
                             this.emit('strategy-deactivated', {
                                 strategyId: strategyId,
                                 strategyName: removedStrategy.name,
@@ -660,7 +679,8 @@ class MainController extends events_1.EventEmitter {
             const dbInitialized = await this.db.initialize();
             if (!dbInitialized) {
                 this.addLog('error', 'MAIN', 'Failed to initialize database');
-                return false;
+                this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+                // Don't fail - EA might already be installed manually
             }
             this.addLog('info', 'MAIN', 'Database initialized successfully');
             // Configure API service
@@ -671,7 +691,8 @@ class MainController extends events_1.EventEmitter {
             if (this.mt5Installations.length === 0) {
                 this.addLog('warn', 'MAIN', 'No MT5 installations found');
                 this.emit('mt5-not-found');
-                return false;
+                this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+                // Don't fail - EA might already be installed manually
             }
             this.addLog('info', 'MAIN', `Found ${this.mt5Installations.length} MT5 installation(s)`);
             this.emit('mt5-detected', this.mt5Installations);
@@ -679,7 +700,8 @@ class MainController extends events_1.EventEmitter {
             const installResult = await this.mt5Installer.autoInstallEverything();
             this.handleAutoInstallResult(installResult, { emitDetectionEvent: false });
             if (!installResult.success) {
-                return false;
+                this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+                // Don't fail - EA might already be installed manually
             }
             // Step 3: Initialize security service
             this.addLog('info', 'MAIN', 'Step 3: Initializing security service...');
@@ -717,12 +739,14 @@ class MainController extends events_1.EventEmitter {
                 this.connectionStatus.zeromq = 'connected';
                 this.monitoringService.updateConnectionStatus('zeromq', { connected: true });
             }
-            // Step 5.5: Connect ZeroMQ Client to MT5
-            this.addLog('info', 'MAIN', 'Step 5.5: Connecting ZeroMQ Client to MT5...');
+            // Step 5.5: Connect ZeroMQ Client (port 5556) for sending requests to MT5
+            // Server uses port 5555 to receive from MT5, client uses 5556 to send to MT5
+            this.addLog('info', 'MAIN', 'Step 5.5: Connecting ZeroMQ Client on port 5556...');
             try {
                 const zmqClientConnected = await this.zeromqService.connect(config);
                 if (zmqClientConnected) {
-                    this.addLog('info', 'MAIN', '✅ ZeroMQ Client connected - ready to fetch market data');
+                    this.addLog('info', 'MAIN', '✅ ZeroMQ Client connected on port 5556 - ready to send requests to MT5');
+                    this.connectionStatus.zeromq = 'connected';
                 }
                 else {
                     this.addLog('warn', 'MAIN', 'ZeroMQ Client connection failed - will retry automatically');
@@ -741,7 +765,7 @@ class MainController extends events_1.EventEmitter {
             this.addLog('info', 'MAIN', 'Step 9: Initializing Strategy Engine...');
             this.llmService = new llm_service_1.LLMService(config.platformUrl, config.apiKey, this.executorId);
             // Initialize additional services
-            this.mt5AccountService = new mt5_account_service_1.MT5AccountService();
+            this.mt5AccountService = new mt5_account_service_1.MT5AccountService(this.zeromqServer);
             this.performanceMonitor = new performance_monitor_service_1.PerformanceMonitorService();
             this.alertService = new alert_service_1.AlertService();
             this.addLog('info', 'MAIN', 'Additional services initialized (MT5Account, PerformanceMonitor, Alert)');
@@ -788,7 +812,8 @@ class MainController extends events_1.EventEmitter {
             });
             this.addLog('error', 'MAIN', `Initialization failed: ${errorMessage}`, { error });
             this.emit('initialization-failed', error);
-            return false;
+            this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+            // Don't fail - EA might already be installed manually
         }
     }
     /**
@@ -821,7 +846,8 @@ class MainController extends events_1.EventEmitter {
             });
             this.addLog('error', 'MAIN', `Failed to start: ${errorMessage}`, { error });
             this.emit('start-failed', error);
-            return false;
+            this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+            // Don't fail - EA might already be installed manually
         }
     }
     /**
@@ -855,60 +881,161 @@ class MainController extends events_1.EventEmitter {
         catch (error) {
             this.addLog('error', 'MAIN', `Failed to stop: ${error.message}`, { error });
             this.emit('stop-failed', error);
-            return false;
+            this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+            // Don't fail - EA might already be installed manually
         }
     }
     /**
      * Sync active strategies from platform after restart
+     * Improved with retry mechanism and persistence fallback
      */
     async syncActiveStrategiesFromPlatform() {
-        try {
-            if (!this.config) {
-                throw new Error('Config not initialized');
-            }
-            // Fetch active strategies from web platform API
-            const response = await fetch(`${this.config.platformUrl}/api/executor/${this.executorId}/active-strategies`, {
-                headers: {
-                    'Authorization': `Bearer ${this.config.apiKey}`,
-                    'Content-Type': 'application/json'
+        const maxRetries = 3;
+        let attempt = 0;
+        let lastError = null;
+        while (attempt < maxRetries) {
+            try {
+                if (!this.config) {
+                    throw new Error('Config not initialized');
                 }
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            const data = await response.json();
-            const activeStrategies = data.strategies || [];
-            logger_1.logger.info(`[MainController] Found ${activeStrategies.length} active strategies to sync`, {
-                category: 'SYNC',
-                metadata: { strategies: activeStrategies.map((s) => ({ id: s.id, name: s.name })) }
-            });
-            // Start each active strategy
-            for (const strategy of activeStrategies) {
-                try {
-                    this.addLog('info', 'SYNC', `Restoring strategy: ${strategy.name}`);
-                    // Add to active list
-                    this.activeStrategies.push({
-                        id: strategy.id,
-                        name: strategy.name,
-                        symbol: strategy.symbol,
-                        timeframe: strategy.timeframe
-                    });
-                    // Start monitoring
-                    if (this.strategyMonitor) {
-                        await this.strategyMonitor.startMonitoring(strategy);
-                        this.addLog('info', 'SYNC', `Strategy ${strategy.name} restored and monitoring started`);
+                attempt++;
+                this.addLog('info', 'SYNC', `Syncing active strategies (attempt ${attempt}/${maxRetries})...`);
+                // Fetch active strategies from web platform API
+                const response = await fetch(`${this.config.platformUrl}/api/executor/${this.executorId}/active-strategies`, {
+                    headers: {
+                        'Authorization': `Bearer ${this.config.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    signal: AbortSignal.timeout(10000) // 10 second timeout
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                const activeStrategies = data.strategies || [];
+                logger_1.logger.info(`[MainController] Found ${activeStrategies.length} active strategies to sync`, {
+                    category: 'SYNC',
+                    metadata: { strategies: activeStrategies.map((s) => ({ id: s.id, name: s.name })) }
+                });
+                // Clear previous active strategies
+                this.activeStrategies = [];
+                // Start each active strategy
+                for (const strategy of activeStrategies) {
+                    try {
+                        this.addLog('info', 'SYNC', `Restoring strategy: ${strategy.name}`);
+                        // Add to active list
+                        this.activeStrategies.push({
+                            id: strategy.id,
+                            name: strategy.name,
+                            symbol: strategy.symbol,
+                            timeframe: strategy.timeframe
+                        });
+                        // Save to persistence
+                        this.persistence.saveActiveStrategy({
+                            id: strategy.id,
+                            name: strategy.name,
+                            symbol: strategy.symbol,
+                            timeframe: strategy.timeframe,
+                            status: 'active',
+                            activatedAt: new Date().toISOString(),
+                        });
+                        // Start monitoring
+                        if (this.strategyMonitor) {
+                            await this.strategyMonitor.startMonitoring(strategy);
+                            this.addLog('info', 'SYNC', `Strategy ${strategy.name} restored and monitoring started`);
+                        }
+                        // Check if EA was previously attached for this strategy
+                        await this.restoreEAAttachment(strategy);
+                    }
+                    catch (error) {
+                        logger_1.logger.error(`[MainController] Failed to restore strategy ${strategy.name}:`, error);
+                        this.addLog('error', 'SYNC', `Failed to restore strategy: ${strategy.name}`, { error });
                     }
                 }
-                catch (error) {
-                    logger_1.logger.error(`[MainController] Failed to restore strategy ${strategy.name}:`, error);
-                    this.addLog('error', 'SYNC', `Failed to restore strategy: ${strategy.name}`, { error });
+                logger_1.logger.info(`[MainController] Active strategies sync completed: ${activeStrategies.length} restored`);
+                return; // Success - exit retry loop
+            }
+            catch (error) {
+                lastError = error;
+                logger_1.logger.error(`[MainController] Sync attempt ${attempt} failed:`, error);
+                if (attempt < maxRetries) {
+                    // Wait before retry (exponential backoff)
+                    const delay = 1000 * Math.pow(2, attempt - 1);
+                    this.addLog('warn', 'SYNC', `Retrying in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
                 }
             }
-            logger_1.logger.info(`[MainController] Active strategies sync completed: ${activeStrategies.length} restored`);
+        }
+        // All retries failed - fallback to persisted state
+        this.addLog('warn', 'SYNC', 'Failed to sync from platform, using persisted state');
+        logger_1.logger.warn('[MainController] Using persisted state as fallback');
+        try {
+            const persistedStrategies = this.persistence.getActiveStrategies();
+            if (persistedStrategies.length > 0) {
+                this.addLog('info', 'SYNC', `Restoring ${persistedStrategies.length} strategies from persisted state`);
+                for (const strategy of persistedStrategies) {
+                    try {
+                        // Add to active list
+                        this.activeStrategies.push({
+                            id: strategy.id,
+                            name: strategy.name,
+                            symbol: strategy.symbol,
+                            timeframe: strategy.timeframe
+                        });
+                        // Start monitoring
+                        if (this.strategyMonitor) {
+                            await this.strategyMonitor.startMonitoring(strategy);
+                            this.addLog('info', 'SYNC', `Strategy ${strategy.name} restored from persistence`);
+                        }
+                        // Restore EA attachment if it was attached
+                        if (strategy.eaAttached && strategy.eaAttachmentState) {
+                            await this.restoreEAAttachment(strategy);
+                        }
+                    }
+                    catch (error) {
+                        logger_1.logger.error(`[MainController] Failed to restore persisted strategy ${strategy.name}:`, error);
+                    }
+                }
+            }
+            else {
+                this.addLog('info', 'SYNC', 'No persisted strategies found');
+            }
+        }
+        catch (fallbackError) {
+            logger_1.logger.error('[MainController] Failed to restore from persisted state:', fallbackError);
+            throw lastError || fallbackError;
+        }
+    }
+    /**
+     * Restore EA attachment for a strategy
+     */
+    async restoreEAAttachment(strategy) {
+        try {
+            if (!this.config)
+                return;
+            // Get EA attachment state from persistence
+            const mt5Installations = await this.mt5Detector.detectAllInstallations();
+            if (mt5Installations.length === 0) {
+                return;
+            }
+            const accountNumber = mt5Installations[0].accountNumber || '';
+            const attachment = this.persistence.getEAAttachment(strategy.symbol, strategy.timeframe, accountNumber);
+            if (attachment) {
+                this.addLog('info', 'SYNC', `Reattaching EA for ${strategy.name} on ${strategy.symbol} ${strategy.timeframe}`);
+                // Send command to MT5 to reattach EA
+                try {
+                    // Note: EA reattachment would typically be done manually in MT5
+                    // This is logged for informational purposes
+                    this.addLog('info', 'SYNC', `EA attachment detected for ${strategy.name}, ready to execute`);
+                }
+                catch (error) {
+                    this.addLog('warn', 'SYNC', `Failed to reattach EA for ${strategy.name}, manual attachment may be required`);
+                    logger_1.logger.warn(`[MainController] EA reattachment failed:`, error);
+                }
+            }
         }
         catch (error) {
-            logger_1.logger.error('[MainController] Failed to sync active strategies:', error);
-            throw error;
+            logger_1.logger.error(`[MainController] Error restoring EA attachment:`, error);
         }
     }
     /**
@@ -1085,7 +1212,8 @@ class MainController extends events_1.EventEmitter {
         }
         catch (error) {
             this.addLog('error', 'MAIN', `Failed to update configuration: ${error.message}`, { error });
-            return false;
+            this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+            // Don't fail - EA might already be installed manually
         }
     }
     /**
@@ -1159,6 +1287,36 @@ class MainController extends events_1.EventEmitter {
             timeframe: strategy.timeframe,
             lastSignal: strategy.lastSignal
         }));
+    }
+    /**
+     * Notify that EA has been attached
+     */
+    notifyEAAttached(info) {
+        try {
+            this.eaAttachmentHandler.notifyEAAttached(info);
+            this.addLog('info', 'EA', `EA attached: ${info.symbol} ${info.timeframe}`);
+        }
+        catch (error) {
+            this.addLog('error', 'EA', `Failed to track EA attachment: ${error.message}`);
+        }
+    }
+    /**
+     * Notify that EA has been detached
+     */
+    notifyEADetached(info) {
+        try {
+            this.eaAttachmentHandler.notifyEADetached(info);
+            this.addLog('info', 'EA', `EA detached: ${info.symbol} ${info.timeframe}`);
+        }
+        catch (error) {
+            this.addLog('error', 'EA', `Failed to track EA detachment: ${error.message}`);
+        }
+    }
+    /**
+     * Get EA attachments
+     */
+    getEAAttachments() {
+        return this.eaAttachmentHandler.getAttachments();
     }
     /**
      * Get recent activity

@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useAppStore } from '../../stores/app.store';
 import { StatusIndicator } from '../../components/StatusIndicator';
-import { RefreshCcw, Activity, TrendingUp, AlertCircle } from 'lucide-react';
+import { RefreshCcw, Activity, TrendingUp, AlertCircle, CheckCircle, XCircle, Zap } from 'lucide-react';
 import type { ElectronAPI } from '../../types/window';
 
 // Extend window interface
@@ -30,6 +30,7 @@ export function DashboardSimple() {
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [recentSignals, setRecentSignals] = useState<any[]>([]);
   const [activeStrategies, setActiveStrategies] = useState<any[]>([]);
+  const [eaAttachments, setEaAttachments] = useState<any[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdate, setLastUpdate] = useState(new Date());
 
@@ -46,6 +47,7 @@ export function DashboardSimple() {
   }, []);
 
   const loadDashboardData = async () => {
+    console.log('[Dashboard] 🔄 Loading dashboard data...');
     try {
       // Get MT5 account info
       const account = await window.electronAPI?.getMT5AccountInfo?.();
@@ -69,6 +71,15 @@ export function DashboardSimple() {
       const strategies = await window.electronAPI?.getActiveStrategies?.();
       if (strategies) {
         setActiveStrategies(strategies);
+      }
+
+      // Get EA attachments
+      const attachments = await window.electronAPI?.getEAAttachments?.();
+      if (attachments) {
+        console.log('[Dashboard] EA Attachments loaded:', attachments);
+        setEaAttachments(attachments);
+      } else {
+        console.log('[Dashboard] No EA attachments found');
       }
 
       setLastUpdate(new Date());
@@ -95,6 +106,132 @@ export function DashboardSimple() {
       hour: '2-digit',
       minute: '2-digit'
     });
+  };
+
+  const isEAAttached = (strategy: any) => {
+    if (!strategy.symbols || strategy.symbols.length === 0) {
+      console.log('[EA Check] Strategy has no symbols:', strategy.name);
+      return false;
+    }
+    
+    const timeframe = strategy.timeframe || 'M15';
+    
+    // Check if ANY of the strategy's symbols has EA attached
+    const hasAttachment = strategy.symbols.some((symbol: string) => {
+      const attached = eaAttachments.some(
+        (att: any) => att.symbol === symbol && att.timeframe === timeframe
+      );
+      if (attached) {
+        console.log(`[EA Check] ✅ Found attachment for ${symbol} ${timeframe}`);
+      }
+      return attached;
+    });
+    
+    if (!hasAttachment) {
+      console.log(`[EA Check] ❌ No attachment found for ${strategy.name}`, {
+        symbols: strategy.symbols,
+        timeframe,
+        availableAttachments: eaAttachments
+      });
+    }
+    
+    return hasAttachment;
+  };
+
+  const handleNotifyEAAttached = async (strategy: any) => {
+    try {
+      if (!strategy.symbols || strategy.symbols.length === 0) {
+        alert('Strategy has no symbols defined');
+        return;
+      }
+      
+      // If multiple symbols, let user choose
+      let symbol = strategy.symbols[0];
+      if (strategy.symbols.length > 1) {
+        const choice = prompt(
+          `This strategy has multiple symbols: ${strategy.symbols.join(', ')}\n\nWhich symbol did you attach EA to?`,
+          strategy.symbols[0]
+        );
+        if (!choice) return;
+        symbol = choice.toUpperCase().trim();
+      }
+      
+      const timeframe = strategy.timeframe || 'M15';
+      
+      // Get account number from account info or prompt
+      let accountNumber = accountInfo?.accountNumber || '';
+      if (!accountNumber) {
+        accountNumber = prompt('Enter MT5 Account Number:') || '';
+        if (!accountNumber) return;
+      }
+      
+      console.log('[EA Attach] Notifying EA attached:', { symbol, timeframe, accountNumber });
+      
+      await window.electronAPI?.notifyEAAttached?.({
+        symbol,
+        timeframe,
+        accountNumber,
+      });
+      
+      // Reload attachments
+      await loadDashboardData();
+      
+      console.log('[EA Attach] ✅ EA marked as attached successfully');
+      alert(`✅ EA marked as attached for ${strategy.name} (${symbol} ${timeframe})`);
+    } catch (error) {
+      console.error('[EA Attach] ❌ Failed to notify EA attached:', error);
+      alert('Failed to mark EA as attached');
+    }
+  };
+
+  const handleNotifyEADetached = async (strategy: any) => {
+    try {
+      if (!strategy.symbols || strategy.symbols.length === 0) {
+        alert('Strategy has no symbols defined');
+        return;
+      }
+      
+      // Find which symbol has EA attached
+      const timeframe = strategy.timeframe || 'M15';
+      const attachedSymbols = strategy.symbols.filter((sym: string) =>
+        eaAttachments.some((att: any) => att.symbol === sym && att.timeframe === timeframe)
+      );
+      
+      // If multiple symbols attached, let user choose
+      let symbol = attachedSymbols[0] || strategy.symbols[0];
+      if (attachedSymbols.length > 1) {
+        const choice = prompt(
+          `EAs attached to: ${attachedSymbols.join(', ')}\n\nWhich one do you want to detach?`,
+          attachedSymbols[0]
+        );
+        if (!choice) return;
+        symbol = choice.toUpperCase().trim();
+      }
+      
+      // Get account number from account info
+      let accountNumber = accountInfo?.accountNumber || '';
+      if (!accountNumber) {
+        accountNumber = prompt('Enter MT5 Account Number:') || '';
+        if (!accountNumber) return;
+      }
+      
+      console.log('[EA Detach] Notifying EA detached:', { symbol, timeframe, accountNumber });
+      
+      await window.electronAPI?.notifyEADetached?.({
+        symbol,
+        timeframe,
+        accountNumber,
+      });
+      
+      // Reload attachments
+      await loadDashboardData();
+      
+      console.log('[EA Detach] ✅ EA marked as detached successfully');
+      alert(`✅ EA marked as detached for ${strategy.name} (${symbol} ${timeframe})`);
+    } catch (error) {
+      console.error('[EA Detach] ❌ Failed to notify EA detached:', error);
+      alert('Failed to mark EA as detached');
+    }
   };
 
   return (
@@ -195,34 +332,68 @@ export function DashboardSimple() {
               
               <div className="p-4">
                 {activeStrategies.length > 0 ? (
-                  <div className="space-y-2">
-                    {activeStrategies.slice(0, 5).map((strategy: any) => (
-                      <div 
-                        key={strategy.id}
-                        className="flex items-center justify-between p-3 bg-gray-50 rounded-md hover:bg-gray-100 transition"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <StatusIndicator 
-                            status={strategy.status === 'active' ? 'online' : 'warning'}
-                            size="sm"
-                          />
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {strategy.name}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              {strategy.symbols?.slice(0, 3).join(', ') || 'No symbols'}
-                              {strategy.symbols?.length > 3 && ` +${strategy.symbols.length - 3}`}
+                  <div className="space-y-3">
+                    {activeStrategies.slice(0, 5).map((strategy: any) => {
+                      const eaAttached = isEAAttached(strategy);
+                      console.log(`[Render] Strategy: ${strategy.name}, EA Attached: ${eaAttached}`, {
+                        symbols: strategy.symbols,
+                        timeframe: strategy.timeframe,
+                      });
+                      
+                      return (
+                        <div 
+                          key={strategy.id}
+                          className="border border-gray-200 rounded-lg p-3 bg-white hover:shadow-md transition"
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center space-x-3 flex-1">
+                              <StatusIndicator 
+                                status={strategy.status === 'active' ? 'online' : 'warning'}
+                                size="sm"
+                              />
+                              <div className="flex-1">
+                                <div className="text-sm font-medium text-gray-900 flex items-center gap-2">
+                                  {strategy.name}
+                                  {eaAttached && (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                      <Zap className="h-3 w-3 mr-1" />
+                                      EA Attached
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-0.5">
+                                  {strategy.symbols?.slice(0, 3).join(', ') || 'No symbols'}
+                                  {strategy.symbols?.length > 3 && ` +${strategy.symbols.length - 3}`}
+                                  <span className="mx-1">•</span>
+                                  {strategy.timeframe || 'M15'}
+                                </div>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs font-medium text-gray-700">
-                            {strategy.timeframe || 'M15'}
+                          
+                          {/* EA Attachment Buttons */}
+                          <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
+                            {!eaAttached ? (
+                              <button
+                                onClick={() => handleNotifyEAAttached(strategy)}
+                                className="flex-1 inline-flex items-center justify-center px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md hover:bg-green-100 transition text-xs font-medium"
+                              >
+                                <CheckCircle className="h-3.5 w-3.5 mr-1.5" />
+                                Mark EA Attached
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleNotifyEADetached(strategy)}
+                                className="flex-1 inline-flex items-center justify-center px-3 py-1.5 bg-red-50 text-red-700 border border-red-200 rounded-md hover:bg-red-100 transition text-xs font-medium"
+                              >
+                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                Mark EA Detached
+                              </button>
+                            )}
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-8 text-gray-400">

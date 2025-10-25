@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/Card";
 import { TRADING_CONFIG } from "@/lib/config";
+import { getCategorizedSymbols } from "@/lib/market/symbols";
 
 // Market context types
 interface MarketContext {
@@ -409,11 +410,69 @@ Please create a strategy that takes this current market situation into account.`
               className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
               disabled={loading}
             >
-              {TRADING_CONFIG.SUPPORTED_SYMBOLS.map((sym) => (
-                <option key={sym} value={sym}>
-                  {sym}
-                </option>
-              ))}
+              {(() => {
+                const categorized = getCategorizedSymbols();
+                return (
+                  <>
+                    {categorized.forex.major.length > 0 && (
+                      <optgroup label="📊 Forex - Major Pairs">
+                        {categorized.forex.major.map((sym) => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {categorized.forex.minor.length > 0 && (
+                      <optgroup label="📊 Forex - Minor Pairs">
+                        {categorized.forex.minor.map((sym) => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {categorized.forex.exotic.length > 0 && (
+                      <optgroup label="📊 Forex - Exotic Pairs">
+                        {categorized.forex.exotic.map((sym) => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {categorized.commodities.preciousMetals.length > 0 && (
+                      <optgroup label="🥇 Commodities - Precious Metals">
+                        {categorized.commodities.preciousMetals.map((sym) => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {categorized.commodities.energy.length > 0 && (
+                      <optgroup label="⚡ Commodities - Energy">
+                        {categorized.commodities.energy.map((sym) => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {categorized.commodities.baseMetals.length > 0 && (
+                      <optgroup label="🔩 Commodities - Base Metals">
+                        {categorized.commodities.baseMetals.map((sym) => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {categorized.commodities.agricultural.length > 0 && (
+                      <optgroup label="🌾 Commodities - Agricultural">
+                        {categorized.commodities.agricultural.map((sym) => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {categorized.crypto.cryptocurrency.length > 0 && (
+                      <optgroup label="₿ Cryptocurrency">
+                        {categorized.crypto.cryptocurrency.map((sym) => (
+                          <option key={sym} value={sym}>{sym}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </>
+                );
+              })()}
             </select>
           </div>
           
