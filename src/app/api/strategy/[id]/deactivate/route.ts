@@ -60,25 +60,21 @@ export async function POST(
     for (const assignment of assignments) {
       const command = {
         id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        strategyId,
-        executorId: assignment.executorId,
-        type: 'EMERGENCY_STOP' as const,
+        type: 'STOP_STRATEGY' as const,
         priority: 'HIGH' as const,
-        command: {
-          action: 'CLOSE_POSITION' as const,
-          symbol: strategy.symbol,
-          volume: 0,
-          stopLoss: 0,
-          takeProfit: 0,
-          metadata: {
-            strategyId,
-            source: 'user',
-            userId: session.user.id,
-            closePositions,
-          },
+        executorId: assignment.executorId,
+        strategyId,
+        payload: {
+          strategyId,
+          strategyName: strategy.name,
+          closePositions,
+        },
+        metadata: {
+          source: 'web_platform',
+          userId: session.user.id,
+          assignmentId: assignment.id,
         },
         timestamp: new Date(),
-        createdAt: new Date(),
         expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       };
 

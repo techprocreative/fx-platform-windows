@@ -69,29 +69,25 @@ export async function POST(
     // Send START_STRATEGY command via Pusher
     const command = {
       id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      strategyId,
-      executorId,
-      type: 'TRADE_SIGNAL' as const,
+      type: 'START_STRATEGY' as const,
       priority: 'HIGH' as const,
-      command: {
-        action: 'OPEN_POSITION' as const,
+      executorId,
+      strategyId,
+      payload: {
+        strategyId: strategy.id,
+        strategyName: strategy.name,
         symbol: strategy.symbol,
-        type: 'BUY' as const,
-        volume: 0.01,
-        stopLoss: 0,
-        takeProfit: 0,
-        metadata: {
-          strategyId: strategy.id,
-          strategyName: strategy.name,
-          timeframe: strategy.timeframe,
-          rules: strategy.rules,
-          source: 'user',
-          userId: session.user.id,
-          options,
-        },
+        timeframe: strategy.timeframe,
+        rules: strategy.rules,
+        enabled: true,
+        options: options || {},
+      },
+      metadata: {
+        source: 'web_platform',
+        userId: session.user.id,
+        assignmentId: assignment.id,
       },
       timestamp: new Date(),
-      createdAt: new Date(),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
     };
 
