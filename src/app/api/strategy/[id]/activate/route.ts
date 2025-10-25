@@ -126,7 +126,6 @@ export async function POST(
           id: commandId,
           userId: session.user.id,
           executorId: execId,
-          strategyId: strategy.id,
           command: 'START_STRATEGY',
           parameters: {
             strategyId: strategy.id,
