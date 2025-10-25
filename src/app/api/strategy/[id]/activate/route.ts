@@ -33,14 +33,21 @@ export async function POST(
       // Multiple executors
       targetExecutors = executorIds;
     } else if (autoAssign) {
-      // Auto-assign to all online executors
-      const onlineExecutors = await prisma.executor.findMany({
+      // Auto-assign to all online executors (connected in last 5 minutes)
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+      const executors = await prisma.executor.findMany({
         where: {
           userId: session.user.id,
-          isConnected: true,
+          deletedAt: null,
+          lastHeartbeat: {
+            gte: fiveMinutesAgo,
+          },
+        },
+        select: {
+          id: true,
         },
       });
-      targetExecutors = onlineExecutors.map(e => e.id);
+      targetExecutors = executors.map(e => e.id);
     }
 
     if (targetExecutors.length === 0) {
