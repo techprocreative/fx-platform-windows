@@ -21,11 +21,31 @@ export async function POST(
 
     const strategyId = params.id;
     const body = await request.json();
-    const { executorId, options } = body;
+    const { executorId, executorIds, autoAssign, options, settings } = body;
 
-    if (!executorId) {
+    // Determine executors to activate
+    let targetExecutors: string[] = [];
+    
+    if (executorId) {
+      // Single executor (legacy)
+      targetExecutors = [executorId];
+    } else if (executorIds && Array.isArray(executorIds)) {
+      // Multiple executors
+      targetExecutors = executorIds;
+    } else if (autoAssign) {
+      // Auto-assign to all online executors
+      const onlineExecutors = await prisma.executor.findMany({
+        where: {
+          userId: session.user.id,
+          isConnected: true,
+        },
+      });
+      targetExecutors = onlineExecutors.map(e => e.id);
+    }
+
+    if (targetExecutors.length === 0) {
       return NextResponse.json(
-        { error: 'executorId is required' },
+        { error: 'No executors available. Please select executors or ensure at least one executor is online.' },
         { status: 400 }
       );
     }
@@ -45,54 +65,62 @@ export async function POST(
       );
     }
 
-    // Check if executor exists and is online
-    const executor = await prisma.executor.findUnique({
-      where: { id: executorId },
-    });
+    // Process each executor
+    const assignments = [];
+    const commands = [];
 
-    if (!executor) {
-      return NextResponse.json(
-        { error: 'Executor not found' },
-        { status: 404 }
-      );
-    }
+    for (const execId of targetExecutors) {
+      // Check if executor exists and is online
+      const executor = await prisma.executor.findUnique({
+        where: { id: execId },
+      });
 
-    // Create strategy assignment
-    const assignment = await prisma.strategyAssignment.create({
-      data: {
+      if (!executor) {
+        console.warn(`Executor ${execId} not found, skipping`);
+        continue;
+      }
+
+      // Create strategy assignment
+      const assignment = await prisma.strategyAssignment.create({
+        data: {
+          strategyId,
+          executorId: execId,
+          status: 'active',
+        },
+      });
+
+      assignments.push(assignment);
+
+      // Send START_STRATEGY command via Pusher
+      const command = {
+        id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        type: 'START_STRATEGY' as const,
+        priority: 'HIGH' as const,
+        executorId: execId,
         strategyId,
-        executorId,
-        status: 'active',
-      },
-    });
+        payload: {
+          strategyId: strategy.id,
+          strategyName: strategy.name,
+          symbol: strategy.symbol,
+          timeframe: strategy.timeframe,
+          rules: strategy.rules,
+          enabled: true,
+          options: options || {},
+          settings: settings || {},
+        },
+        metadata: {
+          source: 'web_platform',
+          userId: session.user.id,
+          assignmentId: assignment.id,
+        },
+        timestamp: new Date(),
+        expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+      };
 
-    // Send START_STRATEGY command via Pusher
-    const command = {
-      id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      type: 'START_STRATEGY' as const,
-      priority: 'HIGH' as const,
-      executorId,
-      strategyId,
-      payload: {
-        strategyId: strategy.id,
-        strategyName: strategy.name,
-        symbol: strategy.symbol,
-        timeframe: strategy.timeframe,
-        rules: strategy.rules,
-        enabled: true,
-        options: options || {},
-      },
-      metadata: {
-        source: 'web_platform',
-        userId: session.user.id,
-        assignmentId: assignment.id,
-      },
-      timestamp: new Date(),
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
-    };
-
-    // Send command
-    await sendCommandToExecutor(executorId, command);
+      // Send command
+      await sendCommandToExecutor(execId, command);
+      commands.push(command);
+    }
 
     // Update strategy status
     await prisma.strategy.update({
@@ -104,11 +132,12 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: 'Strategy activation command sent',
+      message: `Strategy activated on ${assignments.length} executor(s)`,
+      executorsNotified: assignments.length,
       data: {
-        commandId: command.id,
-        assignmentId: assignment.id,
-        executorId,
+        commandIds: commands.map(c => c.id),
+        assignmentIds: assignments.map(a => a.id),
+        executorIds: targetExecutors,
         strategyId,
       },
     });
