@@ -277,8 +277,59 @@ class MainController extends events_1.EventEmitter {
             this.addLog('info', 'PUSHER', `Connection status: ${data.status}`, data);
         });
         this.pusherService.on('command-received', async (command) => {
-            this.addLog('info', 'COMMAND', `Command received: ${command.command}`, { command });
-            await this.commandService.addCommand(command);
+            this.addLog('info', 'COMMAND', `Command received: ${command.type || command.command}`, { command });
+            // Transform web platform command format to executor format
+            const transformedCommand = {
+                id: command.id,
+                command: command.type || command.command, // Web platform uses 'type', executor uses 'command'
+                parameters: command.payload || command.parameters || {},
+                priority: command.priority || 'NORMAL',
+                createdAt: command.timestamp || command.createdAt || new Date().toISOString(),
+                executorId: command.executorId || this.executorId,
+                timeout: command.timeout,
+                retryCount: 0,
+                maxRetries: command.maxRetries || 3,
+            };
+            this.addLog('debug', 'COMMAND', 'Transformed command', { original: command, transformed: transformedCommand });
+            // Handle START_STRATEGY command directly with commandProcessor
+            if (transformedCommand.command === 'START_STRATEGY' && this.commandProcessor) {
+                try {
+                    await this.commandProcessor.handleStrategyCommand({
+                        type: 'START_STRATEGY',
+                        strategyId: transformedCommand.parameters.strategyId,
+                        strategy: {
+                            id: transformedCommand.parameters.strategyId,
+                            name: transformedCommand.parameters.strategyName,
+                            symbol: transformedCommand.parameters.symbol,
+                            timeframe: transformedCommand.parameters.timeframe,
+                            rules: transformedCommand.parameters.rules,
+                            enabled: true,
+                        },
+                        options: transformedCommand.parameters.options || {},
+                    });
+                    // Add to active strategies
+                    this.activeStrategies.push({
+                        id: transformedCommand.parameters.strategyId,
+                        name: transformedCommand.parameters.strategyName,
+                        status: 'active',
+                        symbols: [transformedCommand.parameters.symbol],
+                        timeframes: [transformedCommand.parameters.timeframe],
+                        activeSince: new Date(),
+                    });
+                    this.emit('strategy-activated', {
+                        strategyId: transformedCommand.parameters.strategyId,
+                        strategyName: transformedCommand.parameters.strategyName,
+                    });
+                    this.addLog('info', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyName} activated`);
+                }
+                catch (error) {
+                    this.addLog('error', 'COMMAND', `Failed to start strategy: ${error instanceof Error ? error.message : 'Unknown error'}`, { error });
+                }
+            }
+            else {
+                // For other commands, use command service
+                await this.commandService.addCommand(transformedCommand);
+            }
         });
         this.pusherService.on('emergency-stop', (data) => {
             this.addLog('warn', 'SAFETY', 'Emergency stop received', data);
@@ -429,6 +480,7 @@ class MainController extends events_1.EventEmitter {
             this.addLog('info', 'MAIN', 'Step 3: Initializing security service...');
             await this.securityService.initialize();
             this.connectionStatus.api = 'connected';
+            this.monitoringService.updateConnectionStatus('api', { connected: true });
             this.addLog('info', 'MAIN', 'Security service initialized');
             // Step 4: Connect to Pusher
             this.addLog('info', 'MAIN', 'Step 4: Connecting to Pusher...');
@@ -439,22 +491,26 @@ class MainController extends events_1.EventEmitter {
             const pusherConnected = await this.pusherService.connect(config);
             if (!pusherConnected) {
                 this.addLog('warn', 'MAIN', 'Failed to connect to Pusher - continuing without real-time updates');
+                this.monitoringService.updateConnectionStatus('pusher', { connected: false });
                 // Don't fail initialization, just log warning
                 // Real-time updates will be disabled but app can still function
             }
             else {
                 this.addLog('info', 'MAIN', 'Pusher connected successfully');
+                this.monitoringService.updateConnectionStatus('pusher', { connected: true });
             }
             // Step 5: Start ZeroMQ Server (listen for MT5 connections)
             this.addLog('info', 'MAIN', 'Step 5: Starting ZeroMQ Server...');
             const zeromqStarted = await this.zeromqServer.start(config);
             if (!zeromqStarted) {
                 this.addLog('error', 'MAIN', 'Failed to start ZeroMQ Server - MT5 communication will be unavailable');
+                this.monitoringService.updateConnectionStatus('zeromq', { connected: false });
                 // Don't fail initialization, continue without MT5 connection
             }
             else {
                 this.addLog('info', 'MAIN', '✅ ZeroMQ Server started - ready for MT5 connections');
                 this.connectionStatus.zeromq = 'connected';
+                this.monitoringService.updateConnectionStatus('zeromq', { connected: true });
             }
             // Step 6: Start heartbeat service
             await this.heartbeatService.start(config);
@@ -509,6 +565,7 @@ class MainController extends events_1.EventEmitter {
             // It starts automatically when commands are added
             // Update MT5 connection status
             this.connectionStatus.mt5 = 'connected';
+            this.monitoringService.updateConnectionStatus('mt5', { connected: true });
             this.emit('connection-status-changed', this.connectionStatus);
             this.addLog('info', 'MAIN', 'Windows Executor started successfully');
             this.emit('started');

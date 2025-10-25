@@ -45,6 +45,11 @@ function App() {
         const config = await window.electronAPI?.getConfig();
         console.log('Config loaded:', config ? 'Yes' : 'No', config);
         
+        // Set config to store
+        if (config) {
+          setConfig(config);
+        }
+        
         // More thorough validation - check all required fields
         const isValidConfig = config && 
                              config.apiKey && 

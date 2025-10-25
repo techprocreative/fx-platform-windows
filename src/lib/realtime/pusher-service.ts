@@ -62,14 +62,14 @@ export async function sendCommandToExecutor(
 
     await pusher.trigger(
       `private-executor-${executorId}`,
-      'trade-command',
+      'command-received',
       {
         ...command,
         timestamp: new Date().toISOString(),
       }
     );
 
-    console.log(`Command sent to executor ${executorId} via Pusher`);
+    console.log(`Command sent to executor ${executorId} via Pusher (event: command-received)`);
     return true;
   } catch (error) {
     console.error('Failed to send command via Pusher:', error);
