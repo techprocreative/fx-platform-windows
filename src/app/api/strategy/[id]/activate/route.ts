@@ -91,9 +91,34 @@ export async function POST(
 
       assignments.push(assignment);
 
+      // Create command in database for tracking
+      const commandId = `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      await prisma.command.create({
+        data: {
+          id: commandId,
+          userId: session.user.id,
+          executorId: execId,
+          strategyId: strategy.id,
+          command: 'START_STRATEGY',
+          parameters: {
+            strategyId: strategy.id,
+            strategyName: strategy.name,
+            symbol: strategy.symbol,
+            timeframe: strategy.timeframe,
+            rules: strategy.rules,
+            enabled: true,
+            options: options || {},
+            settings: settings || {},
+          },
+          priority: 'HIGH',
+          status: 'pending',
+        },
+      });
+
       // Send START_STRATEGY command via Pusher
       const command = {
-        id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: commandId,
         type: 'START_STRATEGY' as const,
         priority: 'HIGH' as const,
         executorId: execId,
@@ -117,7 +142,7 @@ export async function POST(
         expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
       };
 
-      // Send command
+      // Send command via Pusher
       await sendCommandToExecutor(execId, command);
       commands.push(command);
     }
