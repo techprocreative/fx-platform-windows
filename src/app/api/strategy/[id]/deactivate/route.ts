@@ -58,12 +58,19 @@ export async function POST(
 
     // Send STOP_STRATEGY command to all executors
     for (const assignment of assignments) {
+      const commandId = `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       const command = {
-        id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        id: commandId,
+        command: 'STOP_STRATEGY', // Add command field (executor expects this)
         type: 'STOP_STRATEGY' as const,
         priority: 'HIGH' as const,
         executorId: assignment.executorId,
-        strategyId,
+        parameters: {
+          strategyId,
+          strategyName: strategy.name,
+          closePositions,
+        },
         payload: {
           strategyId,
           strategyName: strategy.name,
@@ -74,11 +81,39 @@ export async function POST(
           userId: session.user.id,
           assignmentId: assignment.id,
         },
+        createdAt: new Date().toISOString(),
         timestamp: new Date(),
         expiresAt: new Date(Date.now() + 5 * 60 * 1000),
       };
 
-      await sendCommandToExecutor(assignment.executorId, command);
+      // Save command to database
+      await prisma.command.create({
+        data: {
+          id: commandId,
+          userId: session.user.id,
+          executorId: assignment.executorId,
+          command: 'STOP_STRATEGY',
+          parameters: {
+            strategyId,
+            strategyName: strategy.name,
+            closePositions,
+          },
+          priority: 'HIGH',
+          status: 'pending',
+        },
+      });
+
+      const sent = await sendCommandToExecutor(assignment.executorId, command);
+      if (sent) {
+        console.log(`✅ STOP command sent to executor ${assignment.executorId}:`, {
+          commandId: command.id,
+          channel: `private-executor-${assignment.executorId}`,
+          event: 'command-received',
+        });
+      } else {
+        console.error(`❌ Failed to send STOP command to executor ${assignment.executorId}`);
+      }
+      
       commands.push(command);
 
       // Update assignment
