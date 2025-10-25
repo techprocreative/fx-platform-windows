@@ -234,12 +234,12 @@ Please create a strategy that takes this current market situation into account.`
 
   // Format market context for prompt
   const formatMarketContextForPrompt = (context: MarketContext): string => {
-    return `- Current Price: ${context.price.current.toFixed(5)} (${context.price.changePercent >= 0 ? '+' : ''}${context.price.changePercent.toFixed(2)}%)
-- Trend: ${context.trend.direction} (Strength: ${context.trend.strength}/100)
-- Volatility: ${context.volatility.volatilityLevel} (ATR: ${context.volatility.currentATR.toFixed(5)})
-- Key Levels: Support ${context.keyLevels.nearestSupport?.toFixed(5) || 'N/A'}, Resistance ${context.keyLevels.nearestResistance?.toFixed(5) || 'N/A'}
-- Market Sessions: ${context.session.activeSessions.join(', ')} (${context.session.marketCondition} activity)
-- Optimal for ${context.symbol}: ${context.session.isOptimalForPair ? 'YES' : 'NO'}`;
+    return `- Current Price: ${context.price?.current?.toFixed(5) || 'N/A'} (${context.price?.changePercent ? (context.price.changePercent >= 0 ? '+' : '') + context.price.changePercent.toFixed(2) : '0.00'}%)
+- Trend: ${context.trend?.direction || 'unknown'} (Strength: ${context.trend?.strength || 0}/100)
+- Volatility: ${context.volatility?.volatilityLevel || 'unknown'} (ATR: ${context.volatility?.currentATR?.toFixed(5) || 'N/A'})
+- Key Levels: Support ${context.keyLevels?.nearestSupport?.toFixed(5) || 'N/A'}, Resistance ${context.keyLevels?.nearestResistance?.toFixed(5) || 'N/A'}
+- Market Sessions: ${context.session?.activeSessions?.join(', ') || 'N/A'} (${context.session?.marketCondition || 'unknown'} activity)
+- Optimal for ${context.symbol}: ${context.session?.isOptimalForPair ? 'YES' : 'NO'}`;
   };
 
   // Extract indicators from strategy rules
@@ -535,15 +535,15 @@ Please create a strategy that takes this current market situation into account.`
                         ? 'bg-green-100 text-green-700'
                         : 'bg-red-100 text-red-700'
                     }`}>
-                      {marketContext.price.current.toFixed(5)}
-                      ({marketContext.price.changePercent >= 0 ? '+' : ''}{marketContext.price.changePercent.toFixed(2)}%)
+                      {marketContext.price?.current?.toFixed(5) || 'N/A'}
+                      ({marketContext.price?.changePercent ? (marketContext.price.changePercent >= 0 ? '+' : '') + marketContext.price.changePercent.toFixed(2) : '0.00'}%)
                     </span>
                   </div>
                   <div className="flex items-center gap-1">
-                    {marketContext.trend.direction === 'bullish' && <TrendingUp className="h-3 w-3 text-green-600" />}
-                    {marketContext.trend.direction === 'bearish' && <TrendingDown className="h-3 w-3 text-red-600" />}
-                    <span className="text-xs capitalize">{marketContext.trend.direction}</span>
-                    <span className="text-xs text-neutral-500">({marketContext.trend.strength}/100)</span>
+                    {marketContext.trend?.direction === 'bullish' && <TrendingUp className="h-3 w-3 text-green-600" />}
+                    {marketContext.trend?.direction === 'bearish' && <TrendingDown className="h-3 w-3 text-red-600" />}
+                    <span className="text-xs capitalize">{marketContext.trend?.direction || 'unknown'}</span>
+                    <span className="text-xs text-neutral-500">({marketContext.trend?.strength || 0}/100)</span>
                   </div>
                 </div>
 
@@ -551,15 +551,15 @@ Please create a strategy that takes this current market situation into account.`
                 <div className="flex items-center gap-2 text-sm">
                   <span className="text-xs text-neutral-500">Volatility:</span>
                   <span className={`px-2 py-1 rounded text-xs ${
-                    marketContext.volatility.volatilityLevel === 'high'
+                    marketContext.volatility?.volatilityLevel === 'high'
                       ? 'bg-red-100 text-red-700'
-                      : marketContext.volatility.volatilityLevel === 'medium'
+                      : marketContext.volatility?.volatilityLevel === 'medium'
                       ? 'bg-yellow-100 text-yellow-700'
                       : 'bg-green-100 text-green-700'
                   }`}>
-                    {marketContext.volatility.volatilityLevel.toUpperCase()}
+                    {marketContext.volatility?.volatilityLevel?.toUpperCase() || 'N/A'}
                   </span>
-                  <span className="text-xs text-neutral-500">(ATR: {marketContext.volatility.currentATR.toFixed(5)})</span>
+                  <span className="text-xs text-neutral-500">(ATR: {marketContext.volatility?.currentATR?.toFixed(5) || 'N/A'})</span>
                 </div>
 
                 {/* All Market Sessions with Status */}
@@ -655,7 +655,7 @@ Please create a strategy that takes this current market situation into account.`
                         <div className="p-2 rounded border border-green-200 bg-green-50">
                           <div className="text-xs font-semibold text-green-700 mb-1">Support (S)</div>
                           <div className="text-sm font-bold text-green-600">
-                            {marketContext.keyLevels.nearestSupport.toFixed(5)}
+                            {marketContext.keyLevels.nearestSupport?.toFixed(5) || 'N/A'}
                           </div>
                           <div className="text-xs text-green-600 mt-1">Buy zone / Stop loss</div>
                         </div>
@@ -664,7 +664,7 @@ Please create a strategy that takes this current market situation into account.`
                         <div className="p-2 rounded border border-red-200 bg-red-50">
                           <div className="text-xs font-semibold text-red-700 mb-1">Resistance (R)</div>
                           <div className="text-sm font-bold text-red-600">
-                            {marketContext.keyLevels.nearestResistance.toFixed(5)}
+                            {marketContext.keyLevels.nearestResistance?.toFixed(5) || 'N/A'}
                           </div>
                           <div className="text-xs text-red-600 mt-1">Sell zone / Take profit</div>
                         </div>
@@ -684,11 +684,11 @@ Please create a strategy that takes this current market situation into account.`
                 {/* Optimal Trading Indicator */}
                 <div className="flex items-center gap-2 text-xs pt-2 border-t border-blue-200">
                   <span className={`px-2 py-1 rounded ${
-                    marketContext.session.isOptimalForPair
+                    marketContext.session?.isOptimalForPair
                       ? 'bg-green-100 text-green-700'
                       : 'bg-gray-100 text-gray-700'
                   }`}>
-                    {marketContext.session.isOptimalForPair ? '✅ OPTIMAL' : '⚠️ SUBOPTIMAL'}
+                    {marketContext.session?.isOptimalForPair ? '✅ OPTIMAL' : '⚠️ SUBOPTIMAL'}
                   </span>
                   <span className="text-neutral-500">
                     for {marketContext.symbol} at this time
