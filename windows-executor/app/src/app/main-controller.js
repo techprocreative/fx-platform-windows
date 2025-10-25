@@ -403,7 +403,41 @@ class MainController extends events_1.EventEmitter {
             }
             else {
                 // For other commands, use command service
-                await this.commandService.addCommand(transformedCommand);
+                try {
+                    await this.commandService.addCommand(transformedCommand);
+                }
+                catch (commandError) {
+                    const errorMessage = commandError instanceof Error ? commandError.message : 'Unknown error';
+                    const errorStack = commandError instanceof Error ? commandError.stack : undefined;
+                    // Log to file
+                    logger_1.logger.error(`[MainController] Failed to add command to queue: ${errorMessage}`, {
+                        category: 'COMMAND',
+                        metadata: {
+                            command: transformedCommand.command,
+                            commandId: transformedCommand.id,
+                            error: errorMessage,
+                            stack: errorStack
+                        }
+                    });
+                    this.addLog('error', 'COMMAND', `Failed to queue command: ${errorMessage}`, {
+                        command: transformedCommand.command,
+                        error: commandError
+                    });
+                    // Report failure if API available
+                    try {
+                        if (this.apiService && typeof this.apiService.reportCommandResult === 'function') {
+                            await this.apiService.reportCommandResult(transformedCommand.id, 'failed', {
+                                success: false,
+                                error: errorMessage,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
+                    }
+                    catch (apiError) {
+                        // Non-critical, just log
+                        this.addLog('warn', 'COMMAND', `Failed to report command queue failure: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
+                    }
+                }
             }
         });
         this.pusherService.on('emergency-stop', (data) => {
