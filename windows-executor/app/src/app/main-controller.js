@@ -6,6 +6,7 @@ const mt5_auto_installer_service_1 = require("../services/mt5-auto-installer.ser
 const mt5_detector_service_1 = require("../services/mt5-detector.service");
 const pusher_service_1 = require("../services/pusher.service");
 const zeromq_service_1 = require("../services/zeromq.service");
+const zeromq_server_service_1 = require("../services/zeromq-server.service");
 const command_service_1 = require("../services/command.service");
 const heartbeat_service_1 = require("../services/heartbeat.service");
 const safety_service_1 = require("../services/safety.service");
@@ -103,6 +104,7 @@ class MainController extends events_1.EventEmitter {
         }, logger);
         this.pusherService = new pusher_service_1.PusherService(logger);
         this.zeromqService = new zeromq_service_1.ZeroMQService(logger);
+        this.zeromqServer = new zeromq_server_service_1.ZeroMQServerService(logger);
         this.safetyService = new safety_service_1.SafetyService(this.db);
         this.monitoringService = new monitoring_service_1.MonitoringService(this.db);
         this.securityService = new security_service_1.SecurityService(this.db, 'encryption-key-placeholder');
@@ -443,15 +445,16 @@ class MainController extends events_1.EventEmitter {
             else {
                 this.addLog('info', 'MAIN', 'Pusher connected successfully');
             }
-            // Step 5: Connect to ZeroMQ
-            this.addLog('info', 'MAIN', 'Step 5: Connecting to ZeroMQ...');
-            const zeromqConnected = await this.zeromqService.connect(config);
-            if (!zeromqConnected) {
-                this.addLog('warn', 'MAIN', 'Failed to connect to ZeroMQ - MT5 communication will be unavailable');
-                // Don't fail initialization, just log warning
+            // Step 5: Start ZeroMQ Server (listen for MT5 connections)
+            this.addLog('info', 'MAIN', 'Step 5: Starting ZeroMQ Server...');
+            const zeromqStarted = await this.zeromqServer.start(config);
+            if (!zeromqStarted) {
+                this.addLog('error', 'MAIN', 'Failed to start ZeroMQ Server - MT5 communication will be unavailable');
+                // Don't fail initialization, continue without MT5 connection
             }
             else {
-                this.addLog('info', 'MAIN', 'ZeroMQ connected successfully');
+                this.addLog('info', 'MAIN', '✅ ZeroMQ Server started - ready for MT5 connections');
+                this.connectionStatus.zeromq = 'connected';
             }
             // Step 6: Start heartbeat service
             await this.heartbeatService.start(config);
