@@ -263,14 +263,26 @@ export class PusherService {
       });
       
       // Try to infer command type from payload or parameters
-      if (command.payload?.strategyId || command.parameters?.strategyId) {
-        command.command = 'START_STRATEGY';
-        command.type = 'START_STRATEGY';
-        this.log('info', 'Inferred command type as START_STRATEGY from payload');
+      const hasStrategyId = command.payload?.strategyId || command.parameters?.strategyId;
+      const hasClosePositions = 'closePositions' in (command.payload || {}) || 'closePositions' in (command.parameters || {});
+      
+      if (hasStrategyId) {
+        if (hasClosePositions) {
+          // Has closePositions field = STOP command
+          command.command = 'STOP_STRATEGY';
+          command.type = 'STOP_STRATEGY';
+          this.log('info', 'Inferred command type as STOP_STRATEGY from closePositions field');
+        } else {
+          // Has strategyId but no closePositions = START command
+          command.command = 'START_STRATEGY';
+          command.type = 'START_STRATEGY';
+          this.log('info', 'Inferred command type as START_STRATEGY from payload');
+        }
       } else {
         // Default fallback
         command.command = 'UNKNOWN';
         command.type = 'UNKNOWN';
+        this.log('warn', 'Could not infer command type, using UNKNOWN');
       }
     }
     
