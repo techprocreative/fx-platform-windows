@@ -14,6 +14,7 @@
 
 import { getCurrentSessionContext, getOptimalPairsForCurrentSessions } from './sessions';
 import YahooFinance from 'yahoo-finance2';
+import { convertToProviderSymbol } from '../data-providers/common/symbol-mapper';
 
 export interface OHLCV {
   timestamp: Date;
@@ -206,37 +207,13 @@ export class MarketContextProvider {
   }
 
   /**
-   * Convert symbol to Yahoo Finance format
+   * Convert symbol to Yahoo Finance format using centralized mapper
    */
   private convertSymbolToYahooFormat(symbol: string): string {
-    // Forex pairs need =X suffix
-    const forexPairs: Record<string, string> = {
-      'EURUSD': 'EURUSD=X',
-      'GBPUSD': 'GBPUSD=X',
-      'USDJPY': 'USDJPY=X',
-      'USDCHF': 'USDCHF=X',
-      'AUDUSD': 'AUDUSD=X',
-      'USDCAD': 'USDCAD=X',
-      'NZDUSD': 'NZDUSD=X',
-      'EURGBP': 'EURGBP=X',
-      'EURJPY': 'EURJPY=X',
-      'GBPJPY': 'GBPJPY=X',
-      'AUDJPY': 'AUDJPY=X',
-      'CHFJPY': 'CHFJPY=X',
-      'CADJPY': 'CADJPY=X',
-      'NZDJPY': 'NZDJPY=X',
-    };
-
-    // Commodities
-    const commodities: Record<string, string> = {
-      'XAUUSD': 'GC=F',  // Gold Futures
-      'XAGUSD': 'SI=F',  // Silver Futures
-      'USOIL': 'CL=F',   // WTI Crude Oil Futures
-      'UKOIL': 'BZ=F',   // Brent Crude Futures
-      'NGAS': 'NG=F',    // Natural Gas Futures
-    };
-
-    return forexPairs[symbol] || commodities[symbol] || symbol;
+    // Use centralized symbol mapper for comprehensive symbol support
+    const yahooSymbol = convertToProviderSymbol(symbol, 'yahooFinance');
+    console.log(`🔄 Symbol conversion: ${symbol} → ${yahooSymbol}`);
+    return yahooSymbol;
   }
 
   /**
