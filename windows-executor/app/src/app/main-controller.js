@@ -742,6 +742,12 @@ class MainController extends events_1.EventEmitter {
      */
     async getMT5AccountInfo() {
         try {
+            // Get account info from ZeroMQ server (received from MT5 EA)
+            const accountInfo = this.zeromqServer.getAccountInfo();
+            if (accountInfo) {
+                return accountInfo;
+            }
+            // Fallback to old method if no data from ZMQ yet
             return await this.mt5AccountService.getAccountInfo();
         }
         catch (error) {

@@ -52,6 +52,8 @@ class ZeroMQServerService {
         this.config = null;
         this.messageCount = 0;
         this.lastMessageTime = null;
+        this.accountInfo = null; // Store account info from MT5
+        this.positions = []; // Store positions from MT5
         this.logger = logger || this.defaultLogger;
     }
     defaultLogger(level, message, metadata) {
@@ -67,7 +69,8 @@ class ZeroMQServerService {
     async start(config) {
         try {
             this.config = config;
-            const bindAddress = `tcp://*:${config.zmqPort || 5555}`;
+            // Use 127.0.0.1 instead of * for localhost binding (Windows compatibility)
+            const bindAddress = `tcp://127.0.0.1:${config.zmqPort || 5555}`;
             this.log("info", "Starting ZeroMQ Server...", { bindAddress });
             // Create Reply socket (server)
             this.socket = new zmq.Reply();
@@ -146,6 +149,8 @@ class ZeroMQServerService {
                     return this.handleHeartbeat(request.data);
                 case "get_account_info":
                     return this.handleGetAccountInfo();
+                case "update_account_info":
+                    return this.handleUpdateAccountInfo(request.data);
                 case "get_positions":
                     return this.handleGetPositions();
                 case "open_trade":
@@ -197,12 +202,31 @@ class ZeroMQServerService {
      * Handle get account info request
      */
     handleGetAccountInfo() {
-        // This will be populated by MT5 when it sends account data
+        if (this.accountInfo) {
+            return {
+                success: true,
+                data: this.accountInfo
+            };
+        }
+        else {
+            return {
+                success: false,
+                error: "No account info available yet"
+            };
+        }
+    }
+    /**
+     * Handle account info update from MT5
+     */
+    handleUpdateAccountInfo(data) {
+        this.accountInfo = data;
+        this.log("info", "Account info updated from MT5", {
+            balance: data.balance,
+            equity: data.equity
+        });
         return {
             success: true,
-            data: {
-                message: "Send account info to update executor"
-            }
+            data: { message: "Account info updated" }
         };
     }
     /**
@@ -281,8 +305,20 @@ class ZeroMQServerService {
             isRunning: this.isRunning,
             messageCount: this.messageCount,
             lastMessageTime: this.lastMessageTime,
-            bindAddress: this.config ? `tcp://*:${this.config.zmqPort || 5555}` : null
+            bindAddress: this.config ? `tcp://127.0.0.1:${this.config.zmqPort || 5555}` : null
         };
+    }
+    /**
+     * Get current account info from MT5
+     */
+    getAccountInfo() {
+        return this.accountInfo;
+    }
+    /**
+     * Get current positions from MT5
+     */
+    getPositions() {
+        return this.positions;
     }
 }
 exports.ZeroMQServerService = ZeroMQServerService;
