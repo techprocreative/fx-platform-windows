@@ -107,12 +107,17 @@ export default function StrategiesPage() {
     // If active, allow direct deactivation
     if (currentStatus === 'active') {
       try {
-        const response = await fetch(`/api/strategy/${id}/activate`, {
-          method: 'DELETE',
+        const response = await fetch(`/api/strategy/${id}/deactivate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            closePositions: false, // Don't close positions by default
+          }),
         });
 
         if (!response.ok) {
-          throw new Error(`Failed to deactivate strategy`);
+          const data = await response.json().catch(() => null);
+          throw new Error(data?.error || 'Failed to deactivate strategy');
         }
 
         const data = await response.json();
