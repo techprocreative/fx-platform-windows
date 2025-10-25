@@ -388,6 +388,25 @@ export class MainController extends EventEmitter {
     });
 
     this.pusherService.on('command-received', async (command: any) => {
+      // Log EVERYTHING about incoming command
+      logger.info('[MainController] ===== COMMAND RECEIVED FROM PUSHER =====', {
+        category: 'COMMAND',
+        metadata: {
+          commandId: command.id,
+          command: command.command,
+          type: command.type,
+          priority: command.priority,
+          executorId: command.executorId,
+          parameters: command.parameters,
+          payload: command.payload,
+          hasCommand: !!command.command,
+          hasType: !!command.type,
+          hasId: !!command.id,
+          allKeys: Object.keys(command),
+          timestamp: new Date().toISOString()
+        }
+      });
+      
       this.addLog('info', 'COMMAND', `Command received: ${command.type || command.command}`, { command });
       
       // Transform web platform command format to executor format
@@ -405,9 +424,30 @@ export class MainController extends EventEmitter {
       
       this.addLog('debug', 'COMMAND', 'Transformed command', { original: command, transformed: transformedCommand });
       
+      // Log transformed command to file
+      logger.info('[MainController] Command transformed and validated', {
+        category: 'COMMAND',
+        metadata: {
+          commandId: transformedCommand.id,
+          command: transformedCommand.command,
+          parameters: transformedCommand.parameters,
+          willBeHandledBy: (transformedCommand.command === 'START_STRATEGY' || transformedCommand.command === 'STOP_STRATEGY') ? 'commandProcessor' : 'commandService'
+        }
+      });
+      
       // Handle strategy commands directly with commandProcessor
       if (this.commandProcessor && (transformedCommand.command === 'START_STRATEGY' || transformedCommand.command === 'STOP_STRATEGY')) {
         try {
+          logger.info('[MainController] Handling strategy command with commandProcessor', {
+            category: 'COMMAND',
+            metadata: {
+              commandId: transformedCommand.id,
+              command: transformedCommand.command,
+              strategyId: transformedCommand.parameters?.strategyId,
+              strategyName: transformedCommand.parameters?.strategyName
+            }
+          });
+          
           if (transformedCommand.command === 'START_STRATEGY') {
             // Handle START_STRATEGY
             await this.commandProcessor.handleStrategyCommand({
@@ -441,12 +481,39 @@ export class MainController extends EventEmitter {
             
             this.addLog('info', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyName} activated`);
             
+            logger.info('[MainController] START_STRATEGY completed successfully', {
+              category: 'COMMAND',
+              metadata: {
+                commandId: transformedCommand.id,
+                strategyId: transformedCommand.parameters.strategyId,
+                strategyName: transformedCommand.parameters.strategyName
+              }
+            });
+            
           } else if (transformedCommand.command === 'STOP_STRATEGY') {
             // Handle STOP_STRATEGY
+            logger.info('[MainController] Starting STOP_STRATEGY handler', {
+              category: 'COMMAND',
+              metadata: {
+                commandId: transformedCommand.id,
+                parameters: transformedCommand.parameters,
+                currentActiveStrategies: this.activeStrategies.map(s => ({ id: s.id, name: s.name }))
+              }
+            });
+            
             const strategyId = transformedCommand.parameters?.strategyId;
             
             if (!strategyId) {
-              throw new Error('Missing strategyId in STOP_STRATEGY command');
+              const error = new Error('Missing strategyId in STOP_STRATEGY command');
+              logger.error('[MainController] STOP_STRATEGY failed: Missing strategyId', {
+                category: 'COMMAND',
+                metadata: {
+                  commandId: transformedCommand.id,
+                  parameters: transformedCommand.parameters,
+                  error: error.message
+                }
+              });
+              throw error;
             }
             
             // Call command processor to handle the strategy command
@@ -471,8 +538,27 @@ export class MainController extends EventEmitter {
               });
               
               this.addLog('info', 'COMMAND', `Strategy ${removedStrategy.name} deactivated`);
+              
+              logger.info('[MainController] STOP_STRATEGY completed - strategy removed from active list', {
+                category: 'COMMAND',
+                metadata: {
+                  commandId: transformedCommand.id,
+                  strategyId: strategyId,
+                  strategyName: removedStrategy.name,
+                  remainingActiveStrategies: this.activeStrategies.length
+                }
+              });
             } else {
               this.addLog('warn', 'COMMAND', `Strategy ${strategyId} not found in active strategies`);
+              
+              logger.warn('[MainController] STOP_STRATEGY - strategy not found in active list', {
+                category: 'COMMAND',
+                metadata: {
+                  commandId: transformedCommand.id,
+                  strategyId: strategyId,
+                  currentActiveStrategies: this.activeStrategies.map(s => ({ id: s.id, name: s.name }))
+                }
+              });
             }
           }
           
