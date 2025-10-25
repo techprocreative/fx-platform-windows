@@ -1,15 +1,6 @@
 import { create } from 'zustand';
-import { ConnectionStatus, AppConfig } from '../types/config.types';
+import { ConnectionStatus, AppConfig, LogEntry } from '../types/config.types';
 import { MT5Info } from '../types/mt5.types';
-
-// Define log entry type
-export interface LogEntry {
-  id: string;
-  type: 'INFO' | 'ERROR' | 'TRADE' | 'SIGNAL';
-  message: string;
-  timestamp: Date;
-  metadata?: any;
-}
 
 // Define the app state interface
 interface AppState {
@@ -84,7 +75,7 @@ interface AppState {
     metadata?: any;
   }) => void;
   clearRecentActivity: () => void;
-  addLog: (log: LogEntry) => void;
+  addLog: (log: Omit<LogEntry, 'id' | 'timestamp'>) => void;
   clearLogs: () => void;
 }
 
@@ -157,10 +148,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   clearRecentActivity: () => set({ recentActivity: [] }),
   
   addLog: (log) => set((state) => {
-    const newLog = {
+    const newLog: LogEntry = {
       ...log,
-      id: log.id || `log-${Date.now()}-${Math.random()}`,
-      timestamp: log.timestamp || new Date(),
+      id: Date.now() + Math.random(),
+      timestamp: new Date(),
     };
     const updatedLogs = [newLog, ...state.logs];
     

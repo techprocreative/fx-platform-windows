@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } f
 import { Toaster } from 'react-hot-toast';
 import { useAppStore } from '../stores/app.store';
 import { Setup } from './pages/Setup';
-import { Dashboard } from './pages/Dashboard';
+import { DashboardSimple } from './pages/DashboardSimple';
 import { Settings } from './pages/Settings';
 import { Logs } from './pages/Logs';
 import { StatusBar } from '../components/StatusBar';
@@ -40,16 +40,31 @@ function App() {
       try {
         console.log('Initializing app...');
         
-        // Check if app is configured
+        // Check if app is configured with VALID config
         const config = await window.electronAPI?.getConfig();
-        console.log('Config loaded:', config ? 'Yes' : 'No');
+        console.log('Config loaded:', config ? 'Yes' : 'No', config);
         
-        if (config && config.apiKey && config.apiSecret) {
-          console.log('App is configured, showing dashboard');
+        // More thorough validation - check all required fields
+        const isValidConfig = config && 
+                             config.apiKey && 
+                             config.apiSecret && 
+                             config.platformUrl &&
+                             config.executorId;
+        
+        if (isValidConfig) {
+          console.log('App has valid config, showing dashboard');
           setIsConfigured(true);
           setCurrentPage('dashboard');
         } else {
-          console.log('App not configured, showing setup wizard');
+          console.log('App not configured or config invalid, showing setup wizard');
+          console.log('Config details:', {
+            hasApiKey: !!config?.apiKey,
+            hasApiSecret: !!config?.apiSecret,
+            hasPlatformUrl: !!config?.platformUrl,
+            hasExecutorId: !!config?.executorId
+          });
+          setIsConfigured(false);
+          setCurrentPage('setup');
         }
 
         // Set up event listeners
@@ -278,7 +293,7 @@ function AppContent() {
           {/* Page Content */}
           <div className="flex-1 overflow-auto">
             <Routes>
-              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/dashboard" element={<DashboardSimple />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/logs" element={<Logs />} />
               <Route path="*" element={<Navigate to="/dashboard" replace />} />

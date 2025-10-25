@@ -64,7 +64,6 @@ export function Logs() {
     clearLogs();
     addLog({
       level: 'info',
-      source: 'LOGS',
       message: 'Logs cleared by user',
       category: 'LOGS',
     });
@@ -84,7 +83,6 @@ export function Logs() {
     
     addLog({
       level: 'info',
-      source: 'LOGS',
       message: 'Logs exported',
       category: 'LOGS',
     });

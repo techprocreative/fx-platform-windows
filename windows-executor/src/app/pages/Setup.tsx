@@ -4,6 +4,7 @@ import { useAppStore } from "../../stores/app.store";
 import { LoadingSpinner } from "../../components/LoadingSpinner";
 import { StatusIndicator } from "../../components/StatusIndicator";
 import { InstallResult } from "../../types/mt5.types";
+import { AppConfig } from "../../types/config.types";
 
 export function Setup() {
   const {
@@ -234,7 +235,7 @@ export function Setup() {
 
       // Call setupComplete to initialize services
       console.log("[Setup.tsx] Calling window.electronAPI.setupComplete...");
-      const result = await window.electronAPI?.setupComplete(config);
+      const result = await window.electronAPI?.setupComplete(config as AppConfig);
       console.log("[Setup.tsx] setupComplete result:", result);
 
       if (result?.success) {
@@ -302,7 +303,7 @@ export function Setup() {
         pusherCluster: config.pusherCluster
       });
       
-      const result = await window.electronAPI.setupComplete(config);
+      const result = await window.electronAPI.setupComplete(config as AppConfig);
       console.log('[Setup.tsx] setupComplete result:', result);
 
       if (!result?.success) {

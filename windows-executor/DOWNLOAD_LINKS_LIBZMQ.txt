@@ -1,0 +1,55 @@
+DIRECT DOWNLOAD LINKS FOR LIBZMQ.DLL (Pre-built Binaries)
+===========================================================
+
+⚠️ IMPORTANT: Download BINARY version, NOT source code!
+
+WORKING LINKS (as of Oct 2025):
+--------------------------------
+
+1. From vcpkg (RECOMMENDED):
+   Run: vcpkg install zeromq:x64-windows
+   DLL location after install: C:\vcpkg\installed\x64-windows\bin\libzmq.dll
+
+2. From NuGet:
+   https://www.nuget.org/packages/zeromq/4.3.6
+   - Download the .nupkg file
+   - Rename to .zip and extract
+   - Find DLL in: build/native/bin/x64/v142/dynamic/Release/libzmq.dll
+
+3. From Conda (if you have Anaconda/Miniconda):
+   conda install -c conda-forge zeromq
+   DLL at: %CONDA_PREFIX%\Library\bin\libzmq.dll
+
+4. Build from source (Advanced):
+   You already have source at: D:\fx-platform-windows-fresh\windows-executor\zeromq-4.3.5
+   
+   To build:
+   - Install Visual Studio 2019+ with C++ tools
+   - Open "Developer Command Prompt for VS"
+   - cd D:\fx-platform-windows-fresh\windows-executor\zeromq-4.3.5
+   - mkdir build && cd build
+   - cmake .. -G "Visual Studio 16 2019" -A x64 -DBUILD_SHARED=ON -DBUILD_STATIC=OFF
+   - cmake --build . --config Release
+   - DLL will be in: build/bin/Release/libzmq.dll
+
+FILE REQUIREMENTS:
+------------------
+✅ Size: 1-3 MB (NOT 8+ MB!)
+✅ Architecture: x64 (64-bit)
+✅ Has C exports (not C++ mangled)
+✅ Format: .dll for Windows
+
+AFTER DOWNLOAD:
+---------------
+1. Copy to: D:\fx-platform-windows-fresh\windows-executor\resources\libs\libzmq-x64.dll
+2. Verify: npm run verify:dll
+3. Should see: "✅ VERIFICATION PASSED"
+
+---
+
+Quick Check if DLL is Correct:
+- File size between 1-3 MB? ✅
+- Verification passes? ✅
+- MT5 test EA loads? ✅
+
+If verification fails, try different source!

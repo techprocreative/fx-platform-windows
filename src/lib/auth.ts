@@ -1,8 +1,10 @@
 import { type NextAuthOptions } from 'next-auth';
+import { getServerSession } from 'next-auth/next';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@next-auth/prisma-adapter';
 import { prisma } from './prisma';
 import { verifyPassword } from './crypto';
+import type { NextRequest } from 'next/server';
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
@@ -121,3 +123,11 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60,
   },
 };
+
+/**
+ * Helper function to require authentication in API routes
+ */
+export async function requireAuth(request?: NextRequest) {
+  const session = await getServerSession(authOptions);
+  return session;
+}

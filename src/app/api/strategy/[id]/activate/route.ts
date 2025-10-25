@@ -1,267 +1,127 @@
+/**
+ * Activate Strategy API Endpoint
+ * Sends START_STRATEGY command to Windows Executor
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { sendCommandToExecutor } from '@/lib/realtime/pusher-service';
+import { requireAuth } from '@/lib/auth';
 
-import { authOptions } from '../../../../../lib/auth';
-import { prisma } from '../../../../../lib/prisma';
-import { AppError, handleApiError } from '@/lib/errors';
-import { triggerExecutorCommand } from '@/lib/pusher/server';
-
-export const dynamic = 'force-dynamic';
-
-const activateSchema = z.object({
-  autoAssign: z.boolean().default(false),
-  executorIds: z.array(z.string()).optional(),
-  settings: z.object({
-    lotSize: z.number().optional(),
-    maxRisk: z.number().optional(),
-    maxDailyLoss: z.number().optional(),
-    maxOpenTrades: z.number().optional(),
-  }).optional(),
-});
-
-/**
- * POST /api/strategy/[id]/activate
- * Activate strategy and assign to executors
- */
 export async function POST(
-  req: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      throw new AppError(401, 'Unauthorized');
+    // Auth check
+    const session = await requireAuth(request);
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse request body
-    const body = await req.json();
-    const validation = activateSchema.safeParse(body);
+    const strategyId = params.id;
+    const body = await request.json();
+    const { executorId, options } = body;
 
-    if (!validation.success) {
-      throw new AppError(
-        400,
-        'Validation error',
-        'VALIDATION_ERROR',
-        validation.error.flatten().fieldErrors
+    if (!executorId) {
+      return NextResponse.json(
+        { error: 'executorId is required' },
+        { status: 400 }
       );
     }
 
-    const { autoAssign, executorIds, settings } = validation.data;
-
     // Get strategy
-    const strategy = await prisma.strategy.findFirst({
+    const strategy = await prisma.strategy.findUnique({
       where: {
-        id: params.id,
+        id: strategyId,
         userId: session.user.id,
-        deletedAt: null,
       },
     });
 
     if (!strategy) {
-      throw new AppError(404, 'Strategy not found', 'STRATEGY_NOT_FOUND');
-    }
-
-    // Update strategy status to active
-    const updatedStrategy = await prisma.strategy.update({
-      where: { id: params.id },
-      data: { status: 'active' },
-    });
-
-    // Determine target executors
-    let targetExecutors;
-    if (autoAssign) {
-      // Get all online executors
-      const now = new Date();
-      const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
-
-      targetExecutors = await prisma.executor.findMany({
-        where: {
-          userId: session.user.id,
-          deletedAt: null,
-          lastHeartbeat: {
-            gte: fiveMinutesAgo,
-          },
-        },
-      });
-    } else if (executorIds && executorIds.length > 0) {
-      // Get specified executors
-      targetExecutors = await prisma.executor.findMany({
-        where: {
-          id: { in: executorIds },
-          userId: session.user.id,
-          deletedAt: null,
-        },
-      });
-    } else {
-      throw new AppError(
-        400,
-        'Either autoAssign must be true or executorIds must be provided',
-        'INVALID_REQUEST'
+      return NextResponse.json(
+        { error: 'Strategy not found' },
+        { status: 404 }
       );
     }
 
-    if (targetExecutors.length === 0) {
-      throw new AppError(
-        400,
-        'No executors available. Make sure at least one executor is online.',
-        'NO_EXECUTORS_AVAILABLE'
+    // Check if executor exists and is online
+    const executor = await prisma.executor.findUnique({
+      where: { id: executorId },
+    });
+
+    if (!executor) {
+      return NextResponse.json(
+        { error: 'Executor not found' },
+        { status: 404 }
       );
     }
 
-    // Create assignments
-    const assignments = await Promise.all(
-      targetExecutors.map((executor) =>
-        prisma.strategyAssignment.upsert({
-          where: {
-            strategyId_executorId: {
-              strategyId: strategy.id,
-              executorId: executor.id,
-            },
-          },
-          create: {
-            strategyId: strategy.id,
-            executorId: executor.id,
-            status: 'active',
-            settings: settings || {},
-          },
-          update: {
-            status: 'active',
-            settings: settings || {},
-          },
-        })
-      )
-    );
-
-    // Send START_STRATEGY command to each executor
-    const commands = await Promise.all(
-      targetExecutors.map(async (executor) => {
-        const command = await prisma.command.create({
-          data: {
-            userId: session.user.id,
-            executorId: executor.id,
-            command: 'START_STRATEGY',
-            parameters: {
-              strategyId: strategy.id,
-              strategyName: strategy.name,
-              symbol: strategy.symbol,
-              timeframe: strategy.timeframe,
-              rules: strategy.rules,
-              settings: settings || {},
-            },
-            priority: 'HIGH',
-            status: 'pending',
-          },
-        });
-
-        // Trigger Pusher event for real-time delivery
-        await triggerExecutorCommand(executor.id, {
-          id: command.id,
-          command: 'START_STRATEGY',
-          parameters: command.parameters,
-          priority: 'HIGH',
-        });
-
-        return command;
-      })
-    );
-
-    return NextResponse.json({
-      success: true,
-      message: `Strategy activated and assigned to ${targetExecutors.length} executor(s)`,
-      strategy: updatedStrategy,
-      assignments,
-      executorsNotified: targetExecutors.length,
-      commands: commands.length,
-    });
-  } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-/**
- * DELETE /api/strategy/[id]/activate
- * Deactivate strategy and stop on all executors
- */
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
-      throw new AppError(401, 'Unauthorized');
-    }
-
-    // Get strategy
-    const strategy = await prisma.strategy.findFirst({
-      where: {
-        id: params.id,
-        userId: session.user.id,
-        deletedAt: null,
-      },
-      include: {
-        assignments: {
-          where: { status: 'active' },
-          include: { executor: true },
-        },
-      },
-    });
-
-    if (!strategy) {
-      throw new AppError(404, 'Strategy not found', 'STRATEGY_NOT_FOUND');
-    }
-
-    // Update strategy status to paused
-    await prisma.strategy.update({
-      where: { id: params.id },
-      data: { status: 'paused' },
-    });
-
-    // Update all assignments to stopped
-    await prisma.strategyAssignment.updateMany({
-      where: {
-        strategyId: params.id,
+    // Create strategy assignment
+    const assignment = await prisma.strategyAssignment.create({
+      data: {
+        strategyId,
+        executorId,
         status: 'active',
       },
-      data: { status: 'stopped' },
     });
 
-    // Send STOP_STRATEGY command to each executor
-    const commands = await Promise.all(
-      strategy.assignments.map(async (assignment) => {
-        const command = await prisma.command.create({
-          data: {
-            userId: session.user.id,
-            executorId: assignment.executorId,
-            command: 'STOP_STRATEGY',
-            parameters: {
-              strategyId: strategy.id,
-              strategyName: strategy.name,
-            },
-            priority: 'HIGH',
-            status: 'pending',
-          },
-        });
+    // Send START_STRATEGY command via Pusher
+    const command = {
+      id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      strategyId,
+      executorId,
+      type: 'TRADE_SIGNAL' as const,
+      priority: 'HIGH' as const,
+      command: {
+        action: 'OPEN_POSITION' as const,
+        symbol: strategy.symbol,
+        type: 'BUY' as const,
+        volume: 0.01,
+        stopLoss: 0,
+        takeProfit: 0,
+        metadata: {
+          strategyId: strategy.id,
+          strategyName: strategy.name,
+          timeframe: strategy.timeframe,
+          rules: strategy.rules,
+          source: 'user',
+          userId: session.user.id,
+          options,
+        },
+      },
+      timestamp: new Date(),
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+    };
 
-        // Trigger Pusher event
-        await triggerExecutorCommand(assignment.executorId, {
-          id: command.id,
-          command: 'STOP_STRATEGY',
-          parameters: command.parameters,
-          priority: 'HIGH',
-        });
+    // Send command
+    await sendCommandToExecutor(executorId, command);
 
-        return command;
-      })
-    );
+    // Update strategy status
+    await prisma.strategy.update({
+      where: { id: strategyId },
+      data: {
+        status: 'active',
+      },
+    });
 
     return NextResponse.json({
       success: true,
-      message: `Strategy deactivated on ${strategy.assignments.length} executor(s)`,
-      executorsNotified: strategy.assignments.length,
+      message: 'Strategy activation command sent',
+      data: {
+        commandId: command.id,
+        assignmentId: assignment.id,
+        executorId,
+        strategyId,
+      },
     });
-  } catch (error) {
-    return handleApiError(error);
+
+  } catch (error: any) {
+    console.error('Error activating strategy:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to activate strategy' },
+      { status: 500 }
+    );
   }
 }

@@ -47,8 +47,9 @@ function createWindow(): void {
     // In production, main.js is in dist/electron/electron/main.js
     // index.html is in dist-app/index.html
     // Use absolute path to avoid confusion
-    const indexPath = path.resolve(__dirname, '../../../dist-app/index.html');
+    const indexPath = path.join(__dirname, '../../dist-app/index.html');
     console.log('Loading index.html from:', indexPath);
+    console.log('__dirname:', __dirname);
 
     if (existsSync(indexPath)) {
       mainWindow.loadFile(indexPath).catch((error) => {
@@ -358,6 +359,31 @@ function setupIpcHandlers(): void {
   // Get service stats
   ipcMain.handle('get-service-stats', () => {
     return mainController?.getServiceStats();
+  });
+
+  // Get MT5 account info
+  ipcMain.handle('get-mt5-account-info', async () => {
+    return await mainController?.getMT5AccountInfo();
+  });
+
+  // Get system health
+  ipcMain.handle('get-system-health', () => {
+    return mainController?.getSystemHealth();
+  });
+
+  // Get recent signals
+  ipcMain.handle('get-recent-signals', (event, limit) => {
+    return mainController?.getRecentSignals(limit);
+  });
+
+  // Get active strategies
+  ipcMain.handle('get-active-strategies', () => {
+    return mainController?.getActiveStrategies();
+  });
+
+  // Get recent activity
+  ipcMain.handle('get-recent-activity', (event, limit) => {
+    return mainController?.getRecentActivity(limit);
   });
   
   // Execute command

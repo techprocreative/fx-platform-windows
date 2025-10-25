@@ -14,6 +14,13 @@ const electronAPI = {
   getServiceStats: () => ipcRenderer.invoke('get-service-stats'),
   autoInstallMT5: (): Promise<InstallResult> => ipcRenderer.invoke('auto-install-mt5'),
   
+  // Dashboard APIs (NEW)
+  getMT5AccountInfo: () => ipcRenderer.invoke('get-mt5-account-info'),
+  getSystemHealth: () => ipcRenderer.invoke('get-system-health'),
+  getRecentSignals: (limit?: number) => ipcRenderer.invoke('get-recent-signals', limit),
+  getActiveStrategies: () => ipcRenderer.invoke('get-active-strategies'),
+  getRecentActivity: (limit?: number) => ipcRenderer.invoke('get-recent-activity', limit),
+  
   // Configuration
   getConfig: () => ipcRenderer.invoke('get-config'),
   updateConfig: (newConfig: Partial<AppConfig>) => ipcRenderer.invoke('update-config', newConfig),
@@ -102,29 +109,20 @@ const electronAPI = {
     return () => ipcRenderer.removeListener('show-status', handler);
   },
   
-  // Remove all listeners
-  removeAllListeners: () => {
-    ipcRenderer.removeAllListeners('executor-initialized');
-    ipcRenderer.removeAllListeners('mt5-detected');
-    ipcRenderer.removeAllListeners('mt5-not-found');
-    ipcRenderer.removeAllListeners('auto-install-completed');
-    ipcRenderer.removeAllListeners('auto-install-failed');
-    ipcRenderer.removeAllListeners('connection-status-changed');
-    ipcRenderer.removeAllListeners('log-added');
-    ipcRenderer.removeAllListeners('safety-alert');
-    ipcRenderer.removeAllListeners('performance-alert');
-    ipcRenderer.removeAllListeners('security-threat');
-    ipcRenderer.removeAllListeners('emergency-stop');
-    ipcRenderer.removeAllListeners('show-status');
+  // Add any commands from COMMAND types here as well
+  showNotification: (title: string, body: string) => {
+    return ipcRenderer.invoke('show-notification', title, body);
   },
 };
 
-// Expose the API to the renderer process
+// Expose the electronAPI object to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', electronAPI);
 
-// Type declarations for the renderer process
+// TypeScript declaration for the global window object
 declare global {
   interface Window {
     electronAPI: typeof electronAPI;
   }
 }
+
+export {};

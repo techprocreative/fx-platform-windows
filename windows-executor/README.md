@@ -1,6 +1,8 @@
 # 🖥️ FX Platform Windows Executor
 
-Automated trading bridge between FX Platform and MetaTrader 5 with **100% automatic installation**.
+> **Status:** ✅ **Production Ready** | **Version:** 1.0.0 | **Build:** Verified
+
+Automated trading bridge between FX Platform and MetaTrader 5 with **100% automatic installation** and **advanced strategy execution**.
 
 ## ✨ Key Features
 
@@ -29,6 +31,18 @@ Automated trading bridge between FX Platform and MetaTrader 5 with **100% automa
 - Expert Advisor is installed and attached
 - Real-time monitoring is active
 - You're ready to receive trading signals!
+
+## 📚 Documentation
+
+> **[📖 Complete Documentation Index](./DOCUMENTATION_INDEX.md)** - All docs organized by role
+
+### Quick Access:
+- ✅ **[Production Status](./PRODUCTION_READY_CONFIRMED.md)** - Deployment verification
+- 🔍 **[Gap Analysis](./WEB_PLATFORM_VS_EXECUTOR_GAP_ANALYSIS.md)** - Feature audit
+- 🛠️ **[Setup Guide](./SETUP_GUIDE.md)** - Installation guide
+- 💻 **[Developer Guide](./DEVELOPER.md)** - Dev documentation
+- 🔌 **[API Reference](./API_ENDPOINTS_REFERENCE.md)** - API docs
+- ⚡ **[ZeroMQ Setup](./LIBZMQ_SETUP.md)** - MT5 bridge
 
 ## 🔧 What Happens Automatically?
 

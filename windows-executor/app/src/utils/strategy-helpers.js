@@ -1,0 +1,56 @@
+"use strict";
+/**
+ * Strategy Helper Functions
+ * Utilities to work with Strategy interface consistently
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.getPrimarySymbol = getPrimarySymbol;
+exports.getAllSymbols = getAllSymbols;
+exports.hasSymbol = hasSymbol;
+exports.getRiskConfig = getRiskConfig;
+exports.getPositionSizeConfig = getPositionSizeConfig;
+/**
+ * Get primary symbol from strategy
+ * Strategy has symbols array, this gets the first one
+ */
+function getPrimarySymbol(strategy) {
+    if (!strategy.symbols || strategy.symbols.length === 0) {
+        return 'EURUSD'; // Default fallback
+    }
+    return strategy.symbols[0];
+}
+/**
+ * Get all symbols from strategy
+ */
+function getAllSymbols(strategy) {
+    return strategy.symbols || ['EURUSD'];
+}
+/**
+ * Check if strategy has specific symbol
+ */
+function hasSymbol(strategy, symbol) {
+    return strategy.symbols?.includes(symbol) || false;
+}
+/**
+ * Get risk management config
+ * Strategy has positionSizing and dynamicRisk, this combines them
+ */
+function getRiskConfig(strategy) {
+    return {
+        riskPercentage: strategy.riskPercent || strategy.positionSizing?.riskPercentage || 2,
+        maxDailyLoss: strategy.dynamicRisk?.maxDailyLoss || 500,
+        maxDrawdown: strategy.dynamicRisk?.maxDrawdown || 1000,
+        positionSizingMethod: strategy.positionSizing?.method || 'percentage_risk',
+    };
+}
+/**
+ * Get position size config safely
+ */
+function getPositionSizeConfig(strategy) {
+    return strategy.positionSizing || {
+        method: 'percentage_risk',
+        riskPercentage: 2,
+        maxPositionSize: 1.0,
+        minPositionSize: 0.01,
+    };
+}

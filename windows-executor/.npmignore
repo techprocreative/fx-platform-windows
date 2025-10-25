@@ -1,0 +1,14 @@
+# Build outputs to keep
+!dist/
+!dist-app/
+
+# But ignore these
+*.log
+.env
+.env.*
+node_modules
+src
+electron
+tests
+*.md
+!README.md

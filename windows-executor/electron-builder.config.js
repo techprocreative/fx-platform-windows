@@ -7,41 +7,45 @@ module.exports = {
     buildResources: "resources",
   },
 
+  // Use simple patterns with new output folder (app/ instead of dist/)
   files: [
-    "dist/**/*",
-    "dist/electron/**/*",
+    "app/**/*",
+    "dist-app/**/*",
     "node_modules/**/*",
     "resources/**/*",
-    "package.json",
-    "!node_modules/**/{CHANGELOG.md,README.md,README,readme.md,readme}",
-    "!node_modules/**/{test,__tests__,tests,powered-test,example,examples}/**/*",
-    "!**/*.{iml,o,hprof,orig,pyc,pyo,rbc,swp,csproj,sln,xproj}",
-    "!**/{appveyor.yml,.travis.yml,circle.yml}",
-    "!**/{npm-debug.log,yarn.lock,.yarn-integrity,.yarn-metadata.json}",
+    "package.json"
   ],
+  
+  // Don't use .gitignore patterns
+  useGitIgnore: false,
+  
+  // Re-enable asar for production
+  asar: true,
 
-  extraResources: [
-    {
-      from: "resources/libs",
-      to: "resources/libs",
-      filter: ["libzmq-x64.dll", "libzmq-x86.dll"],
-    },
-    {
-      from: "resources/experts",
-      to: "resources/experts",
-      filter: ["*.mq5", "*.ex5"],
-    },
-    {
-      from: "node_modules/zeromq/build/Release",
-      to: "resources/native",
-      filter: ["*.node"],
-    },
-  ],
-
+  // CRITICAL: Native modules must be unpacked from asar
   asarUnpack: [
     "node_modules/zeromq/**/*",
     "node_modules/better-sqlite3/**/*",
     "resources/**/*",
+  ],
+
+  // Extra resources to copy outside asar (critical for native DLLs and MT5 files)
+  extraResources: [
+    {
+      from: "resources/libs",
+      to: "resources/libs",
+      filter: ["*.dll"]  // Copy all DLL files
+    },
+    {
+      from: "resources/experts",
+      to: "resources/experts",
+      filter: ["*.mq5", "*.ex5"]  // Copy MT5 Expert Advisors
+    },
+    {
+      from: "resources/icons",
+      to: "resources/icons",
+      filter: ["*.ico", "*.png"]  // Copy icons
+    }
   ],
 
   win: {
@@ -64,18 +68,12 @@ module.exports = {
     createStartMenuShortcut: true,
     perMachine: true,
     shortcutName: "FX Platform Executor",
-    artifactName: "${productName}-Setup-${version}.${ext}",
+    artifactName: "${productName}-Setup-${version}.${ext}"
   },
 
-  publish: {
-    provider: "github",
-    owner: "fx-platform",
-    repo: "fx-executor",
-    private: false,
-    releaseType: "release",
-  },
-
-  compression: "maximum",
-
-  afterPack: "./scripts/afterPack.js",
+  // Disable auto-publish for now
+  publish: null,
+  
+  // Hook to copy resources after packing
+  afterPack: "./scripts/afterPack.js"
 };

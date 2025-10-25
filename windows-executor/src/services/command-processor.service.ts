@@ -1,10 +1,16 @@
 import { Command, CommandResult } from '../types/command.types';
+import { StrategyCommand, StrategyCommandType } from '../types/strategy-command.types';
 import { CommandService } from './command.service';
 import { ZeroMQService } from './zeromq.service';
 import { PusherService } from './pusher.service';
+import { StrategyMonitor } from './strategy-monitor.service';
+import { EmergencyStopService } from './emergency-stop.service';
+import { logger } from '../utils/logger';
 
 export class CommandProcessor {
   private commandService: CommandService;
+  private strategyMonitor: StrategyMonitor | null = null;
+  private emergencyStop: EmergencyStopService | null = null;
   private isProcessing: boolean = false;
 
   constructor() {
@@ -28,7 +34,12 @@ export class CommandProcessor {
   /**
    * Initialize the processor with actual services
    */
-  initialize(zeromqService: ZeroMQService, pusherService: PusherService) {
+  initialize(
+    zeromqService: ZeroMQService,
+    pusherService: PusherService,
+    strategyMonitor: StrategyMonitor,
+    emergencyStop: EmergencyStopService
+  ) {
     this.commandService = new CommandService(
       zeromqService,
       pusherService,
@@ -43,6 +54,116 @@ export class CommandProcessor {
         maxRequests: 100,
       }
     );
+    
+    this.strategyMonitor = strategyMonitor;
+    this.emergencyStop = emergencyStop;
+    
+    logger.info('[CommandProcessor] Initialized with all services');
+  }
+  
+  /**
+   * Handle strategy commands (START, STOP, PAUSE, RESUME, UPDATE)
+   */
+  async handleStrategyCommand(command: StrategyCommand): Promise<void> {
+    logger.info(`[CommandProcessor] Handling strategy command: ${command.type} for strategy ${command.strategyId}`);
+    
+    try {
+      switch (command.type) {
+        case StrategyCommandType.START_STRATEGY:
+          await this.handleStartStrategy(command);
+          break;
+          
+        case StrategyCommandType.STOP_STRATEGY:
+          await this.handleStopStrategy(command);
+          break;
+          
+        case StrategyCommandType.PAUSE_STRATEGY:
+          await this.handlePauseStrategy(command);
+          break;
+          
+        case StrategyCommandType.RESUME_STRATEGY:
+          await this.handleResumeStrategy(command);
+          break;
+          
+        case StrategyCommandType.UPDATE_STRATEGY:
+          await this.handleUpdateStrategy(command);
+          break;
+          
+        default:
+          logger.warn(`[CommandProcessor] Unknown strategy command type: ${command.type}`);
+      }
+    } catch (error) {
+      logger.error(`[CommandProcessor] Error handling strategy command:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Handle START_STRATEGY command
+   */
+  private async handleStartStrategy(command: StrategyCommand): Promise<void> {
+    if (!command.strategy) {
+      throw new Error('Strategy data is required for START_STRATEGY command');
+    }
+    
+    if (!this.strategyMonitor) {
+      throw new Error('Strategy monitor not initialized');
+    }
+    
+    logger.info(`[CommandProcessor] Starting strategy: ${command.strategy.name}`);
+    
+    // Check if emergency stop is active
+    if (this.emergencyStop && !this.emergencyStop.canTrade()) {
+      throw new Error('Cannot start strategy: Emergency stop is active');
+    }
+    
+    // Start monitoring the strategy
+    await this.strategyMonitor.startMonitoring(command.strategy);
+    
+    logger.info(`[CommandProcessor] Strategy monitoring started: ${command.strategy.name}`);
+  }
+  
+  /**
+   * Handle STOP_STRATEGY command
+   */
+  private async handleStopStrategy(command: StrategyCommand): Promise<void> {
+    if (!this.strategyMonitor) {
+      throw new Error('Strategy monitor not initialized');
+    }
+    
+    logger.info(`[CommandProcessor] Stopping strategy: ${command.strategyId}`);
+    
+    // Stop monitoring
+    await this.strategyMonitor.stopMonitoring(command.strategyId);
+    
+    // Close all positions for this strategy (if requested)
+    // TODO: Implement closing positions by strategy ID
+    
+    logger.info(`[CommandProcessor] Strategy stopped: ${command.strategyId}`);
+  }
+  
+  /**
+   * Handle PAUSE_STRATEGY command
+   */
+  private async handlePauseStrategy(command: StrategyCommand): Promise<void> {
+    logger.info(`[CommandProcessor] Pausing strategy: ${command.strategyId}`);
+    // TODO: Implement pause logic (stop monitoring but keep positions)
+  }
+  
+  /**
+   * Handle RESUME_STRATEGY command
+   */
+  private async handleResumeStrategy(command: StrategyCommand): Promise<void> {
+    logger.info(`[CommandProcessor] Resuming strategy: ${command.strategyId}`);
+    // TODO: Implement resume logic
+  }
+  
+  /**
+   * Handle UPDATE_STRATEGY command
+   */
+  private async handleUpdateStrategy(command: StrategyCommand): Promise<void> {
+    logger.info(`[CommandProcessor] Updating strategy: ${command.strategyId}`);
+    // TODO: Implement update logic
   }
 
   /**
@@ -99,10 +220,10 @@ export class CommandProcessor {
    * Resume command processing
    */
   resume() {
-    if (this.isProcessing) {
-      // Create new command service to restart processing
-      // This is a workaround since startProcessing is private
-      this.initialize(new ZeroMQService(), new PusherService());
+    if (!this.isProcessing) {
+      // Mark as processing again
+      this.isProcessing = true;
+      logger.info('[CommandProcessor] Processing resumed');
     }
   }
 

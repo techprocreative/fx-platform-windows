@@ -205,10 +205,11 @@ export class SecurityService extends EventEmitter {
       
       if (!session) {
         // Check database
-        session = await this.db.getSecuritySession(sessionId);
+        const dbSession = await this.db.getSecuritySession(sessionId);
         
-        if (session) {
-          this.activeSessions.set(sessionId, session);
+        if (dbSession) {
+          session = dbSession;
+          this.activeSessions.set(sessionId, dbSession);
         }
       }
       

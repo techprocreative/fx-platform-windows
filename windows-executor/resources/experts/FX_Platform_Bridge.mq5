@@ -13,18 +13,19 @@
 #include <Trade\AccountInfo.mqh>
 #include <Trade\SymbolInfo.mqh>
 
-// ZeroMQ imports - Use proper function pointers without namespace
+// ZeroMQ imports - CRITICAL: Use 'long' for 64-bit pointers, not 'void*' or 'int'
 #import "libzmq.dll"
-void* zmq_ctx_new(void);
-void* zmq_socket(void*, int);
-int zmq_connect(void*, uchar&[]);
-int zmq_bind(void*, uchar&[]);
-int zmq_send(void*, uchar&[], int, int);
-int zmq_recv(void*, uchar&[], int, int);
-int zmq_close(void*);
-int zmq_ctx_term(void*);
-int zmq_setsockopt(void*, int, const int&, int);
 void zmq_version(int&, int&, int&);
+long zmq_ctx_new();
+int zmq_ctx_term(long context);
+long zmq_socket(long context, int type);
+int zmq_close(long socket);
+int zmq_bind(long socket, const uchar &endpoint[]);
+int zmq_connect(long socket, const uchar &endpoint[]);
+int zmq_send(long socket, const uchar &buf[], int len, int flags);
+int zmq_recv(long socket, uchar &buf[], int len, int flags);
+int zmq_setsockopt(long socket, int option, const int &optval, int optvallen);
+int zmq_errno();
 #import
 
 // ZeroMQ constants
@@ -55,8 +56,8 @@ CTrade trade;
 CPositionInfo position;
 CAccountInfo account;
 CSymbolInfo symbol;
-int g_context = 0;
-int g_socket = 0;
+long g_context = 0;  // FIXED: Use long for 64-bit pointers
+long g_socket = 0;   // FIXED: Use long for 64-bit pointers
 datetime g_lastHeartbeat = 0;
 bool g isConnected = false;
 string g_configFile = "";
@@ -156,7 +157,7 @@ bool InitializeZeroMQ() {
     g_socket = zmq_socket(g_context, ZMQ_REQ);
     if (g_socket == 0) {
         Print("[ZeroMQ Bridge] Failed to create socket");
-        zmq_term(g_context);
+        zmq_ctx_term(g_context);
         return false;
     }
 
@@ -196,7 +197,7 @@ void CleanupZeroMQ() {
     }
 
     if (g_context != 0) {
-        zmq_term(g_context);
+        zmq_ctx_term(g_context);
         g_context = 0;
     }
 
@@ -258,6 +259,14 @@ string ProcessCommand(string command) {
 
     if (cmdType == "get_market_data") {
         return GetMarketData(command);
+    }
+    
+    if (cmdType == "get_bars") {
+        return GetHistoricalBars(command);
+    }
+    
+    if (cmdType == "get_price") {
+        return GetCurrentPrice(command);
     }
 
     if (cmdType == "get_symbols") {
@@ -487,6 +496,92 @@ string GetMarketData(string command) {
     response += "\"digits\":" + IntegerToString(symbol.Digits()) + ",";
     response += "\"volume\":" + IntegerToString(symbol.VolumeLong()) + ",";
     response += "\"time\":" + IntegerToString(symbol.Time()) + "";
+    response += "}";
+    return response;
+}
+
+//+------------------------------------------------------------------+
+//| Get historical bars/candles                                      |
+//+------------------------------------------------------------------+
+string GetHistoricalBars(string command) {
+    string symbolName = ExtractJsonValue(command, "symbol");
+    string timeframe = ExtractJsonValue(command, "timeframe");
+    int barsCount = (int)StringToInteger(ExtractJsonValue(command, "bars"));
+    
+    if (StringLen(symbolName) == 0) {
+        return CreateResponse("", "error", "Symbol is required");
+    }
+    
+    if (barsCount <= 0) {
+        barsCount = 100; // Default
+    }
+    
+    // Convert timeframe string to ENUM_TIMEFRAMES
+    ENUM_TIMEFRAMES tf = PERIOD_M15; // Default
+    if (timeframe == "M1") tf = PERIOD_M1;
+    else if (timeframe == "M5") tf = PERIOD_M5;
+    else if (timeframe == "M15") tf = PERIOD_M15;
+    else if (timeframe == "M30") tf = PERIOD_M30;
+    else if (timeframe == "H1") tf = PERIOD_H1;
+    else if (timeframe == "H4") tf = PERIOD_H4;
+    else if (timeframe == "D1") tf = PERIOD_D1;
+    else if (timeframe == "W1") tf = PERIOD_W1;
+    else if (timeframe == "MN1") tf = PERIOD_MN1;
+    
+    // Copy bars
+    MqlRates rates[];
+    ArraySetAsSeries(rates, true);
+    
+    int copied = CopyRates(symbolName, tf, 0, barsCount, rates);
+    
+    if (copied <= 0) {
+        return CreateResponse("", "error", "Failed to copy bars: " + IntegerToString(GetLastError()));
+    }
+    
+    // Build JSON response
+    string response = "{";
+    response += "\"type\":\"historical_bars\",";
+    response += "\"status\":\"success\",";
+    response += "\"symbol\":\"" + symbolName + "\",";
+    response += "\"timeframe\":\"" + timeframe + "\",";
+    response += "\"bars\":[";
+    
+    for (int i = 0; i < copied; i++) {
+        if (i > 0) response += ",";
+        response += "{";
+        response += "\"time\":" + IntegerToString(rates[i].time) + ",";
+        response += "\"open\":" + DoubleToString(rates[i].open, 5) + ",";
+        response += "\"high\":" + DoubleToString(rates[i].high, 5) + ",";
+        response += "\"low\":" + DoubleToString(rates[i].low, 5) + ",";
+        response += "\"close\":" + DoubleToString(rates[i].close, 5) + ",";
+        response += "\"volume\":" + IntegerToString(rates[i].tick_volume);
+        response += "}";
+    }
+    
+    response += "]}";
+    return response;
+}
+
+//+------------------------------------------------------------------+
+//| Get current price for symbol                                     |
+//+------------------------------------------------------------------+
+string GetCurrentPrice(string command) {
+    string symbolName = ExtractJsonValue(command, "symbol");
+    
+    if (StringLen(symbolName) == 0) {
+        return CreateResponse("", "error", "Symbol is required");
+    }
+    
+    if (!symbol.Name(symbolName)) {
+        return CreateResponse("", "error", "Invalid symbol: " + symbolName);
+    }
+    
+    string response = "{";
+    response += "\"type\":\"current_price\",";
+    response += "\"status\":\"success\",";
+    response += "\"symbol\":\"" + symbolName + "\",";
+    response += "\"bid\":" + DoubleToString(symbol.Bid(), symbol.Digits()) + ",";
+    response += "\"ask\":" + DoubleToString(symbol.Ask(), symbol.Digits());
     response += "}";
     return response;
 }

@@ -3,6 +3,7 @@ import { useConfigStore } from '../../stores/config.store';
 import { useAppStore } from '../../stores/app.store';
 import { useLogsStore } from '../../stores/logs.store';
 import { StatusIndicator } from '../../components/StatusIndicator';
+import type { AppConfig } from '../../types/config.types';
 import { ConfirmDialog } from '../../components/ConfirmDialog';
 
 export function Settings() {
@@ -42,36 +43,34 @@ export function Settings() {
       
       // Test connection if API credentials are provided
       if (config?.apiKey && config?.apiSecret && config?.executorId) {
-        const result = await window.electronAPI?.updateConfig(config);
+        const result: any = await window.electronAPI?.updateConfig(config);
         
-        if (result?.success) {
+        if (result && typeof result === 'object' && result.success) {
           setTestResult('success');
           setSuccessMessage('Configuration saved and connection test successful');
-        } else {
+        } else if (result && typeof result === 'object' && result.error) {
           setTestResult('error');
-          setErrors([result?.error || 'Connection test failed']);
+          setErrors([result.error || 'Connection test failed']);
+        } else {
+          setSuccessMessage('Configuration saved');
         }
       } else {
         setSuccessMessage('Configuration saved');
       }
       
       addLog({
-        id: `config-save-${Date.now()}`,
-        type: 'INFO',
+        level: 'info',
         message: 'Configuration updated',
-        timestamp: new Date(),
-        metadata: { category: 'SETTINGS' }
+        category: 'SETTINGS'
       });
       
     } catch (error) {
       const errorMsg = (error as Error).message;
       setErrors([errorMsg]);
       addLog({
-        id: `config-error-${Date.now()}`,
-        type: 'ERROR',
+        level: 'error',
         message: `Failed to save config: ${errorMsg}`,
-        timestamp: new Date(),
-        metadata: { category: 'SETTINGS' }
+        category: 'SETTINGS'
       });
     } finally {
       setIsSaving(false);
@@ -87,6 +86,7 @@ export function Settings() {
         apiKey: '',
         apiSecret: '',
         platformUrl: 'https://fx.nusanexus.com',
+        pusherKey: '',
         pusherCluster: 'mt1',
         zmqPort: 5555,
         zmqHost: 'tcp://localhost',
@@ -98,11 +98,9 @@ export function Settings() {
       setShowResetDialog(false);
       
       addLog({
-        id: `config-reset-${Date.now()}`,
-        type: 'INFO',
+        level: 'info',
         message: 'Configuration reset to defaults',
-        timestamp: new Date(),
-        metadata: { category: 'SETTINGS' }
+        category: 'SETTINGS'
       });
       
     } catch (error) {
@@ -146,7 +144,7 @@ export function Settings() {
   // Handle complete setup reset
   const handleResetSetup = async () => {
     try {
-      await window.electronAPI?.setupComplete(config);
+      await window.electronAPI?.setupComplete(config as AppConfig);
       setIsSetupComplete(false);
       setSuccessMessage('Setup reset. You will need to go through the setup process again.');
     } catch (error) {

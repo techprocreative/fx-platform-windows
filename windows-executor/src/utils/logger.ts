@@ -194,6 +194,9 @@ export const createLogger = (category: string) => {
     error: (message: string, metadata?: any) => {
       logger.error(message, { category, metadata });
     },
+    critical: (message: string, metadata?: any) => {
+      logger.error(`[CRITICAL] ${message}`, { category, metadata, severity: 'CRITICAL' });
+    },
     // Performance logging
     performance: (operation: string, duration: number, metadata?: any) => {
       logger.info(`Performance: ${operation}`, { 
@@ -387,6 +390,11 @@ const scheduleLogCleanup = () => {
 if (process.env.NODE_ENV === 'production') {
   scheduleLogCleanup();
 }
+
+// Add critical method to main logger
+(logger as any).critical = (message: string, metadata?: any) => {
+  logger.error(`[CRITICAL] ${message}`, { metadata, severity: 'CRITICAL' });
+};
 
 // Export default logger for backward compatibility
 export default logger;

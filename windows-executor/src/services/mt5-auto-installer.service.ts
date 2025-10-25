@@ -252,14 +252,13 @@ export class MT5AutoInstaller {
 
     try {
       // Determine architecture (32-bit or 64-bit)
-      const is64bit = await FileUtils.pathExists(
-        path.join(mt5.path, "terminal64.exe"),
-      );
-      const libName = is64bit ? "libzmq-x64.dll" : "libzmq-x86.dll";
+      // Use libzmq.dll from DWX (works for both 32-bit and 64-bit)
+      const libName = "libzmq.dll";
 
       // Source path would be from resources in production
       const resourcesPath = this.getResourcesPath();
       const libzmqSource = path.join(resourcesPath, "libs", libName);
+      const libsodiumSource = path.join(resourcesPath, "libs", "libsodium.dll");
       result.sourcePath = libzmqSource;
 
       console.log('[MT5AutoInstaller] Installing libzmq...');
@@ -293,7 +292,7 @@ export class MT5AutoInstaller {
         return result;
       }
 
-      // Copy with backup
+      // Copy libzmq.dll with backup
       const copyResult = await FileUtils.copyWithBackup(
         libzmqSource,
         result.destinationPath,
@@ -306,6 +305,25 @@ export class MT5AutoInstaller {
 
       if (result.success) {
         console.log(`✓ libzmq.dll installed to ${result.destinationPath}`);
+        
+        // Also copy libsodium.dll (dependency for libzmq from DWX)
+        const libsodiumDest = path.join(path.dirname(result.destinationPath), "libsodium.dll");
+        const libsodiumExists = await FileUtils.pathExists(libsodiumSource);
+        
+        if (libsodiumExists) {
+          console.log('[MT5AutoInstaller] Installing libsodium.dll...');
+          const sodiumResult = await FileUtils.copyWithBackup(
+            libsodiumSource,
+            libsodiumDest,
+            this.config.createBackups,
+          );
+          
+          if (sodiumResult.success) {
+            console.log(`✓ libsodium.dll installed to ${libsodiumDest}`);
+          } else {
+            console.warn(`⚠ Failed to install libsodium.dll: ${sodiumResult.error}`);
+          }
+        }
       }
     } catch (error) {
       result.error = (error as Error).message;
@@ -322,25 +340,60 @@ export class MT5AutoInstaller {
 
   private async verifyLibzmqCompatibility(dllPath: string): Promise<boolean> {
     try {
+      console.log('[MT5AutoInstaller] Verifying libzmq.dll compatibility...');
+      console.log('[MT5AutoInstaller] DLL path:', dllPath);
+      
+      // Use the enhanced verification script
       const scriptCandidates = [
-        path.join(process.cwd(), "verify-libzmq-dll.js"),
-        path.join(this.getResourcesPath(), "..", "verify-libzmq-dll.js"),
+        path.join(process.cwd(), "scripts", "verify-libzmq-enhanced.js"),
+        path.join(this.getResourcesPath(), "..", "scripts", "verify-libzmq-enhanced.js"),
+        path.join(process.cwd(), "verify-libzmq-dll.js"), // Fallback
+        path.join(this.getResourcesPath(), "..", "verify-libzmq-dll.js"), // Fallback
       ];
 
+      let scriptFound = false;
       for (const candidate of scriptCandidates) {
         if (await FileUtils.pathExists(candidate)) {
-          execSync(`node "${candidate}" --dll "${dllPath}"`, {
-            stdio: "pipe",
-            cwd: path.dirname(candidate),
-          });
-          return true;
+          console.log('[MT5AutoInstaller] Using verification script:', candidate);
+          scriptFound = true;
+          
+          try {
+            const result = execSync(`node "${candidate}" --dll "${dllPath}"`, {
+              encoding: 'utf8',
+              stdio: 'pipe',
+              cwd: path.dirname(candidate),
+            });
+            
+            // Check if verification passed
+            const passed = result.includes('VERIFICATION PASSED');
+            
+            if (passed) {
+              console.log('[MT5AutoInstaller] ✅ DLL verification PASSED');
+              return true;
+            } else {
+              console.error('[MT5AutoInstaller] ❌ DLL verification FAILED');
+              console.error('[MT5AutoInstaller] Verification output:', result);
+              return false;
+            }
+          } catch (execError) {
+            console.error('[MT5AutoInstaller] Verification script execution failed:', (execError as Error).message);
+            return false;
+          }
         }
       }
 
-      console.warn(
-        "[MT5AutoInstaller] verify-libzmq-dll.js not found. Skipping DLL export verification.",
-      );
-      return true;
+      if (!scriptFound) {
+        console.warn(
+          "[MT5AutoInstaller] verify-libzmq-enhanced.js not found. Skipping DLL export verification.",
+        );
+        console.warn(
+          "[MT5AutoInstaller] ⚠️  WARNING: Cannot verify DLL compatibility - proceeding anyway",
+        );
+        return true; // Don't block installation if verification script missing
+      }
+
+      return false;
+      
     } catch (error) {
       console.error(
         "[MT5AutoInstaller] libzmq.dll verification failed:",
