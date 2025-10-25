@@ -80,14 +80,33 @@ export async function POST(
         continue;
       }
 
-      // Create strategy assignment
-      const assignment = await prisma.strategyAssignment.create({
-        data: {
+      // Check if strategy already assigned to this executor
+      let assignment = await prisma.strategyAssignment.findFirst({
+        where: {
           strategyId,
           executorId: execId,
-          status: 'active',
         },
       });
+
+      if (assignment) {
+        // Update existing assignment to active
+        assignment = await prisma.strategyAssignment.update({
+          where: { id: assignment.id },
+          data: {
+            status: 'active',
+            updatedAt: new Date(),
+          },
+        });
+      } else {
+        // Create new strategy assignment
+        assignment = await prisma.strategyAssignment.create({
+          data: {
+            strategyId,
+            executorId: execId,
+            status: 'active',
+          },
+        });
+      }
 
       assignments.push(assignment);
 
