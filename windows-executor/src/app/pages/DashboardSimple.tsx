@@ -98,7 +98,7 @@ export function DashboardSimple() {
   };
 
   return (
-    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+    <div className="h-full overflow-auto bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         
         {/* Header */}

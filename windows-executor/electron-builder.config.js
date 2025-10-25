@@ -3,17 +3,23 @@ module.exports = {
   productName: "FX Platform Executor",
 
   directories: {
-    output: "dist-build",
+    output: "dist",
     buildResources: "resources",
   },
 
   // Use simple patterns with new output folder (app/ instead of dist/)
   files: [
     "app/**/*",
-    "dist-app/**/*",
+    "!app/dist-app",  // Exclude, will be added separately
     "node_modules/**/*",
+    "!node_modules/**/test/**",
+    "!node_modules/**/tests/**",
     "resources/**/*",
-    "package.json"
+    "package.json",
+    {
+      from: "dist-app",
+      to: "dist-app"
+    }
   ],
   
   // Don't use .gitignore patterns

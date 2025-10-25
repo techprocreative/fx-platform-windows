@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, Link, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAppStore } from '../stores/app.store';
 import { Setup } from './pages/Setup';
 import { DashboardSimple } from './pages/DashboardSimple';
+import { DashboardTest } from './pages/DashboardTest';
 import { Settings } from './pages/Settings';
 import { Logs } from './pages/Logs';
 import { StatusBar } from '../components/StatusBar';
@@ -209,9 +210,7 @@ function App() {
     );
   }
 
-  console.log('Rendering main app interface');
-
-  // Main app interface (wrapped in Router context)
+  // Main app interface (wrapped in HashRouter for Electron compatibility)
   return (
     <Router>
       <AppContent />
@@ -221,88 +220,29 @@ function App() {
 
 // Separate component to use useLocation inside Router context
 function AppContent() {
-  const location = useLocation();
   const { 
     connectionStatus,
-    addRecentActivity,
   } = useAppStore();
 
   return (
-      <div className="min-h-screen bg-gray-100 flex flex-col">
-        {/* Status Bar */}
+      <div className="h-screen flex flex-col bg-gray-50">
+        {/* Minimal Status Bar */}
         <StatusBar 
           connectionStatus={connectionStatus}
-          onNavigate={() => {}} // Not used with Router
-          currentPage={location.pathname.substring(1) || 'dashboard'}
+          onNavigate={() => {}} 
+          currentPage="dashboard"
         />
         
-        {/* Main Content */}
-        <div className="flex-1 flex overflow-hidden">
-          {/* Sidebar */}
-          <div className="w-64 bg-white shadow-md">
-            <div className="p-4">
-              <h2 className="text-lg font-semibold text-gray-800">FX Executor</h2>
-            </div>
-            
-            <nav className="mt-4">
-              <ul>
-                <li>
-                  <Link
-                    to="/dashboard"
-                    className={`block w-full text-left px-4 py-2 hover:bg-gray-100 ${
-                      location.pathname === '/dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                    }`}
-                  >
-                    Dashboard
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/settings"
-                    className={`block w-full text-left px-4 py-2 hover:bg-gray-100 ${
-                      location.pathname === '/settings' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                    }`}
-                  >
-                    Settings
-                  </Link>
-                </li>
-                <li>
-                  <Link
-                    to="/logs"
-                    className={`block w-full text-left px-4 py-2 hover:bg-gray-100 ${
-                      location.pathname === '/logs' ? 'bg-blue-50 text-blue-600' : 'text-gray-700'
-                    }`}
-                  >
-                    Logs
-                  </Link>
-                </li>
-              </ul>
-            </nav>
-            
-            {/* Activity Log (Sidebar) */}
-            <div className="mt-8 border-t border-gray-200">
-              <div className="p-4">
-                <h3 className="text-sm font-medium text-gray-900">Recent Activity</h3>
-              </div>
-              <div className="px-4 pb-4">
-                <ActivityLog activities={[]} limit={5} />
-              </div>
-            </div>
-          </div>
-          
-          {/* Page Content */}
-          <div className="flex-1 overflow-auto">
-            <Routes>
-              <Route path="/dashboard" element={<DashboardSimple />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/logs" element={<Logs />} />
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </div>
+        {/* Full Page Content - No Sidebar */}
+        <div className="flex-1 overflow-auto">
+          <Routes>
+            <Route path="/" element={<DashboardSimple />} />
+            <Route path="/dashboard" element={<DashboardSimple />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="/logs" element={<Logs />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
         </div>
-        
-        {/* Notification Container */}
-        <NotificationContainer notifications={[]} onDismiss={() => {}} />
         
         {/* Toast Container */}
         <Toaster

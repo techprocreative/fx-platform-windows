@@ -21,16 +21,19 @@ module.exports = async function(context) {
     
     fs.ensureDirSync(dllDest);
     
-    const dlls = ['libzmq.dll', 'libsodium.dll'];
-    dlls.forEach(dll => {
-      const src = path.join(dllSource, dll);
-      const dest = path.join(dllDest, dll);
-      
-      if (fs.existsSync(src)) {
+    // Copy all DLL files
+    if (fs.existsSync(dllSource)) {
+      const allDlls = fs.readdirSync(dllSource).filter(f => f.endsWith('.dll'));
+      allDlls.forEach(dll => {
+        const src = path.join(dllSource, dll);
+        const dest = path.join(dllDest, dll);
+        
         fs.copyFileSync(src, dest);
         console.log(`   ✅ Copied ${dll}`);
-      }
-    });
+      });
+    } else {
+      console.warn(`   ⚠️  DLL source not found: ${dllSource}`);
+    }
     
     // 2. Copy Expert Advisors
     const eaSource = path.join(__dirname, '../resources/experts');

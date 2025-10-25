@@ -47,7 +47,7 @@ function createWindow(): void {
     // In production, main.js is in dist/electron/electron/main.js
     // index.html is in dist-app/index.html
     // Use absolute path to avoid confusion
-    const indexPath = path.join(__dirname, '../../dist-app/index.html');
+    const indexPath = path.join(__dirname, '../dist-app/index.html');
     console.log('Loading index.html from:', indexPath);
     console.log('__dirname:', __dirname);
 
