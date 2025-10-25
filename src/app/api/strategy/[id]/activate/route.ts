@@ -169,7 +169,16 @@ export async function POST(
       };
 
       // Send command via Pusher
-      await sendCommandToExecutor(execId, command);
+      const sent = await sendCommandToExecutor(execId, command);
+      if (sent) {
+        console.log(`✅ Command sent to executor ${execId}:`, {
+          commandId: command.id,
+          channel: `private-executor-${execId}`,
+          event: 'command-received',
+        });
+      } else {
+        console.error(`❌ Failed to send command to executor ${execId}`);
+      }
       commands.push(command);
     }
 
