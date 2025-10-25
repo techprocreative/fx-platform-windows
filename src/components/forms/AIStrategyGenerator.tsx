@@ -850,23 +850,108 @@ Please create a strategy that takes this current market situation into account.`
               </div>
             )}
 
-            {/* Entry Conditions Summary */}
+            {/* Entry Conditions Detail */}
             <div className="rounded-lg bg-white border border-green-200 p-4">
               <div className="text-xs font-semibold text-green-700 mb-3">ENTRY CONDITIONS</div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
+              
+              {/* Summary */}
+              <div className="flex items-center gap-4 mb-4 pb-3 border-b border-green-200">
+                <div className="text-sm">
                   <span className="text-neutral-600">Total Rules:</span>
-                  <span className="font-bold text-neutral-900">
+                  <span className="ml-2 font-bold text-neutral-900">
                     {generatedStrategy.rules?.length || 0}
                   </span>
                 </div>
-                <div className="flex items-center justify-between text-sm">
+                <div className="text-sm">
                   <span className="text-neutral-600">Total Conditions:</span>
-                  <span className="font-bold text-neutral-900">
+                  <span className="ml-2 font-bold text-neutral-900">
                     {countConditions(generatedStrategy)}
                   </span>
                 </div>
               </div>
+
+              {/* Detailed Conditions */}
+              {generatedStrategy.rules && Array.isArray(generatedStrategy.rules) && generatedStrategy.rules.length > 0 && (
+                <div className="space-y-3">
+                  {generatedStrategy.rules.map((rule: any, ruleIndex: number) => (
+                    <div key={ruleIndex} className="bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg p-3 border border-blue-200">
+                      {/* Rule Name */}
+                      {rule.name && (
+                        <div className="text-xs font-bold text-blue-700 mb-2">
+                          📋 {rule.name}
+                        </div>
+                      )}
+                      
+                      {/* Conditions */}
+                      {rule.conditions && Array.isArray(rule.conditions) && rule.conditions.length > 0 && (
+                        <div className="space-y-1.5">
+                          {rule.conditions.map((condition: any, condIndex: number) => {
+                            const operatorSymbol = {
+                              'gt': '>',
+                              'gte': '≥',
+                              'lt': '<',
+                              'lte': '≤',
+                              'eq': '=',
+                              'crosses_above': '↗',
+                              'crosses_below': '↘'
+                            }[condition.operator] || condition.operator;
+
+                            const isStringValue = typeof condition.value === 'string';
+                            const displayValue = isStringValue 
+                              ? condition.value.toUpperCase()
+                              : condition.value;
+
+                            return (
+                              <div key={condIndex} className="flex items-center gap-2 text-sm">
+                                <span className="flex items-center gap-1.5 font-mono bg-white px-2 py-1 rounded border border-blue-300">
+                                  <span className="text-blue-700 font-bold">{condition.indicator?.toUpperCase()}</span>
+                                  <span className="text-neutral-600">{operatorSymbol}</span>
+                                  <span className={`font-bold ${isStringValue ? 'text-purple-700' : 'text-green-700'}`}>
+                                    {displayValue}
+                                  </span>
+                                </span>
+                                
+                                {condition.description && (
+                                  <span className="text-xs text-neutral-600 italic">
+                                    {condition.description}
+                                  </span>
+                                )}
+                                
+                                {condIndex < rule.conditions.length - 1 && (
+                                  <span className="text-xs font-bold text-blue-600">
+                                    {rule.logic === 'OR' ? 'OR' : 'AND'}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                      
+                      {/* Action */}
+                      {rule.action && (
+                        <div className="mt-2 pt-2 border-t border-blue-200 text-xs">
+                          <span className="text-neutral-600">Action:</span>
+                          <span className={`ml-2 font-bold ${
+                            rule.action.type === 'buy' ? 'text-green-600' : 
+                            rule.action.type === 'sell' ? 'text-red-600' : 
+                            'text-neutral-600'
+                          }`}>
+                            {rule.action.type?.toUpperCase()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* No conditions warning */}
+              {(!generatedStrategy.rules || generatedStrategy.rules.length === 0) && (
+                <div className="text-sm text-amber-600 bg-amber-50 rounded p-3 border border-amber-200">
+                  ⚠️ No entry conditions defined
+                </div>
+              )}
             </div>
 
             {/* Risk Management Parameters */}
