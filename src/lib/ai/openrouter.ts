@@ -171,6 +171,74 @@ export class OpenRouterAI {
     console.log('✅ Strategy conditions validated successfully');
   }
 
+  /**
+   * Validate that strategy includes advanced features
+   */
+  private validateAdvancedFeatures(strategyData: any): void {
+    const params = strategyData.parameters || {};
+    const warnings: string[] = [];
+    let hasAdvanced = false;
+
+    // Check for each advanced feature
+    const advancedFeatures = {
+      smartExit: params.smartExit || null,
+      dynamicRisk: params.dynamicRisk || null,
+      sessionFilter: params.sessionFilter || null,
+      correlationFilter: params.correlationFilter || null,
+      regimeDetection: params.regimeDetection || null,
+    };
+
+    // Count how many are present
+    const presentFeatures = Object.entries(advancedFeatures)
+      .filter(([_, value]) => value !== null)
+      .map(([key, _]) => key);
+
+    if (presentFeatures.length === 0) {
+      warnings.push(
+        '⚠️ Strategy does not include ANY advanced features. ' +
+        'Consider adding Smart Exit, Dynamic Risk, Session Filter, Correlation Filter, or Regime Detection ' +
+        'for better performance.'
+      );
+    } else if (presentFeatures.length < 3) {
+      warnings.push(
+        `⚠️ Strategy only includes ${presentFeatures.length} advanced features: ${presentFeatures.join(', ')}. ` +
+        'Professional strategies typically use 3-5 advanced features.'
+      );
+      hasAdvanced = true;
+    } else {
+      console.log(`✅ Strategy includes ${presentFeatures.length} advanced features: ${presentFeatures.join(', ')}`);
+      hasAdvanced = true;
+    }
+
+    // Validate specific features if present
+    if (advancedFeatures.smartExit) {
+      if (!advancedFeatures.smartExit.stopLoss || !advancedFeatures.smartExit.takeProfit) {
+        warnings.push('⚠️ Smart Exit is incomplete - missing stopLoss or takeProfit configuration');
+      }
+    }
+
+    if (advancedFeatures.dynamicRisk) {
+      if (!advancedFeatures.dynamicRisk.useATRSizing && !advancedFeatures.dynamicRisk.riskPercentage) {
+        warnings.push('⚠️ Dynamic Risk is incomplete - missing useATRSizing or riskPercentage');
+      }
+    }
+
+    if (advancedFeatures.sessionFilter) {
+      if (!advancedFeatures.sessionFilter.enabled || !advancedFeatures.sessionFilter.allowedSessions) {
+        warnings.push('⚠️ Session Filter is incomplete - missing enabled flag or allowedSessions');
+      }
+    }
+
+    // Log warnings but don't throw - advanced features are recommended but not required for basic strategies
+    if (warnings.length > 0) {
+      warnings.forEach(warning => console.warn(warning));
+    }
+
+    // Set flag to indicate if strategy has advanced features
+    strategyData._hasAdvancedFeatures = hasAdvanced;
+    strategyData._advancedFeaturesCount = presentFeatures.length;
+  }
+
   async generateStrategy(prompt: string): Promise<Partial<Strategy>> {
     const systemPrompt = `You are an expert forex trading strategy generator. Generate realistic trading strategies in JSON format only.
 
@@ -542,7 +610,43 @@ CRITICAL REQUIREMENTS:
 1. Extract the EXACT symbol from my request (XAUUSD, EURUSD, GBPUSD, etc.)
 2. Extract the EXACT timeframe from my request (M1, M5, M15, M30, H1, H4, D1, W1)
 3. Include ALL indicators mentioned (RSI, MACD, EMA, SMA, etc.)
-4. Use the symbol and timeframe I specify - DO NOT use defaults unless I don't specify them`,
+4. Use the symbol and timeframe I specify - DO NOT use defaults unless I don't specify them
+
+MANDATORY ADVANCED FEATURES (DO NOT SKIP):
+You MUST include ALL 5 advanced features in your response:
+
+1. ✅ smartExit: {
+     stopLoss: { type: "atr", atrMultiplier: 2.0 },
+     takeProfit: { type: "partial", partialExits: [...] }
+   }
+
+2. ✅ dynamicRisk: {
+     useATRSizing: true,
+     atrMultiplier: 1.5,
+     riskPercentage: 1.0,
+     autoAdjustLotSize: true,
+     reduceInHighVolatility: true
+   }
+
+3. ✅ sessionFilter: {
+     enabled: true,
+     allowedSessions: ["London", "NewYork"],
+     useOptimalPairs: true
+   }
+
+4. ✅ correlationFilter: {
+     enabled: true,
+     maxCorrelation: 0.7,
+     lookbackPeriod: 30
+   }
+
+5. ✅ regimeDetection: {
+     enableMTFAnalysis: true,
+     primaryTimeframe: "H1",
+     confirmationTimeframes: ["H4", "D1"]
+   }
+
+These are NOT optional - include ALL in parameters section!`,
       },
     ];
 
@@ -553,6 +657,9 @@ CRITICAL REQUIREMENTS:
       
       // Validate strategy conditions
       this.validateStrategyConditions(strategyData);
+      
+      // Validate advanced features (warnings only, not blocking)
+      this.validateAdvancedFeatures(strategyData);
 
       // Debug: Log raw AI response
       console.log('🤖 Raw AI Response (Full):', JSON.stringify(strategyData, null, 2));
