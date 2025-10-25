@@ -3,6 +3,7 @@ import { marketDataCache, CacheKey } from "../cache/market-data-cache";
 import YahooFinance from 'yahoo-finance2';
 import { SmartExitCalculator } from '../trading/smart-exits';
 import { createPartialExitManager, EnhancedPartialExitManager } from '../trading/partial-exits';
+import { convertToProviderSymbol } from "../data-providers/common/symbol-mapper";
 
 // Symbol-specific pip configuration for accurate calculations
 const SYMBOL_CONFIG = {
@@ -105,63 +106,19 @@ interface BacktestResult {
 
 /**
  * Convert symbol to Yahoo Finance API format
- * Yahoo Finance uses different formats for forex, commodities, and indices
+ * Yahoo Finance uses different formats for forex, commodities, indices, and crypto
+ * Now uses centralized symbol mapper for consistency across all symbols
  */
 function convertSymbolToYahooFormat(symbol: string): string {
-  // Remove any spaces
+  // Remove any spaces and uppercase
   symbol = symbol.replace(/\s/g, "").toUpperCase();
 
-  // Commodities mapping
-  const commodityMap: Record<string, string> = {
-    "XAUUSD": "GC=F",      // Gold Futures
-    "XAGUSD": "SI=F",      // Silver Futures
-    "USOIL": "CL=F",       // WTI Crude Oil Futures
-    "UKOIL": "BZ=F",       // Brent Crude Oil Futures
-    "NATGAS": "NG=F",      // Natural Gas Futures
-    "COPPER": "HG=F",      // Copper Futures
-  };
-
-  // Check commodities first
-  if (commodityMap[symbol]) {
-    return commodityMap[symbol];
-  }
-
-  // Forex pairs - add =X suffix
-  const forexPairs = [
-    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "AUDUSD", "USDCAD", "NZDUSD",
-    "EURGBP", "EURJPY", "GBPJPY", "EURCHF", "EURAUD", "EURCAD", "EURNZD",
-    "GBPCHF", "GBPAUD", "GBPCAD", "GBPNZD", "AUDJPY", "AUDNZD", "NZDJPY",
-    "AUDCAD", "CADJPY", "CHFJPY"
-  ];
-
-  if (forexPairs.includes(symbol)) {
-    return `${symbol}=X`;
-  }
-
-  // Indices mapping
-  const indexMap: Record<string, string> = {
-    "US30": "^DJI",       // Dow Jones
-    "SPX500": "^GSPC",    // S&P 500
-    "NAS100": "^IXIC",    // NASDAQ
-    "UK100": "^FTSE",     // FTSE 100
-    "GER40": "^GDAXI",    // DAX
-    "JPN225": "^N225",    // Nikkei 225
-    "FRA40": "^FCHI",     // CAC 40
-  };
-
-  if (indexMap[symbol]) {
-    return indexMap[symbol];
-  }
-
-  // Crypto - add -USD suffix
-  const cryptoPairs = ["BTCUSD", "ETHUSD", "LTCUSD", "XRPUSD", "BCHUSD"];
-  if (cryptoPairs.includes(symbol)) {
-    const base = symbol.substring(0, symbol.length - 3);
-    return `${base}-USD`;
-  }
-
-  // Default: return as-is
-  return symbol;
+  // Use centralized symbol mapper for comprehensive coverage
+  const yahooSymbol = convertToProviderSymbol(symbol, 'yahooFinance');
+  
+  console.log(`📊 Symbol Mapping: ${symbol} → ${yahooSymbol}`);
+  
+  return yahooSymbol;
 }
 
 // Market data interface for backtesting
