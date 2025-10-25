@@ -80,7 +80,7 @@ export async function POST(
         continue;
       }
 
-      // Check if strategy already assigned to this executor
+      // Check if strategy already assigned to this executor (any status)
       let assignment = await prisma.strategyAssignment.findFirst({
         where: {
           strategyId,
@@ -89,7 +89,7 @@ export async function POST(
       });
 
       if (assignment) {
-        // Update existing assignment to active
+        // Update existing assignment to active (reactivate if stopped/paused)
         assignment = await prisma.strategyAssignment.update({
           where: { id: assignment.id },
           data: {
@@ -97,6 +97,7 @@ export async function POST(
             updatedAt: new Date(),
           },
         });
+        console.log(`Reactivated existing assignment ${assignment.id}`);
       } else {
         // Create new strategy assignment
         assignment = await prisma.strategyAssignment.create({
