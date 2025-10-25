@@ -888,6 +888,20 @@ export class MainController extends EventEmitter {
         this.monitoringService.updateConnectionStatus('zeromq', { connected: true });
       }
       
+      // Step 5.5: Connect ZeroMQ Client to MT5
+      this.addLog('info', 'MAIN', 'Step 5.5: Connecting ZeroMQ Client to MT5...');
+      try {
+        const zmqClientConnected = await this.zeromqService.connect(config as any);
+        if (zmqClientConnected) {
+          this.addLog('info', 'MAIN', '✅ ZeroMQ Client connected - ready to fetch market data');
+        } else {
+          this.addLog('warn', 'MAIN', 'ZeroMQ Client connection failed - will retry automatically');
+        }
+      } catch (zmqError) {
+        this.addLog('warn', 'MAIN', `ZeroMQ Client connection error: ${zmqError instanceof Error ? zmqError.message : 'Unknown'}`);
+        // Don't fail initialization, continue without market data access
+      }
+      
       // Step 6: Start heartbeat service
       await this.heartbeatService.start(config as any);
       
@@ -918,6 +932,15 @@ export class MainController extends EventEmitter {
         } catch (error) {
           this.addLog('warn', 'MAIN', 'Failed to download strategies - will retry later', { error });
         }
+      }
+      
+      // Sync active strategies from platform (restore after restart)
+      this.addLog('info', 'MAIN', 'Syncing active strategies from platform...');
+      try {
+        await this.syncActiveStrategiesFromPlatform();
+        this.addLog('info', 'MAIN', 'Active strategies synced successfully');
+      } catch (error) {
+        this.addLog('warn', 'MAIN', 'Failed to sync active strategies - manual reactivation may be required', { error });
       }
       
       // Step 10: Start Live Trading Background Services
@@ -1033,6 +1056,70 @@ export class MainController extends EventEmitter {
     }
   }
 
+  /**
+   * Sync active strategies from platform after restart
+   */
+  private async syncActiveStrategiesFromPlatform(): Promise<void> {
+    try {
+      if (!this.config) {
+        throw new Error('Config not initialized');
+      }
+      
+      // Fetch active strategies from web platform API
+      const response = await fetch(
+        `${this.config.platformUrl}/api/executor/${this.executorId}/active-strategies`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.config.apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      const activeStrategies = data.strategies || [];
+      
+      logger.info(`[MainController] Found ${activeStrategies.length} active strategies to sync`, {
+        category: 'SYNC',
+        metadata: { strategies: activeStrategies.map((s: any) => ({ id: s.id, name: s.name })) }
+      });
+      
+      // Start each active strategy
+      for (const strategy of activeStrategies) {
+        try {
+          this.addLog('info', 'SYNC', `Restoring strategy: ${strategy.name}`);
+          
+          // Add to active list
+          this.activeStrategies.push({
+            id: strategy.id,
+            name: strategy.name,
+            symbol: strategy.symbol,
+            timeframe: strategy.timeframe
+          });
+          
+          // Start monitoring
+          if (this.strategyMonitor) {
+            await this.strategyMonitor.startMonitoring(strategy);
+            this.addLog('info', 'SYNC', `Strategy ${strategy.name} restored and monitoring started`);
+          }
+        } catch (error) {
+          logger.error(`[MainController] Failed to restore strategy ${strategy.name}:`, error);
+          this.addLog('error', 'SYNC', `Failed to restore strategy: ${strategy.name}`, { error });
+        }
+      }
+      
+      logger.info(`[MainController] Active strategies sync completed: ${activeStrategies.length} restored`);
+      
+    } catch (error) {
+      logger.error('[MainController] Failed to sync active strategies:', error);
+      throw error;
+    }
+  }
+  
   /**
    * Shutdown the application gracefully
    */
