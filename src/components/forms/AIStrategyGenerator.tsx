@@ -1018,14 +1018,16 @@ Please create a strategy that takes this current market situation into account.`
               </div>
             )}
 
-            {/* Advanced Features Indicator */}
+            {/* Advanced Features Detail */}
             <div className="rounded-lg bg-white border border-blue-200 p-4">
               <div className="text-xs font-semibold text-blue-700 mb-3">ADVANCED FEATURES</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
+              
+              {/* Summary indicators */}
+              <div className="grid grid-cols-2 gap-2 text-xs mb-4 pb-3 border-b border-blue-200">
                 <div className="flex items-center gap-2">
                   <div className={`h-2 w-2 rounded-full ${generatedStrategy.parameters?.smartExit ? 'bg-green-500' : 'bg-gray-300'}`} />
                   <span className={generatedStrategy.parameters?.smartExit ? 'text-green-700 font-semibold' : 'text-gray-500'}>
-                    Smart Exit Rules
+                    Smart Exit
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -1053,9 +1055,213 @@ Please create a strategy that takes this current market situation into account.`
                   </span>
                 </div>
               </div>
-              {!generatedStrategy.parameters?.smartExit && !generatedStrategy.parameters?.dynamicRisk && (
-                <div className="mt-3 text-xs text-blue-600">
-                  💡 You can enable advanced features in the manual form below
+              
+              {/* Detailed Features */}
+              <div className="space-y-3">
+                {/* Smart Exit Details */}
+                {generatedStrategy.parameters?.smartExit && (
+                  <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-300">
+                    <div className="text-xs font-bold text-green-700 mb-2">🎯 Smart Exit Configuration</div>
+                    <div className="space-y-1.5 text-xs">
+                      {generatedStrategy.parameters.smartExit.stopLoss && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Stop Loss Type:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.smartExit.stopLoss.type?.toUpperCase()}</span>
+                        </div>
+                      )}
+                      {generatedStrategy.parameters.smartExit.stopLoss?.atrMultiplier && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">ATR Multiplier (SL):</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.smartExit.stopLoss.atrMultiplier}x</span>
+                        </div>
+                      )}
+                      {generatedStrategy.parameters.smartExit.takeProfit && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Take Profit Type:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.smartExit.takeProfit.type?.toUpperCase()}</span>
+                        </div>
+                      )}
+                      {generatedStrategy.parameters.smartExit.takeProfit?.partialExits && (
+                        <div className="mt-2 pt-2 border-t border-green-200">
+                          <div className="text-neutral-600 mb-1">Partial Exits:</div>
+                          {generatedStrategy.parameters.smartExit.takeProfit.partialExits.map((exit: any, idx: number) => (
+                            <div key={idx} className="flex justify-between text-xs pl-2">
+                              <span className="text-neutral-600">Level {idx + 1}:</span>
+                              <span className="font-semibold text-green-700">{exit.percentage}% @ {exit.atRR}:1 RR</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Dynamic Risk Details */}
+                {generatedStrategy.parameters?.dynamicRisk && (
+                  <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg p-3 border border-amber-300">
+                    <div className="text-xs font-bold text-amber-700 mb-2">⚡ Dynamic Risk Configuration</div>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">ATR Sizing:</span>
+                        <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.dynamicRisk.useATRSizing ? 'Enabled ✅' : 'Disabled'}</span>
+                      </div>
+                      {generatedStrategy.parameters.dynamicRisk.atrMultiplier && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">ATR Multiplier:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.dynamicRisk.atrMultiplier}x</span>
+                        </div>
+                      )}
+                      {generatedStrategy.parameters.dynamicRisk.riskPercentage && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Risk Per Trade:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.dynamicRisk.riskPercentage}%</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">Auto Adjust Lot:</span>
+                        <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.dynamicRisk.autoAdjustLotSize ? 'Yes ✅' : 'No'}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">Reduce in High Vol:</span>
+                        <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.dynamicRisk.reduceInHighVolatility ? 'Yes ✅' : 'No'}</span>
+                      </div>
+                      {generatedStrategy.parameters.dynamicRisk.volatilityThreshold && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Volatility Threshold:</span>
+                          <span className="font-semibold text-neutral-900">{(generatedStrategy.parameters.dynamicRisk.volatilityThreshold * 100).toFixed(2)}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Session Filter Details */}
+                {generatedStrategy.parameters?.sessionFilter && (
+                  <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-300">
+                    <div className="text-xs font-bold text-blue-700 mb-2">🌍 Session Filter Configuration</div>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">Status:</span>
+                        <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.sessionFilter.enabled ? 'Enabled ✅' : 'Disabled'}</span>
+                      </div>
+                      {generatedStrategy.parameters.sessionFilter.allowedSessions && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Allowed Sessions:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.sessionFilter.allowedSessions.join(', ')}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">Use Optimal Pairs:</span>
+                        <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.sessionFilter.useOptimalPairs ? 'Yes ✅' : 'No'}</span>
+                      </div>
+                      {generatedStrategy.parameters.sessionFilter.aggressivenessMultiplier && (
+                        <div className="mt-2 pt-2 border-t border-blue-200">
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">Optimal Session:</span>
+                            <span className="font-semibold text-green-700">{generatedStrategy.parameters.sessionFilter.aggressivenessMultiplier.optimal}x</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">Suboptimal Session:</span>
+                            <span className="font-semibold text-amber-700">{generatedStrategy.parameters.sessionFilter.aggressivenessMultiplier.suboptimal}x</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Correlation Filter Details */}
+                {generatedStrategy.parameters?.correlationFilter && (
+                  <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-300">
+                    <div className="text-xs font-bold text-purple-700 mb-2">🔗 Correlation Filter Configuration</div>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">Status:</span>
+                        <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.correlationFilter.enabled ? 'Enabled ✅' : 'Disabled'}</span>
+                      </div>
+                      {generatedStrategy.parameters.correlationFilter.maxCorrelation && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Max Correlation:</span>
+                          <span className="font-semibold text-neutral-900">{(generatedStrategy.parameters.correlationFilter.maxCorrelation * 100).toFixed(0)}%</span>
+                        </div>
+                      )}
+                      {generatedStrategy.parameters.correlationFilter.lookbackPeriod && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Lookback Period:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.correlationFilter.lookbackPeriod} days</span>
+                        </div>
+                      )}
+                      {generatedStrategy.parameters.correlationFilter.timeframes && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Timeframes:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.correlationFilter.timeframes.join(', ')}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Regime Detection Details */}
+                {generatedStrategy.parameters?.regimeDetection && (
+                  <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-lg p-3 border border-indigo-300">
+                    <div className="text-xs font-bold text-indigo-700 mb-2">📈 Regime Detection Configuration</div>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-neutral-600">MTF Analysis:</span>
+                        <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.regimeDetection.enableMTFAnalysis ? 'Enabled ✅' : 'Disabled'}</span>
+                      </div>
+                      {generatedStrategy.parameters.regimeDetection.primaryTimeframe && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Primary Timeframe:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.regimeDetection.primaryTimeframe}</span>
+                        </div>
+                      )}
+                      {generatedStrategy.parameters.regimeDetection.confirmationTimeframes && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Confirmation TFs:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.regimeDetection.confirmationTimeframes.join(', ')}</span>
+                        </div>
+                      )}
+                      {(generatedStrategy.parameters.regimeDetection.weightTrend || generatedStrategy.parameters.regimeDetection.weightVolatility || generatedStrategy.parameters.regimeDetection.weightRange) && (
+                        <div className="mt-2 pt-2 border-t border-indigo-200">
+                          <div className="text-neutral-600 mb-1">Weights:</div>
+                          {generatedStrategy.parameters.regimeDetection.weightTrend && (
+                            <div className="flex justify-between pl-2">
+                              <span className="text-neutral-600">Trend:</span>
+                              <span className="font-semibold text-neutral-900">{(generatedStrategy.parameters.regimeDetection.weightTrend * 100).toFixed(0)}%</span>
+                            </div>
+                          )}
+                          {generatedStrategy.parameters.regimeDetection.weightVolatility && (
+                            <div className="flex justify-between pl-2">
+                              <span className="text-neutral-600">Volatility:</span>
+                              <span className="font-semibold text-neutral-900">{(generatedStrategy.parameters.regimeDetection.weightVolatility * 100).toFixed(0)}%</span>
+                            </div>
+                          )}
+                          {generatedStrategy.parameters.regimeDetection.weightRange && (
+                            <div className="flex justify-between pl-2">
+                              <span className="text-neutral-600">Range:</span>
+                              <span className="font-semibold text-neutral-900">{(generatedStrategy.parameters.regimeDetection.weightRange * 100).toFixed(0)}%</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {generatedStrategy.parameters.regimeDetection.minConfidence && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-600">Min Confidence:</span>
+                          <span className="font-semibold text-neutral-900">{generatedStrategy.parameters.regimeDetection.minConfidence}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* No advanced features warning */}
+              {!generatedStrategy.parameters?.smartExit && !generatedStrategy.parameters?.dynamicRisk && 
+               !generatedStrategy.parameters?.sessionFilter && !generatedStrategy.parameters?.correlationFilter && 
+               !generatedStrategy.parameters?.regimeDetection && (
+                <div className="mt-3 text-xs text-amber-600 bg-amber-50 rounded p-3 border border-amber-200">
+                  ⚠️ This is a BASIC strategy without advanced features. Consider regenerating with advanced features for better performance.
                 </div>
               )}
             </div>
