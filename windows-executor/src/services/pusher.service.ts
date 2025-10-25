@@ -129,11 +129,24 @@ export class PusherService {
    */
   private async handleCommand(data: PusherCommandData): Promise<void> {
     try {
-      this.log('info', 'Command received', { commandId: data.id, command: data.command });
+      this.log('info', 'Raw command received', { 
+        commandId: data.id, 
+        command: data.command,
+        type: (data as any).type,
+        hasCommand: !!data.command,
+        hasId: !!data.id,
+        dataKeys: Object.keys(data)
+      });
 
       // Validate command structure
       if (!this.validateCommand(data)) {
-        this.log('error', 'Invalid command structure', { commandId: data.id });
+        this.log('error', 'Invalid command structure', { 
+          commandId: data.id,
+          commandField: data.command,
+          typeField: (data as any).type,
+          idField: data.id,
+          fullData: JSON.stringify(data)
+        });
         this.emitEvent('command-error', {
           commandId: data.id,
           error: 'Invalid command structure',
@@ -226,8 +239,28 @@ export class PusherService {
    */
   private validateCommand(command: any): boolean {
     // Basic validation - only require essential fields
-    if (!command || typeof command.id !== 'string' || typeof command.command !== 'string') {
+    if (!command || typeof command.id !== 'string') {
+      this.log('debug', 'Validation failed: missing or invalid id', { 
+        hasCommand: !!command,
+        idType: typeof command?.id
+      });
       return false;
+    }
+    
+    // Accept either 'command' or 'type' field
+    if (typeof command.command !== 'string' && typeof command.type !== 'string') {
+      this.log('debug', 'Validation failed: missing command/type field', {
+        commandField: command.command,
+        typeField: command.type,
+        commandType: typeof command.command,
+        typeType: typeof command.type
+      });
+      return false;
+    }
+    
+    // Normalize: if only 'type' exists, copy to 'command'
+    if (!command.command && command.type) {
+      command.command = command.type;
     }
     
     // Priority and createdAt are optional - will be added if missing
