@@ -404,41 +404,104 @@ export class MainController extends EventEmitter {
       
       this.addLog('debug', 'COMMAND', 'Transformed command', { original: command, transformed: transformedCommand });
       
-      // Handle START_STRATEGY command directly with commandProcessor
-      if (transformedCommand.command === 'START_STRATEGY' && this.commandProcessor) {
+      // Handle strategy commands directly with commandProcessor
+      if (this.commandProcessor && (transformedCommand.command === 'START_STRATEGY' || transformedCommand.command === 'STOP_STRATEGY')) {
         try {
-          await this.commandProcessor.handleStrategyCommand({
-            type: 'START_STRATEGY' as any,
-            strategyId: transformedCommand.parameters.strategyId,
-            strategy: {
+          if (transformedCommand.command === 'START_STRATEGY') {
+            // Handle START_STRATEGY
+            await this.commandProcessor.handleStrategyCommand({
+              type: 'START_STRATEGY' as any,
+              strategyId: transformedCommand.parameters.strategyId,
+              strategy: {
+                id: transformedCommand.parameters.strategyId,
+                name: transformedCommand.parameters.strategyName,
+                symbol: transformedCommand.parameters.symbol,
+                timeframe: transformedCommand.parameters.timeframe,
+                rules: transformedCommand.parameters.rules,
+                enabled: true,
+              },
+              options: transformedCommand.parameters.options || {},
+            } as any);
+            
+            // Add to active strategies
+            this.activeStrategies.push({
               id: transformedCommand.parameters.strategyId,
               name: transformedCommand.parameters.strategyName,
-              symbol: transformedCommand.parameters.symbol,
-              timeframe: transformedCommand.parameters.timeframe,
-              rules: transformedCommand.parameters.rules,
-              enabled: true,
-            },
-            options: transformedCommand.parameters.options || {},
-          } as any);
+              status: 'active',
+              symbols: [transformedCommand.parameters.symbol],
+              timeframes: [transformedCommand.parameters.timeframe],
+              activeSince: new Date(),
+            });
+            
+            this.emit('strategy-activated', {
+              strategyId: transformedCommand.parameters.strategyId,
+              strategyName: transformedCommand.parameters.strategyName,
+            });
+            
+            this.addLog('info', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyName} activated`);
+            
+          } else if (transformedCommand.command === 'STOP_STRATEGY') {
+            // Handle STOP_STRATEGY
+            await this.commandProcessor.handleStrategyCommand({
+              type: 'STOP_STRATEGY' as any,
+              strategyId: transformedCommand.parameters.strategyId,
+              options: {
+                closePositions: transformedCommand.parameters.closePositions !== false, // Default true
+              },
+            } as any);
+            
+            // Remove from active strategies
+            const index = this.activeStrategies.findIndex(s => s.id === transformedCommand.parameters.strategyId);
+            if (index > -1) {
+              const removedStrategy = this.activeStrategies.splice(index, 1)[0];
+              
+              this.emit('strategy-deactivated', {
+                strategyId: transformedCommand.parameters.strategyId,
+                strategyName: removedStrategy.name,
+              });
+              
+              this.addLog('info', 'COMMAND', `Strategy ${removedStrategy.name} deactivated`);
+            } else {
+              this.addLog('warn', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyId} not found in active strategies`);
+            }
+          }
           
-          // Add to active strategies
-          this.activeStrategies.push({
-            id: transformedCommand.parameters.strategyId,
-            name: transformedCommand.parameters.strategyName,
-            status: 'active',
-            symbols: [transformedCommand.parameters.symbol],
-            timeframes: [transformedCommand.parameters.timeframe],
-            activeSince: new Date(),
-          });
+          // Update command status via API if available
+          if (this.apiService) {
+            try {
+              await this.apiService.reportCommandResult(
+                transformedCommand.id,
+                'executed',
+                { 
+                  success: true, 
+                  timestamp: new Date().toISOString(),
+                  command: transformedCommand.command
+                }
+              );
+            } catch (apiError) {
+              this.addLog('warn', 'COMMAND', `Failed to report command result: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
+            }
+          }
           
-          this.emit('strategy-activated', {
-            strategyId: transformedCommand.parameters.strategyId,
-            strategyName: transformedCommand.parameters.strategyName,
-          });
-          
-          this.addLog('info', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyName} activated`);
         } catch (error) {
-          this.addLog('error', 'COMMAND', `Failed to start strategy: ${error instanceof Error ? error.message : 'Unknown error'}`, { error });
+          this.addLog('error', 'COMMAND', `Failed to execute strategy command: ${error instanceof Error ? error.message : 'Unknown error'}`, { error });
+          
+          // Report failure if API available
+          if (this.apiService) {
+            try {
+              await this.apiService.reportCommandResult(
+                transformedCommand.id,
+                'failed',
+                { 
+                  success: false, 
+                  error: error instanceof Error ? error.message : 'Unknown error',
+                  timestamp: new Date().toISOString()
+                }
+              );
+            } catch (apiError) {
+              this.addLog('warn', 'COMMAND', `Failed to report command failure: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
+            }
+          }
         }
       } else {
         // For other commands, use command service
