@@ -145,11 +145,21 @@ export async function POST(
       // Send START_STRATEGY command via Pusher
       const command = {
         id: commandId,
-        type: 'START_STRATEGY' as const,
+        command: 'START_STRATEGY', // Use 'command' field (executor expects this)
+        type: 'START_STRATEGY' as const, // Keep for backward compatibility
         priority: 'HIGH' as const,
         executorId: execId,
-        strategyId,
-        payload: {
+        parameters: {
+          strategyId: strategy.id,
+          strategyName: strategy.name,
+          symbol: strategy.symbol,
+          timeframe: strategy.timeframe,
+          rules: strategy.rules,
+          enabled: true,
+          options: options || {},
+          settings: settings || {},
+        },
+        payload: { // Keep payload for compatibility
           strategyId: strategy.id,
           strategyName: strategy.name,
           symbol: strategy.symbol,
@@ -164,6 +174,7 @@ export async function POST(
           userId: session.user.id,
           assignmentId: assignment.id,
         },
+        createdAt: new Date().toISOString(),
         timestamp: new Date(),
         expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
       };
