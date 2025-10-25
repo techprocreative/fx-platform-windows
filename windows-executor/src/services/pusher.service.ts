@@ -242,25 +242,43 @@ export class PusherService {
     if (!command || typeof command.id !== 'string') {
       this.log('debug', 'Validation failed: missing or invalid id', { 
         hasCommand: !!command,
-        idType: typeof command?.id
+        idType: typeof command?.id,
+        fullCommand: command
       });
       return false;
     }
     
-    // Accept either 'command' or 'type' field
-    if (typeof command.command !== 'string' && typeof command.type !== 'string') {
-      this.log('debug', 'Validation failed: missing command/type field', {
+    // TEMPORARY FIX: Accept command even without command/type field
+    // Will be set from metadata or default value
+    const hasCommandField = typeof command.command === 'string';
+    const hasTypeField = typeof command.type === 'string';
+    
+    if (!hasCommandField && !hasTypeField) {
+      this.log('warn', 'Command missing both command and type fields, will try to infer', {
         commandField: command.command,
         typeField: command.type,
-        commandType: typeof command.command,
-        typeType: typeof command.type
+        hasPayload: !!command.payload,
+        hasParameters: !!command.parameters,
+        allKeys: Object.keys(command)
       });
-      return false;
+      
+      // Try to infer command type from payload or parameters
+      if (command.payload?.strategyId || command.parameters?.strategyId) {
+        command.command = 'START_STRATEGY';
+        command.type = 'START_STRATEGY';
+        this.log('info', 'Inferred command type as START_STRATEGY from payload');
+      } else {
+        // Default fallback
+        command.command = 'UNKNOWN';
+        command.type = 'UNKNOWN';
+      }
     }
     
-    // Normalize: if only 'type' exists, copy to 'command'
+    // Normalize: ensure both command and type exist
     if (!command.command && command.type) {
       command.command = command.type;
+    } else if (command.command && !command.type) {
+      command.type = command.command;
     }
     
     // Priority and createdAt are optional - will be added if missing
