@@ -26,16 +26,20 @@ export class MarketDataService {
       logger.debug(`[MarketDataService] Fetching ${bars} bars for ${symbol} ${timeframe}`);
       
       // Request from MT5 via ZeroMQ
-      const command = {
-        type: 'get_bars',
-        symbol,
-        timeframe,
-        bars
+      const request = {
+        command: 'GET_BARS',
+        requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        parameters: {
+          symbol,
+          timeframe,
+          bars
+        }
       };
       
-      const response = await this.zeromqService.sendCommand(command);
+      const response = await this.zeromqService.sendRequest(request, 5000);
       
-      if (!response || response.status !== 'success') {
+      if (!response || response.status !== 'OK') {
         logger.warn(`[MarketDataService] Failed to get bars: ${response?.error || 'Unknown error'}`);
         return {
           symbol,
@@ -45,7 +49,7 @@ export class MarketDataService {
       }
       
       // Parse bars data
-      const barData: Bar[] = (response.bars || []).map((b: any) => ({
+      const barData: Bar[] = (response.data?.bars || []).map((b: any) => ({
         time: new Date(b.time * 1000), // Convert unix timestamp to Date
         open: b.open,
         high: b.high,
@@ -91,21 +95,23 @@ export class MarketDataService {
    */
   async getCurrentPrice(symbol: string): Promise<{ bid: number; ask: number } | null> {
     try {
-      const command = {
-        type: 'get_price',
-        symbol
+      const request = {
+        command: 'GET_PRICE',
+        requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: new Date().toISOString(),
+        parameters: { symbol }
       };
       
-      const response = await this.zeromqService.sendCommand(command);
+      const response = await this.zeromqService.sendRequest(request, 3000);
       
-      if (!response || response.status !== 'success') {
+      if (!response || response.status !== 'OK') {
         logger.warn(`[MarketDataService] Failed to get price: ${response?.error || 'Unknown error'}`);
         return null;
       }
       
       return {
-        bid: response.bid,
-        ask: response.ask
+        bid: response.data?.bid || 0,
+        ask: response.data?.ask || 0
       };
       
     } catch (error) {
