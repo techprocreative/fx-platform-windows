@@ -481,9 +481,11 @@ export class MainController extends EventEmitter {
               id: params.strategyId,
               name: params.strategyName,
               status: 'active',
+              symbol: params.symbol,
               symbols: [params.symbol],
-              timeframes: [params.timeframe],
+              timeframe: params.timeframe, // Singular for getActiveStrategies()
               activeSince: new Date(),
+              lastSignal: null
             });
             
             // Persist strategy activation
@@ -1146,8 +1148,11 @@ export class MainController extends EventEmitter {
             this.activeStrategies.push({
               id: strategy.id,
               name: strategy.name,
+              status: 'active',
               symbol: strategy.symbol,
-              timeframe: strategy.timeframe
+              symbols: [strategy.symbol], // Array for compatibility with dashboard
+              timeframe: strategy.timeframe,
+              lastSignal: null
             });
             
             // Save to persistence
@@ -1207,8 +1212,11 @@ export class MainController extends EventEmitter {
             this.activeStrategies.push({
               id: strategy.id,
               name: strategy.name,
+              status: 'active',
               symbol: strategy.symbol,
-              timeframe: strategy.timeframe
+              symbols: [strategy.symbol], // Array for compatibility with dashboard
+              timeframe: strategy.timeframe,
+              lastSignal: null
             });
             
             // Start monitoring
