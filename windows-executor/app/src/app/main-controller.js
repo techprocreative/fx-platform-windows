@@ -22,6 +22,7 @@ const llm_service_1 = require("../services/llm.service");
 const mt5_account_service_1 = require("../services/mt5-account.service");
 const performance_monitor_service_1 = require("../services/performance-monitor.service");
 const alert_service_1 = require("../services/alert.service");
+const logger_1 = require("../utils/logger");
 // New services for live trading readiness
 const strategy_monitor_service_1 = require("../services/strategy-monitor.service");
 const safety_validator_service_1 = require("../services/safety-validator.service");
@@ -291,39 +292,113 @@ class MainController extends events_1.EventEmitter {
                 maxRetries: command.maxRetries || 3,
             };
             this.addLog('debug', 'COMMAND', 'Transformed command', { original: command, transformed: transformedCommand });
-            // Handle START_STRATEGY command directly with commandProcessor
-            if (transformedCommand.command === 'START_STRATEGY' && this.commandProcessor) {
+            // Handle strategy commands directly with commandProcessor
+            if (this.commandProcessor && (transformedCommand.command === 'START_STRATEGY' || transformedCommand.command === 'STOP_STRATEGY')) {
                 try {
-                    await this.commandProcessor.handleStrategyCommand({
-                        type: 'START_STRATEGY',
-                        strategyId: transformedCommand.parameters.strategyId,
-                        strategy: {
+                    if (transformedCommand.command === 'START_STRATEGY') {
+                        // Handle START_STRATEGY
+                        await this.commandProcessor.handleStrategyCommand({
+                            type: 'START_STRATEGY',
+                            strategyId: transformedCommand.parameters.strategyId,
+                            strategy: {
+                                id: transformedCommand.parameters.strategyId,
+                                name: transformedCommand.parameters.strategyName,
+                                symbol: transformedCommand.parameters.symbol,
+                                timeframe: transformedCommand.parameters.timeframe,
+                                rules: transformedCommand.parameters.rules,
+                                enabled: true,
+                            },
+                            options: transformedCommand.parameters.options || {},
+                        });
+                        // Add to active strategies
+                        this.activeStrategies.push({
                             id: transformedCommand.parameters.strategyId,
                             name: transformedCommand.parameters.strategyName,
-                            symbol: transformedCommand.parameters.symbol,
-                            timeframe: transformedCommand.parameters.timeframe,
-                            rules: transformedCommand.parameters.rules,
-                            enabled: true,
-                        },
-                        options: transformedCommand.parameters.options || {},
-                    });
-                    // Add to active strategies
-                    this.activeStrategies.push({
-                        id: transformedCommand.parameters.strategyId,
-                        name: transformedCommand.parameters.strategyName,
-                        status: 'active',
-                        symbols: [transformedCommand.parameters.symbol],
-                        timeframes: [transformedCommand.parameters.timeframe],
-                        activeSince: new Date(),
-                    });
-                    this.emit('strategy-activated', {
-                        strategyId: transformedCommand.parameters.strategyId,
-                        strategyName: transformedCommand.parameters.strategyName,
-                    });
-                    this.addLog('info', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyName} activated`);
+                            status: 'active',
+                            symbols: [transformedCommand.parameters.symbol],
+                            timeframes: [transformedCommand.parameters.timeframe],
+                            activeSince: new Date(),
+                        });
+                        this.emit('strategy-activated', {
+                            strategyId: transformedCommand.parameters.strategyId,
+                            strategyName: transformedCommand.parameters.strategyName,
+                        });
+                        this.addLog('info', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyName} activated`);
+                    }
+                    else if (transformedCommand.command === 'STOP_STRATEGY') {
+                        // Handle STOP_STRATEGY
+                        const strategyId = transformedCommand.parameters?.strategyId;
+                        if (!strategyId) {
+                            throw new Error('Missing strategyId in STOP_STRATEGY command');
+                        }
+                        // Call command processor to handle the strategy command
+                        if (this.commandProcessor) {
+                            await this.commandProcessor.handleStrategyCommand({
+                                type: 'STOP_STRATEGY',
+                                strategyId: strategyId,
+                                options: {
+                                    closePositions: transformedCommand.parameters.closePositions !== false, // Default true
+                                },
+                            });
+                        }
+                        // Remove from active strategies
+                        const index = this.activeStrategies.findIndex(s => s.id === strategyId);
+                        if (index > -1) {
+                            const removedStrategy = this.activeStrategies.splice(index, 1)[0];
+                            this.emit('strategy-deactivated', {
+                                strategyId: strategyId,
+                                strategyName: removedStrategy.name,
+                            });
+                            this.addLog('info', 'COMMAND', `Strategy ${removedStrategy.name} deactivated`);
+                        }
+                        else {
+                            this.addLog('warn', 'COMMAND', `Strategy ${strategyId} not found in active strategies`);
+                        }
+                    }
+                    // Update command status via API if available
+                    try {
+                        if (this.apiService && typeof this.apiService.reportCommandResult === 'function') {
+                            await this.apiService.reportCommandResult(transformedCommand.id, 'executed', {
+                                success: true,
+                                timestamp: new Date().toISOString(),
+                                command: transformedCommand.command
+                            });
+                        }
+                    }
+                    catch (apiError) {
+                        // Non-critical error, just log it
+                        this.addLog('warn', 'COMMAND', `Failed to report command result: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
+                    }
                 }
                 catch (error) {
-                    this.addLog('error', 'COMMAND', `Failed to start strategy: ${error instanceof Error ? error.message : 'Unknown error'}`, { error });
+                    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+                    const errorStack = error instanceof Error ? error.stack : undefined;
+                    // Log to file via Winston
+                    logger_1.logger.error(`[MainController] Failed to execute strategy command: ${errorMessage}`, {
+                        category: 'COMMAND',
+                        metadata: {
+                            command: transformedCommand.command,
+                            commandId: transformedCommand.id,
+                            strategyId: transformedCommand.parameters?.strategyId,
+                            error: errorMessage,
+                            stack: errorStack
+                        }
+                    });
+                    this.addLog('error', 'COMMAND', `Failed to execute strategy command: ${errorMessage}`, { error });
+                    // Report failure if API available
+                    try {
+                        if (this.apiService && typeof this.apiService.reportCommandResult === 'function') {
+                            await this.apiService.reportCommandResult(transformedCommand.id, 'failed', {
+                                success: false,
+                                error: error instanceof Error ? error.message : 'Unknown error',
+                                timestamp: new Date().toISOString()
+                            });
+                        }
+                    }
+                    catch (apiError) {
+                        // Non-critical error, just log it
+                        this.addLog('warn', 'COMMAND', `Failed to report command failure: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
+                    }
                 }
             }
             else {
@@ -365,11 +440,28 @@ class MainController extends events_1.EventEmitter {
     setupErrorHandling() {
         // Catch unhandled promise rejections
         process.on('unhandledRejection', (reason, promise) => {
+            // Log to file
+            logger_1.logger.error(`[MainController] UNHANDLED REJECTION: ${reason}`, {
+                category: 'CRITICAL',
+                metadata: {
+                    reason: String(reason),
+                    timestamp: new Date().toISOString()
+                }
+            });
             this.addLog('error', 'MAIN', 'Unhandled Promise Rejection', { reason, promise });
             this.emit('error', { type: 'unhandledRejection', reason, promise });
         });
         // Catch uncaught exceptions
         process.on('uncaughtException', (error) => {
+            // Log to file FIRST before any other operations
+            logger_1.logger.error(`[MainController] UNCAUGHT EXCEPTION: ${error.message}`, {
+                category: 'CRITICAL',
+                metadata: {
+                    error: error.message,
+                    stack: error.stack,
+                    timestamp: new Date().toISOString()
+                }
+            });
             this.addLog('error', 'MAIN', 'Uncaught Exception', { error: error.message, stack: error.stack });
             this.emit('error', { type: 'uncaughtException', error });
             // Graceful shutdown
@@ -546,7 +638,18 @@ class MainController extends events_1.EventEmitter {
             return true;
         }
         catch (error) {
-            this.addLog('error', 'MAIN', `Initialization failed: ${error.message}`, { error });
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            // Log to file via Winston
+            logger_1.logger.error(`[MainController] Initialization failed: ${errorMessage}`, {
+                category: 'MAIN',
+                metadata: {
+                    config: this.config ? { executorId: this.config.executorId, platformUrl: this.config.platformUrl } : null,
+                    error: errorMessage,
+                    stack: errorStack
+                }
+            });
+            this.addLog('error', 'MAIN', `Initialization failed: ${errorMessage}`, { error });
             this.emit('initialization-failed', error);
             return false;
         }
@@ -572,7 +675,14 @@ class MainController extends events_1.EventEmitter {
             return true;
         }
         catch (error) {
-            this.addLog('error', 'MAIN', `Failed to start: ${error.message}`, { error });
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            const errorStack = error instanceof Error ? error.stack : undefined;
+            // Log to file via Winston
+            logger_1.logger.error(`[MainController] Failed to start: ${errorMessage}`, {
+                category: 'MAIN',
+                metadata: { error: errorMessage, stack: errorStack }
+            });
+            this.addLog('error', 'MAIN', `Failed to start: ${errorMessage}`, { error });
             this.emit('start-failed', error);
             return false;
         }

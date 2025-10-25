@@ -119,10 +119,23 @@ class PusherService {
      */
     async handleCommand(data) {
         try {
-            this.log('info', 'Command received', { commandId: data.id, command: data.command });
+            this.log('info', 'Raw command received', {
+                commandId: data.id,
+                command: data.command,
+                type: data.type,
+                hasCommand: !!data.command,
+                hasId: !!data.id,
+                dataKeys: Object.keys(data)
+            });
             // Validate command structure
             if (!this.validateCommand(data)) {
-                this.log('error', 'Invalid command structure', { commandId: data.id });
+                this.log('error', 'Invalid command structure', {
+                    commandId: data.id,
+                    commandField: data.command,
+                    typeField: data.type,
+                    idField: data.id,
+                    fullData: JSON.stringify(data)
+                });
                 this.emitEvent('command-error', {
                     commandId: data.id,
                     error: 'Invalid command structure',
@@ -209,8 +222,56 @@ class PusherService {
      */
     validateCommand(command) {
         // Basic validation - only require essential fields
-        if (!command || typeof command.id !== 'string' || typeof command.command !== 'string') {
+        if (!command || typeof command.id !== 'string') {
+            this.log('debug', 'Validation failed: missing or invalid id', {
+                hasCommand: !!command,
+                idType: typeof command?.id,
+                fullCommand: command
+            });
             return false;
+        }
+        // TEMPORARY FIX: Accept command even without command/type field
+        // Will be set from metadata or default value
+        const hasCommandField = typeof command.command === 'string';
+        const hasTypeField = typeof command.type === 'string';
+        if (!hasCommandField && !hasTypeField) {
+            this.log('warn', 'Command missing both command and type fields, will try to infer', {
+                commandField: command.command,
+                typeField: command.type,
+                hasPayload: !!command.payload,
+                hasParameters: !!command.parameters,
+                allKeys: Object.keys(command)
+            });
+            // Try to infer command type from payload or parameters
+            const hasStrategyId = command.payload?.strategyId || command.parameters?.strategyId;
+            const hasClosePositions = 'closePositions' in (command.payload || {}) || 'closePositions' in (command.parameters || {});
+            if (hasStrategyId) {
+                if (hasClosePositions) {
+                    // Has closePositions field = STOP command
+                    command.command = 'STOP_STRATEGY';
+                    command.type = 'STOP_STRATEGY';
+                    this.log('info', 'Inferred command type as STOP_STRATEGY from closePositions field');
+                }
+                else {
+                    // Has strategyId but no closePositions = START command
+                    command.command = 'START_STRATEGY';
+                    command.type = 'START_STRATEGY';
+                    this.log('info', 'Inferred command type as START_STRATEGY from payload');
+                }
+            }
+            else {
+                // Default fallback
+                command.command = 'UNKNOWN';
+                command.type = 'UNKNOWN';
+                this.log('warn', 'Could not infer command type, using UNKNOWN');
+            }
+        }
+        // Normalize: ensure both command and type exist
+        if (!command.command && command.type) {
+            command.command = command.type;
+        }
+        else if (command.command && !command.type) {
+            command.type = command.command;
         }
         // Priority and createdAt are optional - will be added if missing
         return true;

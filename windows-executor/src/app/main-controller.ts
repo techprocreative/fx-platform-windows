@@ -23,6 +23,7 @@ import { LLMService } from '../services/llm.service';
 import { MT5AccountService } from '../services/mt5-account.service';
 import { PerformanceMonitorService } from '../services/performance-monitor.service';
 import { AlertService } from '../services/alert.service';
+import { logger, createLogger } from '../utils/logger';
 
 // New services for live trading readiness
 import { StrategyMonitor } from '../services/strategy-monitor.service';
@@ -442,33 +443,42 @@ export class MainController extends EventEmitter {
             
           } else if (transformedCommand.command === 'STOP_STRATEGY') {
             // Handle STOP_STRATEGY
-            await this.commandProcessor.handleStrategyCommand({
-              type: 'STOP_STRATEGY' as any,
-              strategyId: transformedCommand.parameters.strategyId,
-              options: {
-                closePositions: transformedCommand.parameters.closePositions !== false, // Default true
-              },
-            } as any);
+            const strategyId = transformedCommand.parameters?.strategyId;
+            
+            if (!strategyId) {
+              throw new Error('Missing strategyId in STOP_STRATEGY command');
+            }
+            
+            // Call command processor to handle the strategy command
+            if (this.commandProcessor) {
+              await this.commandProcessor.handleStrategyCommand({
+                type: 'STOP_STRATEGY' as any,
+                strategyId: strategyId,
+                options: {
+                  closePositions: transformedCommand.parameters.closePositions !== false, // Default true
+                },
+              } as any);
+            }
             
             // Remove from active strategies
-            const index = this.activeStrategies.findIndex(s => s.id === transformedCommand.parameters.strategyId);
+            const index = this.activeStrategies.findIndex(s => s.id === strategyId);
             if (index > -1) {
               const removedStrategy = this.activeStrategies.splice(index, 1)[0];
               
               this.emit('strategy-deactivated', {
-                strategyId: transformedCommand.parameters.strategyId,
+                strategyId: strategyId,
                 strategyName: removedStrategy.name,
               });
               
               this.addLog('info', 'COMMAND', `Strategy ${removedStrategy.name} deactivated`);
             } else {
-              this.addLog('warn', 'COMMAND', `Strategy ${transformedCommand.parameters.strategyId} not found in active strategies`);
+              this.addLog('warn', 'COMMAND', `Strategy ${strategyId} not found in active strategies`);
             }
           }
           
           // Update command status via API if available
-          if (this.apiService) {
-            try {
+          try {
+            if (this.apiService && typeof this.apiService.reportCommandResult === 'function') {
               await this.apiService.reportCommandResult(
                 transformedCommand.id,
                 'executed',
@@ -478,17 +488,33 @@ export class MainController extends EventEmitter {
                   command: transformedCommand.command
                 }
               );
-            } catch (apiError) {
-              this.addLog('warn', 'COMMAND', `Failed to report command result: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
             }
+          } catch (apiError) {
+            // Non-critical error, just log it
+            this.addLog('warn', 'COMMAND', `Failed to report command result: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
           }
           
         } catch (error) {
-          this.addLog('error', 'COMMAND', `Failed to execute strategy command: ${error instanceof Error ? error.message : 'Unknown error'}`, { error });
+          const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+          const errorStack = error instanceof Error ? error.stack : undefined;
+          
+          // Log to file via Winston
+          logger.error(`[MainController] Failed to execute strategy command: ${errorMessage}`, {
+            category: 'COMMAND',
+            metadata: {
+              command: transformedCommand.command,
+              commandId: transformedCommand.id,
+              strategyId: transformedCommand.parameters?.strategyId,
+              error: errorMessage,
+              stack: errorStack
+            }
+          });
+          
+          this.addLog('error', 'COMMAND', `Failed to execute strategy command: ${errorMessage}`, { error });
           
           // Report failure if API available
-          if (this.apiService) {
-            try {
+          try {
+            if (this.apiService && typeof this.apiService.reportCommandResult === 'function') {
               await this.apiService.reportCommandResult(
                 transformedCommand.id,
                 'failed',
@@ -498,9 +524,10 @@ export class MainController extends EventEmitter {
                   timestamp: new Date().toISOString()
                 }
               );
-            } catch (apiError) {
-              this.addLog('warn', 'COMMAND', `Failed to report command failure: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
             }
+          } catch (apiError) {
+            // Non-critical error, just log it
+            this.addLog('warn', 'COMMAND', `Failed to report command failure: ${apiError instanceof Error ? apiError.message : 'Unknown error'}`);
           }
         }
       } else {
@@ -549,12 +576,31 @@ export class MainController extends EventEmitter {
   private setupErrorHandling(): void {
     // Catch unhandled promise rejections
     process.on('unhandledRejection', (reason, promise) => {
+      // Log to file
+      logger.error(`[MainController] UNHANDLED REJECTION: ${reason}`, {
+        category: 'CRITICAL',
+        metadata: {
+          reason: String(reason),
+          timestamp: new Date().toISOString()
+        }
+      });
+      
       this.addLog('error', 'MAIN', 'Unhandled Promise Rejection', { reason, promise });
       this.emit('error', { type: 'unhandledRejection', reason, promise });
     });
 
     // Catch uncaught exceptions
     process.on('uncaughtException', (error) => {
+      // Log to file FIRST before any other operations
+      logger.error(`[MainController] UNCAUGHT EXCEPTION: ${error.message}`, {
+        category: 'CRITICAL',
+        metadata: {
+          error: error.message,
+          stack: error.stack,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
       this.addLog('error', 'MAIN', 'Uncaught Exception', { error: error.message, stack: error.stack });
       this.emit('error', { type: 'uncaughtException', error });
       
@@ -760,7 +806,20 @@ export class MainController extends EventEmitter {
       return true;
       
     } catch (error) {
-      this.addLog('error', 'MAIN', `Initialization failed: ${(error as Error).message}`, { error });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      // Log to file via Winston
+      logger.error(`[MainController] Initialization failed: ${errorMessage}`, {
+        category: 'MAIN',
+        metadata: {
+          config: this.config ? { executorId: this.config.executorId, platformUrl: this.config.platformUrl } : null,
+          error: errorMessage,
+          stack: errorStack
+        }
+      });
+      
+      this.addLog('error', 'MAIN', `Initialization failed: ${errorMessage}`, { error });
       this.emit('initialization-failed', error);
       return false;
     }
@@ -792,7 +851,16 @@ export class MainController extends EventEmitter {
       return true;
       
     } catch (error) {
-      this.addLog('error', 'MAIN', `Failed to start: ${(error as Error).message}`, { error });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorStack = error instanceof Error ? error.stack : undefined;
+      
+      // Log to file via Winston
+      logger.error(`[MainController] Failed to start: ${errorMessage}`, {
+        category: 'MAIN',
+        metadata: { error: errorMessage, stack: errorStack }
+      });
+      
+      this.addLog('error', 'MAIN', `Failed to start: ${errorMessage}`, { error });
       this.emit('start-failed', error);
       return false;
     }
