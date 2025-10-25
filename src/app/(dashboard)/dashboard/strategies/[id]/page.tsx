@@ -750,82 +750,249 @@ export default function StrategyDetailPage({
                 </div>
               </div>
 
-              {/* Advanced Features */}
+              {/* Advanced Features - Detailed Display */}
               {(strategy.rules?.smartExit ||
                 strategy.rules?.dynamicRisk ||
                 strategy.rules?.sessionFilter ||
                 strategy.rules?.correlationFilter ||
                 strategy.rules?.regimeDetection) && (
-                <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
-                  <div className="flex items-center gap-2 mb-3">
+                <div className="rounded-lg border border-purple-200 bg-white p-4">
+                  <div className="flex items-center gap-2 mb-3 pb-3 border-b border-purple-200">
                     <Sparkles className="h-5 w-5 text-purple-600" />
                     <h4 className="text-base font-bold text-purple-900">
-                      Advanced Features
+                      Advanced Features Configuration
                     </h4>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  
+                  {/* Summary indicators */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-2 mb-4 pb-4 border-b border-purple-100">
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2 w-2 rounded-full ${strategy.rules?.smartExit ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className={`text-xs font-semibold ${strategy.rules?.smartExit ? 'text-green-700' : 'text-gray-500'}`}>
+                        Smart Exit
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2 w-2 rounded-full ${strategy.rules?.dynamicRisk ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className={`text-xs font-semibold ${strategy.rules?.dynamicRisk ? 'text-green-700' : 'text-gray-500'}`}>
+                        Dynamic Risk
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2 w-2 rounded-full ${strategy.rules?.sessionFilter ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className={`text-xs font-semibold ${strategy.rules?.sessionFilter ? 'text-green-700' : 'text-gray-500'}`}>
+                        Session Filter
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2 w-2 rounded-full ${strategy.rules?.correlationFilter ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className={`text-xs font-semibold ${strategy.rules?.correlationFilter ? 'text-green-700' : 'text-gray-500'}`}>
+                        Correlation
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className={`h-2 w-2 rounded-full ${strategy.rules?.regimeDetection ? 'bg-green-500' : 'bg-gray-300'}`} />
+                      <span className={`text-xs font-semibold ${strategy.rules?.regimeDetection ? 'text-green-700' : 'text-gray-500'}`}>
+                        Regime Detection
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Detailed feature cards */}
+                  <div className="space-y-3">
+                    {/* Smart Exit Details */}
                     {strategy.rules?.smartExit && (
-                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
-                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                        <div>
-                          <p className="text-sm font-semibold text-purple-900">
-                            Smart Exit Rules
-                          </p>
-                          <p className="text-xs text-purple-700">
-                            ATR-based trailing stop & partial exits
-                          </p>
+                      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-lg p-3 border border-green-300">
+                        <div className="text-xs font-bold text-green-700 mb-2">🎯 Smart Exit Configuration</div>
+                        <div className="space-y-1.5 text-xs">
+                          {strategy.rules.smartExit.stopLoss && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Stop Loss Type:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.smartExit.stopLoss.type?.toUpperCase()}</span>
+                            </div>
+                          )}
+                          {strategy.rules.smartExit.stopLoss?.atrMultiplier && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">ATR Multiplier (SL):</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.smartExit.stopLoss.atrMultiplier}x</span>
+                            </div>
+                          )}
+                          {strategy.rules.smartExit.takeProfit && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Take Profit Type:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.smartExit.takeProfit.type?.toUpperCase()}</span>
+                            </div>
+                          )}
+                          {strategy.rules.smartExit.takeProfit?.partialExits && (
+                            <div className="mt-2 pt-2 border-t border-green-200">
+                              <div className="text-neutral-600 mb-1">Partial Exits:</div>
+                              {strategy.rules.smartExit.takeProfit.partialExits.map((exit: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-xs pl-2">
+                                  <span className="text-neutral-600">Level {idx + 1}:</span>
+                                  <span className="font-semibold text-green-700">{exit.percentage}% @ {exit.atRR}:1 RR</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
+
+                    {/* Dynamic Risk Details */}
                     {strategy.rules?.dynamicRisk && (
-                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
-                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                        <div>
-                          <p className="text-sm font-semibold text-purple-900">
-                            Dynamic Risk
-                          </p>
-                          <p className="text-xs text-purple-700">
-                            Volatility-adjusted position sizing
-                          </p>
+                      <div className="bg-gradient-to-r from-amber-50 to-yellow-50 rounded-lg p-3 border border-amber-300">
+                        <div className="text-xs font-bold text-amber-700 mb-2">⚡ Dynamic Risk Configuration</div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">ATR Sizing:</span>
+                            <span className="font-semibold text-neutral-900">{strategy.rules.dynamicRisk.useATRSizing ? 'Enabled ✅' : 'Disabled'}</span>
+                          </div>
+                          {strategy.rules.dynamicRisk.atrMultiplier && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">ATR Multiplier:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.dynamicRisk.atrMultiplier}x</span>
+                            </div>
+                          )}
+                          {strategy.rules.dynamicRisk.riskPercentage && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Risk Per Trade:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.dynamicRisk.riskPercentage}%</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">Auto Adjust Lot:</span>
+                            <span className="font-semibold text-neutral-900">{strategy.rules.dynamicRisk.autoAdjustLotSize ? 'Yes ✅' : 'No'}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">Reduce in High Vol:</span>
+                            <span className="font-semibold text-neutral-900">{strategy.rules.dynamicRisk.reduceInHighVolatility ? 'Yes ✅' : 'No'}</span>
+                          </div>
+                          {strategy.rules.dynamicRisk.volatilityThreshold && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Volatility Threshold:</span>
+                              <span className="font-semibold text-neutral-900">{(strategy.rules.dynamicRisk.volatilityThreshold * 100).toFixed(2)}%</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
+
+                    {/* Session Filter Details */}
                     {strategy.rules?.sessionFilter && (
-                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
-                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                        <div>
-                          <p className="text-sm font-semibold text-purple-900">
-                            Session Filter
-                          </p>
-                          <p className="text-xs text-purple-700">
-                            Trade only during optimal sessions
-                          </p>
+                      <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-3 border border-blue-300">
+                        <div className="text-xs font-bold text-blue-700 mb-2">🌍 Session Filter Configuration</div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">Status:</span>
+                            <span className="font-semibold text-neutral-900">{strategy.rules.sessionFilter.enabled ? 'Enabled ✅' : 'Disabled'}</span>
+                          </div>
+                          {strategy.rules.sessionFilter.allowedSessions && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Allowed Sessions:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.sessionFilter.allowedSessions.join(', ')}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">Use Optimal Pairs:</span>
+                            <span className="font-semibold text-neutral-900">{strategy.rules.sessionFilter.useOptimalPairs ? 'Yes ✅' : 'No'}</span>
+                          </div>
+                          {strategy.rules.sessionFilter.aggressivenessMultiplier && (
+                            <div className="mt-2 pt-2 border-t border-blue-200">
+                              <div className="flex justify-between">
+                                <span className="text-neutral-600">Optimal Session:</span>
+                                <span className="font-semibold text-green-700">{strategy.rules.sessionFilter.aggressivenessMultiplier.optimal}x</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-neutral-600">Suboptimal Session:</span>
+                                <span className="font-semibold text-amber-700">{strategy.rules.sessionFilter.aggressivenessMultiplier.suboptimal}x</span>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
+
+                    {/* Correlation Filter Details */}
                     {strategy.rules?.correlationFilter && (
-                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
-                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                        <div>
-                          <p className="text-sm font-semibold text-purple-900">
-                            Correlation Filter
-                          </p>
-                          <p className="text-xs text-purple-700">
-                            Avoid correlated pair exposure
-                          </p>
+                      <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg p-3 border border-purple-300">
+                        <div className="text-xs font-bold text-purple-700 mb-2">🔗 Correlation Filter Configuration</div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">Status:</span>
+                            <span className="font-semibold text-neutral-900">{strategy.rules.correlationFilter.enabled ? 'Enabled ✅' : 'Disabled'}</span>
+                          </div>
+                          {strategy.rules.correlationFilter.maxCorrelation && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Max Correlation:</span>
+                              <span className="font-semibold text-neutral-900">{(strategy.rules.correlationFilter.maxCorrelation * 100).toFixed(0)}%</span>
+                            </div>
+                          )}
+                          {strategy.rules.correlationFilter.lookbackPeriod && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Lookback Period:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.correlationFilter.lookbackPeriod} days</span>
+                            </div>
+                          )}
+                          {strategy.rules.correlationFilter.timeframes && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Timeframes:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.correlationFilter.timeframes.join(', ')}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
+
+                    {/* Regime Detection Details */}
                     {strategy.rules?.regimeDetection && (
-                      <div className="flex items-center gap-2 rounded-lg bg-white border border-purple-200 p-3">
-                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                        <div>
-                          <p className="text-sm font-semibold text-purple-900">
-                            Regime Detection
-                          </p>
-                          <p className="text-xs text-purple-700">
-                            Adapt to market conditions
-                          </p>
+                      <div className="bg-gradient-to-r from-indigo-50 to-violet-50 rounded-lg p-3 border border-indigo-300">
+                        <div className="text-xs font-bold text-indigo-700 mb-2">📈 Regime Detection Configuration</div>
+                        <div className="space-y-1.5 text-xs">
+                          <div className="flex justify-between">
+                            <span className="text-neutral-600">MTF Analysis:</span>
+                            <span className="font-semibold text-neutral-900">{strategy.rules.regimeDetection.enableMTFAnalysis ? 'Enabled ✅' : 'Disabled'}</span>
+                          </div>
+                          {strategy.rules.regimeDetection.primaryTimeframe && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Primary Timeframe:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.regimeDetection.primaryTimeframe}</span>
+                            </div>
+                          )}
+                          {strategy.rules.regimeDetection.confirmationTimeframes && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Confirmation TFs:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.regimeDetection.confirmationTimeframes.join(', ')}</span>
+                            </div>
+                          )}
+                          {(strategy.rules.regimeDetection.weightTrend || strategy.rules.regimeDetection.weightVolatility || strategy.rules.regimeDetection.weightRange) && (
+                            <div className="mt-2 pt-2 border-t border-indigo-200">
+                              <div className="text-neutral-600 mb-1">Weights:</div>
+                              {strategy.rules.regimeDetection.weightTrend && (
+                                <div className="flex justify-between pl-2">
+                                  <span className="text-neutral-600">Trend:</span>
+                                  <span className="font-semibold text-neutral-900">{(strategy.rules.regimeDetection.weightTrend * 100).toFixed(0)}%</span>
+                                </div>
+                              )}
+                              {strategy.rules.regimeDetection.weightVolatility && (
+                                <div className="flex justify-between pl-2">
+                                  <span className="text-neutral-600">Volatility:</span>
+                                  <span className="font-semibold text-neutral-900">{(strategy.rules.regimeDetection.weightVolatility * 100).toFixed(0)}%</span>
+                                </div>
+                              )}
+                              {strategy.rules.regimeDetection.weightRange && (
+                                <div className="flex justify-between pl-2">
+                                  <span className="text-neutral-600">Range:</span>
+                                  <span className="font-semibold text-neutral-900">{(strategy.rules.regimeDetection.weightRange * 100).toFixed(0)}%</span>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {strategy.rules.regimeDetection.minConfidence && (
+                            <div className="flex justify-between">
+                              <span className="text-neutral-600">Min Confidence:</span>
+                              <span className="font-semibold text-neutral-900">{strategy.rules.regimeDetection.minConfidence}%</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
