@@ -69,6 +69,108 @@ export class OpenRouterAI {
     }
   }
 
+  /**
+   * Validate strategy conditions to reject invalid/meaningless rules
+   */
+  private validateStrategyConditions(strategyData: any): void {
+    if (!strategyData.rules || !Array.isArray(strategyData.rules)) {
+      return; // No rules to validate
+    }
+
+    const errors: string[] = [];
+
+    strategyData.rules.forEach((rule: any, ruleIndex: number) => {
+      if (!rule.conditions || !Array.isArray(rule.conditions)) {
+        return;
+      }
+
+      rule.conditions.forEach((condition: any, condIndex: number) => {
+        const { indicator, operator, value } = condition;
+
+        // Validate moving averages (EMA, SMA) not compared to small numbers
+        if (indicator && (indicator.includes('ema') || indicator.includes('sma'))) {
+          if (typeof value === 'number') {
+            // Check if value is too small (likely invalid)
+            if (value >= 0 && value < 100) {
+              errors.push(
+                `Rule ${ruleIndex + 1}, Condition ${condIndex + 1}: ` +
+                `Invalid condition "${indicator} ${operator} ${value}". ` +
+                `Moving averages should be compared to other indicators (e.g., "ema_21") ` +
+                `or price, not small numbers. For crypto/forex, prices are typically > 1000.`
+              );
+            }
+          }
+        }
+
+        // Validate price not compared to 0 or very small numbers
+        if (indicator === 'price' && typeof value === 'number') {
+          if (value >= 0 && value < 100) {
+            errors.push(
+              `Rule ${ruleIndex + 1}, Condition ${condIndex + 1}: ` +
+              `Invalid condition "price ${operator} ${value}". ` +
+              `Price comparisons to near-zero values are meaningless. ` +
+              `Use price vs moving average comparisons instead (e.g., "price > ema_50").`
+            );
+          }
+        }
+
+        // Validate RSI range (should be 0-100)
+        if (indicator === 'rsi' && typeof value === 'number') {
+          if (value < 0 || value > 100) {
+            errors.push(
+              `Rule ${ruleIndex + 1}, Condition ${condIndex + 1}: ` +
+              `Invalid RSI value "${value}". RSI must be between 0-100. ` +
+              `Use 30 for oversold, 70 for overbought.`
+            );
+          }
+        }
+
+        // Validate CCI range (typically -200 to +200)
+        if (indicator === 'cci' && typeof value === 'number') {
+          if (value < -300 || value > 300) {
+            errors.push(
+              `Rule ${ruleIndex + 1}, Condition ${condIndex + 1}: ` +
+              `Invalid CCI value "${value}". CCI typically ranges from -200 to +200. ` +
+              `Use -100 for oversold, +100 for overbought.`
+            );
+          }
+        }
+
+        // Validate Stochastic range (should be 0-100)
+        if ((indicator === 'stochastic' || indicator === 'stochastic_k' || indicator === 'stochastic_d') && 
+            typeof value === 'number') {
+          if (value < 0 || value > 100) {
+            errors.push(
+              `Rule ${ruleIndex + 1}, Condition ${condIndex + 1}: ` +
+              `Invalid Stochastic value "${value}". Stochastic must be between 0-100. ` +
+              `Use 20 for oversold, 80 for overbought.`
+            );
+          }
+        }
+
+        // Warn about always-true conditions
+        if (indicator && indicator.includes('ema') && value === 0 && operator === 'gt') {
+          errors.push(
+            `Rule ${ruleIndex + 1}, Condition ${condIndex + 1}: ` +
+            `Condition "${indicator} > 0" is ALWAYS TRUE for positive prices! ` +
+            `This is NOT a valid trading signal. ` +
+            `Use crossover conditions like "ema_9 > ema_21" instead.`
+          );
+        }
+      });
+    });
+
+    if (errors.length > 0) {
+      console.error('❌ Strategy Validation Errors:', errors);
+      throw new Error(
+        `AI generated invalid strategy conditions:\n\n${errors.join('\n\n')}\n\n` +
+        `Please regenerate the strategy with valid conditions.`
+      );
+    }
+
+    console.log('✅ Strategy conditions validated successfully');
+  }
+
   async generateStrategy(prompt: string): Promise<Partial<Strategy>> {
     const systemPrompt = `You are an expert forex trading strategy generator. Generate realistic trading strategies in JSON format only.
 
@@ -90,10 +192,10 @@ Your response must be a valid JSON object with the following structure:
       "name": "Rule name",
       "conditions": [
         {
-          "indicator": "price|sma_20|sma_50|ema_12|ema_26|rsi",
-          "operator": "gt|lt|eq|gte|lte",
-          "value": number,
-          "timeframes": ["1h", "4h", "1d"]
+          "indicator": "price|sma_20|sma_50|ema_9|ema_12|ema_21|ema_26|ema_50|rsi|macd|cci|atr|stochastic",
+          "operator": "gt|lt|eq|gte|lte|crosses_above|crosses_below",
+          "value": "number OR another_indicator",
+          "timeframes": ["M15", "H1", "H4", "D1"]
         }
       ],
       "action": {
@@ -104,6 +206,149 @@ Your response must be a valid JSON object with the following structure:
       }
     }
   ],
+
+CRITICAL - VALID CONDITION EXAMPLES:
+
+✅ CORRECT CROSSOVER CONDITIONS (Most Common):
+{
+  "indicator": "ema_9",
+  "operator": "gt",
+  "value": "ema_21",  // Fast EMA crosses above Slow EMA
+  "description": "Fast EMA crosses above Slow EMA - Bullish signal"
+}
+
+{
+  "indicator": "price",
+  "operator": "gt", 
+  "value": "ema_50",  // Price breaks above EMA
+  "description": "Price crosses above EMA 50 - Trend continuation"
+}
+
+✅ CORRECT RSI CONDITIONS:
+{
+  "indicator": "rsi",
+  "operator": "lt",
+  "value": 30,  // RSI oversold (use values 0-100)
+  "description": "RSI below 30 - Oversold condition"
+}
+
+{
+  "indicator": "rsi",
+  "operator": "gt",
+  "value": 70,  // RSI overbought
+  "description": "RSI above 70 - Overbought condition"
+}
+
+✅ CORRECT CCI CONDITIONS:
+{
+  "indicator": "cci",
+  "operator": "lt",
+  "value": -100,  // CCI oversold (use values -200 to +200)
+  "description": "CCI below -100 - Oversold"
+}
+
+✅ CORRECT MACD CONDITIONS:
+{
+  "indicator": "macd",
+  "operator": "gt",
+  "value": "macd_signal",  // MACD crosses above signal line
+  "description": "MACD crosses above signal - Bullish"
+}
+
+✅ CORRECT STOCHASTIC CONDITIONS:
+{
+  "indicator": "stochastic_k",
+  "operator": "lt",
+  "value": 20,  // Stochastic oversold (use values 0-100)
+  "description": "Stochastic below 20 - Oversold"
+}
+
+✅ CORRECT PRICE vs MOVING AVERAGE:
+{
+  "indicator": "price",
+  "operator": "gt",
+  "value": "sma_20",  // Price above SMA
+  "description": "Price above 20-period SMA - Uptrend"
+}
+
+❌ INVALID CONDITIONS - NEVER USE THESE:
+
+❌ {
+  "indicator": "ema_9",
+  "operator": "gt",
+  "value": 0  // ❌ WRONG! EMA is always > 0 for positive prices!
+}
+
+❌ {
+  "indicator": "sma_20",
+  "operator": "gt", 
+  "value": 1  // ❌ WRONG! SMA for BTCUSD is ~$67000, not near 0!
+}
+
+❌ {
+  "indicator": "price",
+  "operator": "gt",
+  "value": 0  // ❌ WRONG! Price is always > 0!
+}
+
+❌ {
+  "indicator": "ema_21",
+  "operator": "lt",
+  "value": 100  // ❌ WRONG! For BTCUSD, EMA ~$67000, not < 100!
+}
+
+VALIDATION RULES - MUST FOLLOW:
+
+1. For CROSSOVER strategies: Use indicator vs indicator (e.g., "ema_9" vs "ema_21")
+2. For OSCILLATORS (RSI, CCI, Stochastic): Use numeric values in valid ranges:
+   - RSI: 0-100 (oversold < 30, overbought > 70)
+   - CCI: -200 to +200 (oversold < -100, overbought > +100)
+   - Stochastic: 0-100 (oversold < 20, overbought > 80)
+3. For PRICE vs MA: Compare "price" to "sma_X" or "ema_X"
+4. NEVER compare moving averages or price to small numbers like 0, 1, 10
+5. NEVER use absolute price values unless symbol-specific (e.g., BTCUSD ~67000)
+
+INDICATOR VALUE FORMATS:
+
+When value is ANOTHER INDICATOR (crossover):
+- Use string: "ema_21", "sma_50", "macd_signal", "price"
+
+When value is NUMERIC (oscillator threshold):
+- Use number: 30, 70, -100, +100, 20, 80
+
+TRIPLE MOVING AVERAGE STRATEGY EXAMPLE:
+
+For "Triple EMA" or "Triple MA" strategies, use THIS format:
+{
+  "name": "Triple EMA Strategy",
+  "rules": [
+    {
+      "name": "Bullish Alignment Entry",
+      "conditions": [
+        {
+          "indicator": "ema_9",
+          "operator": "gt",
+          "value": "ema_21",
+          "description": "Fast EMA above Medium EMA"
+        },
+        {
+          "indicator": "ema_21", 
+          "operator": "gt",
+          "value": "ema_50",
+          "description": "Medium EMA above Slow EMA"
+        },
+        {
+          "indicator": "price",
+          "operator": "gt", 
+          "value": "ema_9",
+          "description": "Price above Fast EMA"
+        }
+      ],
+      "logic": "AND",
+      "action": { "type": "buy" }
+    }
+  ]
+}
   "parameters": {
     "riskPerTrade": 0.01,
     "maxPositions": 1,
@@ -305,6 +550,9 @@ CRITICAL REQUIREMENTS:
 
     try {
       const strategyData = JSON.parse(response);
+      
+      // Validate strategy conditions
+      this.validateStrategyConditions(strategyData);
 
       // Debug: Log raw AI response
       console.log('🤖 Raw AI Response (Full):', JSON.stringify(strategyData, null, 2));
