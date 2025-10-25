@@ -1,4 +1,5 @@
 
+import { useState } from 'react';
 import { useAppStore } from '../stores/app.store';
 import { StatusIndicator } from './StatusIndicator';
 
@@ -11,9 +12,26 @@ export function StatusBar({ connectionStatus: propConnectionStatus, onNavigate, 
     isEmergencyStopActive 
   } = useAppStore();
 
+  const [showTradingConfirm, setShowTradingConfirm] = useState(false);
+
   const handleEmergencyStop = () => {
     // This will be handled by the parent component
     window.dispatchEvent(new CustomEvent('emergency-stop-requested'));
+  };
+
+  const handleTradingToggle = () => {
+    // If turning OFF, show confirmation
+    if (isTradingEnabled) {
+      setShowTradingConfirm(true);
+    } else {
+      // Turning ON is safe, do it directly
+      setIsTradingEnabled(true);
+    }
+  };
+
+  const confirmTradingOff = () => {
+    setIsTradingEnabled(false);
+    setShowTradingConfirm(false);
   };
 
   return (
@@ -50,12 +68,13 @@ export function StatusBar({ connectionStatus: propConnectionStatus, onNavigate, 
       </div>
 
       <div className="flex items-center space-x-4">
-        {/* Trading Toggle */}
-        <div className="flex items-center space-x-2 electron-no-drag">
-          <label className="text-xs">Trading:</label>
+        {/* Trading Toggle with Tooltip */}
+        <div className="flex items-center space-x-2 electron-no-drag relative group">
+          <label className="text-xs">Auto Trading:</label>
           <button
-            onClick={() => setIsTradingEnabled(!isTradingEnabled)}
+            onClick={handleTradingToggle}
             disabled={isEmergencyStopActive}
+            title={isTradingEnabled ? "Click to DISABLE automatic trading" : "Click to ENABLE automatic trading"}
             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 focus:ring-offset-gray-900 ${
               isTradingEnabled ? 'bg-success-600' : 'bg-gray-600'
             } ${isEmergencyStopActive ? 'opacity-50 cursor-not-allowed' : ''}`}
@@ -66,6 +85,23 @@ export function StatusBar({ connectionStatus: propConnectionStatus, onNavigate, 
               }`}
             />
           </button>
+          <span className={`text-xs font-medium ${isTradingEnabled ? 'text-success-400' : 'text-gray-400'}`}>
+            {isTradingEnabled ? 'ON' : 'OFF'}
+          </span>
+          
+          {/* Tooltip */}
+          <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block z-50">
+            <div className="bg-gray-800 text-white text-xs rounded py-2 px-3 whitespace-nowrap shadow-lg border border-gray-700">
+              <div className="font-semibold mb-1">Master Trading Switch</div>
+              <div className="text-gray-300">
+                {isTradingEnabled ? (
+                  <>• ON: Executor accepts & executes signals</>
+                ) : (
+                  <>• OFF: All trading paused, no new orders</>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Emergency Stop Button */}
@@ -96,6 +132,49 @@ export function StatusBar({ connectionStatus: propConnectionStatus, onNavigate, 
           </button>
         </div>
       </div>
+
+      {/* Trading Disable Confirmation Dialog */}
+      {showTradingConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 electron-no-drag">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+            <div className="flex items-start mb-4">
+              <div className="flex-shrink-0">
+                <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div className="ml-3 flex-1">
+                <h3 className="text-lg font-medium text-gray-900">Disable Auto Trading?</h3>
+                <div className="mt-2 text-sm text-gray-500">
+                  <p className="mb-2">This will stop all automatic trading activities:</p>
+                  <ul className="list-disc ml-5 space-y-1">
+                    <li>No new signals will be processed</li>
+                    <li>No new orders will be opened</li>
+                    <li>Existing positions will remain open</li>
+                  </ul>
+                  <p className="mt-3 font-medium text-gray-700">
+                    Are you sure you want to disable trading?
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowTradingConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmTradingOff}
+                className="px-4 py-2 text-sm font-medium text-white bg-yellow-600 rounded-md hover:bg-yellow-700"
+              >
+                Yes, Disable Trading
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

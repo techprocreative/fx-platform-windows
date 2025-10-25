@@ -280,20 +280,10 @@ export class MT5AccountService {
     // Placeholder implementation
     // In production, this should send ZMQ request to MT5 Expert Advisor
     
-    // Simulate MT5 response
-    return {
-      balance: 10000,
-      equity: 10000,
-      margin: 0,
-      freeMargin: 10000,
-      marginLevel: 0,
-      profit: 0,
-      currency: 'USD',
-      leverage: 100,
-      accountNumber: '12345678',
-      server: 'MetaQuotes-Demo',
-      company: 'MetaQuotes Software Corp.'
-    };
+    // TODO: Get real data from MT5 via ZMQ
+    // Return null to avoid showing fake balance - user must connect to MT5 first
+    logger.debug('[MT5AccountService] getAccountInfo called - returning null (MT5 not connected)');
+    return null;
   }
 
   /**
