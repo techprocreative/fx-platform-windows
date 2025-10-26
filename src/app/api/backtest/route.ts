@@ -469,10 +469,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Add warning for periods over 60 days
-    if (daysDiff > 60) {
+    // Add warning for periods over 60 days ONLY for limited intervals (15min, 30min)
+    // 1h and 4h intervals support up to 365 days
+    const limitedIntervals = ["1min", "5min", "15min", "30min"];
+    if (daysDiff > 60 && limitedIntervals.includes(interval)) {
       console.warn(
-        `⚠️ WARNING: Long backtest period (${Math.round(daysDiff)} days) detected. Results may be less accurate due to API data limitations.`,
+        `⚠️ WARNING: Long backtest period (${Math.round(daysDiff)} days) detected for ${interval}. This interval is limited to 60 days by Yahoo Finance API.`,
       );
     }
 

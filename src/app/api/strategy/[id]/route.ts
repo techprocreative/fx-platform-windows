@@ -42,11 +42,16 @@ async function validateStrategyOwnership(
     throw new AppError(403, 'Email not verified', 'EMAIL_NOT_VERIFIED');
   }
 
-  // Simple ownership validation - no admin role in current schema
+  // Ownership validation - allow access to:
+  // 1. User's own strategies
+  // 2. System default strategies (read-only for non-owners)
   const strategy = await prisma.strategy.findFirst({
     where: {
       id: strategyId,
-      userId: userId,
+      OR: [
+        { userId: userId }, // User's own strategy
+        { isSystemDefault: true, isPublic: true }, // System default (readable by all)
+      ],
       deletedAt: null,
     },
     include: {
@@ -76,8 +81,17 @@ async function validateStrategyOwnership(
     throw new AppError(404, 'Strategy not found', 'STRATEGY_NOT_FOUND');
   }
 
-  // Additional security check: ensure user owns the strategy
-  if (strategy.userId !== userId) {
+  // Additional security check for write operations on system defaults
+  const isSystemDefault = strategy.isSystemDefault || false;
+  const isOwner = strategy.userId === userId;
+  
+  if (isSystemDefault && !isOwner && operation !== 'read') {
+    // Block edit/delete operations on system defaults by non-owners
+    throw new AppError(403, 'Cannot modify system default strategies', 'FORBIDDEN');
+  }
+
+  // Additional security check: ensure user owns the strategy (for non-system strategies)
+  if (!isSystemDefault && strategy.userId !== userId) {
     // Log potential security breach attempt
     await prisma.auditLog.create({
       data: {

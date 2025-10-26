@@ -224,7 +224,7 @@ export default function BacktestPage() {
     }
 
     // Yahoo Finance limitations - ONLY 15min and 30min have 60-day limit
-    // 1h interval works up to 365+ days (tested and verified)
+    // 1h and 4h intervals work up to 365+ days (tested and verified)
     const limitedIntradayIntervals = ["1min", "5min", "15min", "30min"];
     if (limitedIntradayIntervals.includes(interval)) {
       if (daysFromToday > 60) {
@@ -550,7 +550,7 @@ export default function BacktestPage() {
                     Backtests use Yahoo Finance API for market data.
                     <strong className="font-semibold"> Important:</strong> 15min
                     and 30min intervals are limited to the last{" "}
-                    <strong>60 days</strong>. 1h interval supports up to{" "}
+                    <strong>60 days</strong>. 1h and 4h intervals support up to{" "}
                     <strong>365 days</strong>. Daily interval supports
                     historical data beyond 365 days.
                   </p>

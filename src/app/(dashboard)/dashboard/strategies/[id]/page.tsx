@@ -40,6 +40,8 @@ interface Strategy {
   createdAt: string;
   backtestVerified?: boolean;
   backtestResults?: any;
+  isSystemDefault?: boolean;
+  userId: string;
   _count: {
     trades: number;
     backtests: number;
@@ -320,9 +322,16 @@ export default function StrategyDetailPage({
             <ChevronLeft className="h-6 w-6 text-neutral-600" />
           </Link>
           <div>
-            <h1 className="text-3xl font-bold text-neutral-900">
-              {strategy.name}
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold text-neutral-900">
+                {strategy.name}
+              </h1>
+              {strategy.isSystemDefault && (
+                <span className="px-3 py-1 text-xs font-semibold text-blue-700 bg-blue-100 border border-blue-200 rounded-full">
+                  System Default
+                </span>
+              )}
+            </div>
             <p className="text-neutral-600 mt-1">
               {strategy.symbol} • {strategy.timeframe}
             </p>
@@ -434,13 +443,16 @@ export default function StrategyDetailPage({
             <Server className="h-4 w-4" />
             View Executors
           </Link>
-          <Link
-            href={`/dashboard/strategies/${strategy.id}/edit`}
-            className="inline-flex items-center gap-2 px-4 py-2 text-neutral-700 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
-          >
-            <Edit2 className="h-4 w-4" />
-            Edit
-          </Link>
+          {/* Only show Edit button if user owns the strategy (not system default) */}
+          {!strategy.isSystemDefault && (
+            <Link
+              href={`/dashboard/strategies/${strategy.id}/edit`}
+              className="inline-flex items-center gap-2 px-4 py-2 text-neutral-700 border border-neutral-300 rounded-lg hover:bg-neutral-50 transition-colors"
+            >
+              <Edit2 className="h-4 w-4" />
+              Edit
+            </Link>
+          )}
           <Link
             href={`/dashboard/backtest?strategyId=${strategy.id}`}
             className="inline-flex items-center gap-2 px-4 py-2 text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
@@ -1027,13 +1039,16 @@ export default function StrategyDetailPage({
                   <BarChart3 className="h-5 w-5" />
                   Run Backtest
                 </Link>
-                <Link
-                  href={`/dashboard/strategies/${strategy.id}/edit`}
-                  className="inline-flex items-center gap-2 px-6 py-3 border-2 border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-semibold"
-                >
-                  <Edit2 className="h-5 w-5" />
-                  Edit Strategy
-                </Link>
+                {/* Only show Edit button if user owns the strategy */}
+                {!strategy.isSystemDefault && (
+                  <Link
+                    href={`/dashboard/strategies/${strategy.id}/edit`}
+                    className="inline-flex items-center gap-2 px-6 py-3 border-2 border-neutral-300 text-neutral-700 rounded-lg hover:bg-neutral-50 transition-colors font-semibold"
+                  >
+                    <Edit2 className="h-5 w-5" />
+                    Edit Strategy
+                  </Link>
+                )}
               </div>
             </div>
           )}

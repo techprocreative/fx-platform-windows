@@ -245,9 +245,20 @@ export class YahooFinanceProvider implements MarketDataProvider {
     limit: number = 500,
   ): Promise<HistoricalData> {
     try {
-      // Convert our timeframe to Yahoo Finance interval
-      const interval = this.convertTimeframe(timeframe);
-      const range = this.calculateRange(timeframe, limit);
+      // Special handling for 4h timeframe - Yahoo Finance doesn't support it
+      // We'll fetch 1h data and aggregate to 4h
+      let interval: string;
+      let range: string;
+      let actualLimit = limit;
+      
+      if (timeframe === "4h") {
+        interval = "1h";
+        actualLimit = limit * 4; // Need 4x more 1h candles to create 4h candles
+        range = this.calculateRange("1h", actualLimit);
+      } else {
+        interval = this.convertTimeframe(timeframe);
+        range = this.calculateRange(timeframe, limit);
+      }
 
       const response = await this.makeRequest<YahooFinanceChart>(
         "/market/v2/get-chart",
@@ -281,7 +292,7 @@ export class YahooFinanceProvider implements MarketDataProvider {
         );
       }
 
-      const data: OHLCV[] = result.timestamps.map((timestamp, index) => ({
+      let data: OHLCV[] = result.timestamps.map((timestamp, index) => ({
         timestamp: new Date(timestamp * 1000),
         open: quoteData.open[index] || 0,
         high: quoteData.high[index] || 0,
@@ -289,6 +300,11 @@ export class YahooFinanceProvider implements MarketDataProvider {
         close: quoteData.close[index] || 0,
         volume: quoteData.volume[index] || 0,
       }));
+
+      // Aggregate 1h data to 4h if needed
+      if (timeframe === "4h") {
+        data = this.aggregateTo4h(data);
+      }
 
       return {
         symbol,
@@ -420,13 +436,41 @@ export class YahooFinanceProvider implements MarketDataProvider {
       "15min": "15m",
       "30min": "30m",
       "1h": "1h",
-      "4h": "1d", // Yahoo Finance doesn't have 4h, fallback to daily
+      "4h": "1h", // Will be aggregated from 1h data
       "1day": "1d",
       "1week": "1wk",
       "1month": "1mo",
     };
 
     return timeframeMap[timeframe] || "1h";
+  }
+
+  private aggregateTo4h(hourlyData: OHLCV[]): OHLCV[] {
+    if (hourlyData.length === 0) return [];
+
+    const aggregated: OHLCV[] = [];
+    
+    // Group by 4-hour blocks
+    // Align to 00:00, 04:00, 08:00, 12:00, 16:00, 20:00 UTC
+    for (let i = 0; i < hourlyData.length; i += 4) {
+      const chunk = hourlyData.slice(i, i + 4);
+      
+      if (chunk.length === 0) continue;
+
+      // Aggregate OHLCV data
+      const aggregatedCandle: OHLCV = {
+        timestamp: chunk[0].timestamp, // Use first candle's timestamp
+        open: chunk[0].open,
+        high: Math.max(...chunk.map(c => c.high)),
+        low: Math.min(...chunk.map(c => c.low)),
+        close: chunk[chunk.length - 1].close,
+        volume: chunk.reduce((sum, c) => sum + c.volume, 0),
+      };
+
+      aggregated.push(aggregatedCandle);
+    }
+
+    return aggregated;
   }
 
   private calculateRange(timeframe: string, limit: number): string {
