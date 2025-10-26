@@ -56,13 +56,23 @@ export interface AuditLogEntry {
 
 export class AuditLogger {
   private static logDir = path.join(process.cwd(), 'logs', 'audit');
+  private static isFileLoggingAvailable = false;
   
   /**
    * Initialize audit logger (create log directory)
+   * Safe for serverless environments - fails gracefully
    */
   static initialize() {
-    if (!fs.existsSync(this.logDir)) {
-      fs.mkdirSync(this.logDir, { recursive: true });
+    try {
+      if (!fs.existsSync(this.logDir)) {
+        fs.mkdirSync(this.logDir, { recursive: true });
+      }
+      this.isFileLoggingAvailable = true;
+    } catch (error) {
+      // Failed to create directory (likely serverless environment)
+      // Disable file logging but continue with database logging
+      this.isFileLoggingAvailable = false;
+      console.warn('Audit file logging disabled (serverless environment detected)');
     }
   }
   
@@ -90,16 +100,24 @@ export class AuditLogger {
         console.error('Failed to save audit log to database:', err);
       });
       
-      // Also log to file for backup
-      const logLine = JSON.stringify({
-        timestamp: timestamp.toISOString(),
-        ...entry,
-      }) + '\n';
-      
-      const filename = `audit-${timestamp.toISOString().split('T')[0]}.log`;
-      const filepath = path.join(this.logDir, filename);
-      
-      fs.appendFileSync(filepath, logLine);
+      // Also log to file for backup (if available)
+      if (this.isFileLoggingAvailable) {
+        try {
+          const logLine = JSON.stringify({
+            timestamp: timestamp.toISOString(),
+            ...entry,
+          }) + '\n';
+          
+          const filename = `audit-${timestamp.toISOString().split('T')[0]}.log`;
+          const filepath = path.join(this.logDir, filename);
+          
+          fs.appendFileSync(filepath, logLine);
+        } catch (fileError) {
+          // File logging failed, disable it
+          this.isFileLoggingAvailable = false;
+          console.warn('File logging disabled due to error:', fileError);
+        }
+      }
       
       // Log critical events to console
       if (this.isCritical(entry.action)) {
