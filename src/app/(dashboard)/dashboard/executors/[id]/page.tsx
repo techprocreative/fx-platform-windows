@@ -22,6 +22,8 @@ import {
 
 import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { CardError } from "@/components/ui/ErrorMessage";
+import { PositionManagementPanel } from "@/components/positions/PositionManagementPanel";
+import Pusher from 'pusher-js';
 
 interface Executor {
   id: string;
@@ -80,6 +82,17 @@ export default function ExecutorDetailPage({
   const [error, setError] = useState<Error | null>(null);
   const [sendingCommand, setSendingCommand] = useState(false);
   const [selectedCommand, setSelectedCommand] = useState<string>("");
+  const [positions, setPositions] = useState<any[]>([]);
+  const [positionSummary, setPositionSummary] = useState<any>({
+    total: 0,
+    profitable: 0,
+    losing: 0,
+    totalProfit: 0,
+    totalVolume: 0,
+    byStrategy: [],
+    bySymbol: []
+  });
+  const [strategies, setStrategies] = useState<any[]>([]);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -96,6 +109,29 @@ export default function ExecutorDetailPage({
     // Return undefined for loading state
     return undefined;
   }, [status, router, params.id]);
+
+  // Pusher position updates  
+  useEffect(() => {
+    if (!executor || !process.env.NEXT_PUBLIC_PUSHER_KEY) return;
+
+    const pusher = new Pusher(process.env.NEXT_PUBLIC_PUSHER_KEY, {
+      cluster: process.env.NEXT_PUBLIC_PUSHER_CLUSTER || 'ap1',
+    });
+
+    const channel = pusher.subscribe('private-executor');
+
+    channel.bind('client-position-update', (data: any) => {
+      console.log('Position update received:', data);
+      if (data.positions) setPositions(data.positions);
+      if (data.summary) setPositionSummary(data.summary);
+    });
+
+    return () => {
+      channel.unbind('client-position-update');
+      pusher.unsubscribe('private-executor');
+      pusher.disconnect();
+    };
+  }, [executor]);
 
   const fetchExecutorDetails = async () => {
     try {
@@ -116,6 +152,13 @@ export default function ExecutorDetailPage({
       setExecutor(data.executor);
       setRecentTrades(data.recentTrades || []);
       setRecentCommands(data.recentCommands || []);
+      
+      // Fetch strategies for position management
+      const strategiesResponse = await fetch('/api/strategies');
+      if (strategiesResponse.ok) {
+        const strategiesData = await strategiesResponse.json();
+        setStrategies(strategiesData.strategies || []);
+      }
     } catch (error) {
       const err =
         error instanceof Error ? error : new Error("Failed to load executor");
@@ -123,6 +166,18 @@ export default function ExecutorDetailPage({
       toast.error(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStrategies = async () => {
+    try {
+      const response = await fetch('/api/strategies');
+      if (response.ok) {
+        const data = await response.json();
+        setStrategies(data.strategies || []);
+      }
+    } catch (error) {
+      console.error('Failed to fetch strategies:', error);
     }
   };
 
@@ -468,6 +523,19 @@ export default function ExecutorDetailPage({
           </div>
         )}
       </div>
+
+      {/* Position Management */}
+      {executor?.isConnected && (
+        <div className="mb-6">
+          <PositionManagementPanel
+            executorId={params.id}
+            positions={positions}
+            summary={positionSummary}
+            strategies={strategies}
+            onCommandSent={fetchExecutorDetails}
+          />
+        </div>
+      )}
 
       {/* Recent Trades */}
       <div className="rounded-lg border border-neutral-200 bg-white p-6">

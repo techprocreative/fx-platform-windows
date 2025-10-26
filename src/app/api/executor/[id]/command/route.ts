@@ -27,6 +27,10 @@ const commandSchema = z.object({
     'PAUSE_STRATEGY',     // NEW: Pause strategy execution
     'RESUME_STRATEGY',    // NEW: Resume strategy execution
     'UPDATE_STRATEGY',    // NEW: Update strategy rules
+    'CLOSE_PROFITABLE',   // NEW: Close all profitable positions
+    'CLOSE_LOSING',       // NEW: Close all losing positions
+    'CLOSE_BY_STRATEGY',  // NEW: Close positions by strategy
+    'CLOSE_BY_SYMBOL',    // NEW: Close positions by symbol
   ]),
   parameters: z.record(z.any()).optional(),
   priority: z.enum(['LOW', 'NORMAL', 'HIGH', 'URGENT']).default('NORMAL'),
