@@ -17,6 +17,9 @@ import {
   Send,
   Eye,
   AlertTriangle,
+  Download,
+  Package,
+  HardDrive,
 } from "lucide-react";
 
 import { LoadingState, TableLoadingState } from "@/components/ui/LoadingState";
@@ -263,6 +266,129 @@ function ExecutorsPageContent() {
           <Plus className="h-5 w-5" />
           Add Executor
         </button>
+      </div>
+
+      {/* Download Section */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+              <Download className="h-6 w-6 text-white" />
+            </div>
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold text-neutral-900 mb-2">
+              📥 Download Windows Executor
+            </h3>
+            <p className="text-sm text-neutral-600 mb-4">
+              Choose your preferred version to connect your trading platform with the web interface
+            </p>
+            
+            <div className="grid md:grid-cols-2 gap-4">
+              {/* Installer Version */}
+              <a
+                href="https://drive.google.com/file/d/1Yqf2hjZYyq6-iluIW30eyg0MFmxprGNq/view?usp=sharing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-white rounded-lg border-2 border-blue-200 hover:border-blue-400 transition-all p-4 hover:shadow-md"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-1">
+                    <Package className="h-6 w-6 text-blue-600 group-hover:text-blue-700" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-neutral-900 mb-1 group-hover:text-blue-700">
+                      Installer Version
+                    </h4>
+                    <p className="text-xs text-neutral-600 mb-3">
+                      Full installation with auto-updates and system integration
+                    </p>
+                    <div className="space-y-1 text-xs text-neutral-600 mb-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        <span>One-click installation</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        <span>Auto-updates enabled</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        <span>Start menu shortcuts</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        <span>Recommended for most users</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-neutral-200">
+                      <span className="text-xs font-medium text-neutral-500">Size: ~90 MB</span>
+                      <span className="text-xs font-bold text-blue-600 group-hover:text-blue-700 flex items-center gap-1">
+                        Download
+                        <Download className="h-3 w-3" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+
+              {/* Portable Version */}
+              <a
+                href="https://drive.google.com/file/d/1nYaL1KywNwolaKaNQFH-9iAK85CW1rY0/view?usp=sharing"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="group bg-white rounded-lg border-2 border-purple-200 hover:border-purple-400 transition-all p-4 hover:shadow-md"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 mt-1">
+                    <HardDrive className="h-6 w-6 text-purple-600 group-hover:text-purple-700" />
+                  </div>
+                  <div className="flex-1">
+                    <h4 className="font-bold text-neutral-900 mb-1 group-hover:text-purple-700">
+                      Portable Version
+                    </h4>
+                    <p className="text-xs text-neutral-600 mb-3">
+                      No installation required, run from USB or any folder
+                    </p>
+                    <div className="space-y-1 text-xs text-neutral-600 mb-3">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        <span>No installation needed</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        <span>Run from USB drive</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        <span>Leaves no traces</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600" />
+                        <span>For advanced users</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between pt-2 border-t border-neutral-200">
+                      <span className="text-xs font-medium text-neutral-500">Size: ~85 MB</span>
+                      <span className="text-xs font-bold text-purple-600 group-hover:text-purple-700 flex items-center gap-1">
+                        Download
+                        <Download className="h-3 w-3" />
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </a>
+            </div>
+
+            {/* Installation Note */}
+            <div className="mt-4 bg-blue-100 rounded-lg p-3 border border-blue-300">
+              <p className="text-xs text-blue-900">
+                <strong>💡 Note:</strong> After downloading, you&apos;ll need to create an executor (click &quot;Add Executor&quot; button above) 
+                to get your API credentials. Then configure the Windows app with those credentials to connect to your MT5 terminal.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
