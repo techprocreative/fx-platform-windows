@@ -40,6 +40,7 @@ export function Setup() {
   );
   const [apiKey, setApiKey] = useState(config.apiKey || "");
   const [apiSecret, setApiSecret] = useState(config.apiSecret || "");
+  const [sharedSecret, setSharedSecret] = useState(config.sharedSecret || "");
 
   // Auto-detect MT5 installations on mount
   useEffect(() => {
@@ -204,6 +205,17 @@ export function Setup() {
           message: configError || "Configuration fetch failed",
         });
         return;
+      }
+      
+      // Save shared secret if provided
+      if (sharedSecret) {
+        console.log("[Setup.tsx] Saving shared secret to config...");
+        updateConfig({ sharedSecret });
+        addLog({
+          level: "info",
+          category: "SETUP",
+          message: "Shared secret configured for MT5 EA authentication",
+        });
       }
       
       console.log("[Setup.tsx] Config fetch SUCCESS! Current config:", config);
@@ -520,6 +532,24 @@ export function Setup() {
               />
               <p className="text-xs text-gray-500 mt-1">
                 Encrypted locally, never stored in plain text
+              </p>
+            </div>
+
+            {/* Shared Secret */}
+            <div>
+              <label htmlFor="sharedSecret" className="label">
+                Shared Secret <span className="text-blue-600">(For MT5 EA)</span>
+              </label>
+              <input
+                id="sharedSecret"
+                type="password"
+                value={sharedSecret}
+                onChange={(e) => setSharedSecret(e.target.value)}
+                className="input mt-1"
+                placeholder="Paste from web platform"
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                📋 Copy this from web platform when creating executor. Used for MT5 EA authentication.
               </p>
             </div>
 

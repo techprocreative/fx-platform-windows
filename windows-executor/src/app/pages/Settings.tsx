@@ -286,6 +286,23 @@ export function Settings() {
                 </div>
                 
                 <div>
+                  <label htmlFor="sharedSecret" className="label">
+                    Shared Secret <span className="text-xs text-gray-500">(For MT5 EA)</span>
+                  </label>
+                  <input
+                    id="sharedSecret"
+                    type="password"
+                    value={config?.sharedSecret || ''}
+                    onChange={(e) => updateConfig({ sharedSecret: e.target.value })}
+                    className="input mt-1"
+                    placeholder="Paste shared secret from web platform"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Get this from web platform when creating executor. Used for MT5 EA authentication.
+                  </p>
+                </div>
+                
+                <div>
                   <label htmlFor="pusherKey" className="label">Pusher Key</label>
                   <input
                     id="pusherKey"
