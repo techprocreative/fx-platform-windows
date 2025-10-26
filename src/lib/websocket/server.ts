@@ -330,6 +330,7 @@ export class TradingWebSocketServer {
     await prisma.auditLog.create({
       data: {
         userId: client.executorId,
+        action: 'EXECUTOR_ERROR',
         eventType: 'EXECUTOR_ERROR',
         result: 'error',
         metadata: payload,
@@ -615,10 +616,12 @@ export class TradingWebSocketServer {
    */
   private async logConnection(client: WSClient, connected: boolean): Promise<void> {
     try {
+      const action = connected ? 'EXECUTOR_CONNECTED' : 'EXECUTOR_DISCONNECTED';
       await prisma.auditLog.create({
         data: {
           userId: client.executorId,
-          eventType: connected ? 'EXECUTOR_CONNECTED' : 'EXECUTOR_DISCONNECTED',
+          action,
+          eventType: action,
           metadata: {
             clientId: client.id,
             ipAddress: client.ipAddress,

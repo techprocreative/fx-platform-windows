@@ -61,6 +61,7 @@ async function validateStrategyOwnership(
     await prisma.auditLog.create({
       data: {
         userId: userId,
+        action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
         eventType: 'UNAUTHORIZED_ACCESS_ATTEMPT',
         result: 'denied',
         metadata: {
@@ -81,6 +82,7 @@ async function validateStrategyOwnership(
     await prisma.auditLog.create({
       data: {
         userId: userId,
+        action: 'UNAUTHORIZED_ACCESS_ATTEMPT',
         eventType: 'UNAUTHORIZED_ACCESS_ATTEMPT',
         result: 'denied',
         metadata: {
@@ -98,10 +100,12 @@ async function validateStrategyOwnership(
 
   // Log successful access for sensitive operations
   if (operation === 'update' || operation === 'delete') {
+    const actionType = `STRATEGY_${operation.toUpperCase()}_ATTEMPT`;
     await prisma.auditLog.create({
       data: {
         userId: userId,
-        eventType: `STRATEGY_${operation.toUpperCase()}_ATTEMPT`,
+        action: actionType,
+        eventType: actionType,
         result: 'success',
         metadata: {
           strategyId,
@@ -214,9 +218,11 @@ export async function PATCH(
     // Additional validation for critical fields
     if (validation.data.isPublic !== undefined) {
       // Log attempt to change visibility (for audit purposes)
+      const visibilityAction = validation.data.isPublic ? 'STRATEGY_PUBLISHED' : 'STRATEGY_UNPUBLISHED';
       await prisma.auditLog.create({
         data: {
           userId: session.user.id,
+          action: visibilityAction,
           eventType: 'STRATEGY_VISIBILITY_CHANGE',
           result: 'success',
           metadata: {

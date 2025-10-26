@@ -104,6 +104,7 @@ export async function POST(req: NextRequest) {
     await prisma.auditLog.create({
       data: {
         userId: session.user.id,
+        action: 'EMERGENCY_STOP_TRIGGERED',
         eventType: 'EMERGENCY_STOP_TRIGGERED',
         result: 'success',
         metadata: {

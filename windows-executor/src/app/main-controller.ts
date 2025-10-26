@@ -1056,6 +1056,7 @@ export class MainController extends EventEmitter {
       this.emit('initialization-failed', error);
       this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
         // Don't fail - EA might already be installed manually
+      return false;
     }
   }
 
@@ -1098,6 +1099,7 @@ export class MainController extends EventEmitter {
       this.emit('start-failed', error);
       this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
         // Don't fail - EA might already be installed manually
+      return false;
     }
   }
 
@@ -1141,6 +1143,7 @@ export class MainController extends EventEmitter {
       this.emit('stop-failed', error);
       this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
         // Don't fail - EA might already be installed manually
+      return false;
     }
   }
 
@@ -1541,6 +1544,7 @@ export class MainController extends EventEmitter {
       this.addLog('error', 'MAIN', `Failed to update configuration: ${(error as Error).message}`, { error });
       this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
         // Don't fail - EA might already be installed manually
+      return false;
     }
   }
 

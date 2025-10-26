@@ -443,6 +443,7 @@ export class ExecutorManager {
     await prisma.auditLog.create({
       data: {
         userId: executorId,
+        action: 'CRITICAL_DISCONNECTION',
         eventType: 'CRITICAL_DISCONNECTION',
         result: 'alert_sent',
         metadata: {

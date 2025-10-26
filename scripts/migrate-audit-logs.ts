@@ -20,14 +20,13 @@ async function migrateAuditLogs() {
     console.log(`✅ Updated ${result} audit log records`);
     
     // Verify no NULL actions remain
-    const nullCount = await prisma.auditLog.count({
-      where: {
-        action: null,
-      },
-    });
+    const nullCount = await prisma.$queryRaw<Array<{ count: bigint }>>`
+      SELECT COUNT(*) as count FROM "AuditLog" WHERE "action" IS NULL
+    `;
+    const count = Number(nullCount[0]?.count || 0);
     
-    if (nullCount > 0) {
-      console.error(`❌ Still have ${nullCount} records with NULL action`);
+    if (count > 0) {
+      console.error(`❌ Still have ${count} records with NULL action`);
       process.exit(1);
     }
     

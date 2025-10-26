@@ -227,6 +227,7 @@ export async function logSecurityEvent(
     await prisma.auditLog.create({
       data: {
         userId,
+        action: event,
         eventType: event,
         metadata,
         ipAddress: ip,
