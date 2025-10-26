@@ -861,6 +861,14 @@ export class MainController extends EventEmitter {
       this.config = config;
       this.executorId = config.executorId;
       
+      // Configure shared secret for MT5 EA authentication
+      if (config.sharedSecret) {
+        this.zeromqService.setSharedSecret(config.sharedSecret);
+        this.addLog('info', 'MAIN', '🔐 Shared secret configured for MT5 EA authentication');
+      } else {
+        this.addLog('warn', 'MAIN', '⚠️ No shared secret configured - MT5 EA authentication disabled');
+      }
+      
       // Step 0: Initialize database FIRST
       this.addLog('info', 'MAIN', 'Initializing database...');
       const dbInitialized = await this.db.initialize();
@@ -1530,6 +1538,12 @@ export class MainController extends EventEmitter {
       }
       
       this.config = { ...this.config, ...newConfig };
+      
+      // Update shared secret if changed
+      if ('sharedSecret' in newConfig) {
+        this.zeromqService.setSharedSecret(newConfig.sharedSecret || null);
+        this.addLog('info', 'MAIN', newConfig.sharedSecret ? '🔐 Shared secret updated' : '⚠️ Shared secret removed');
+      }
       
       // Update services with new configuration
       await this.pusherService.forceReconnect();
