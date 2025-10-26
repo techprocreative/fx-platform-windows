@@ -60,7 +60,13 @@ function ExecutorsPageContent() {
   const [error, setError] = useState<Error | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [showCredentials, setShowCredentials] = useState(false);
-  const [credentials, setCredentials] = useState({ apiKey: "", secretKey: "" });
+  const [credentials, setCredentials] = useState({ 
+    apiKey: "", 
+    secretKey: "",
+    sharedSecret: "" 
+  });
+  const [betaLimits, setBetaLimits] = useState<any>(null);
+  const [isBetaMode, setIsBetaMode] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -132,10 +138,23 @@ function ExecutorsPageContent() {
       setCredentials({
         apiKey: data.executor.apiKey,
         secretKey: data.executor.secretKey,
+        sharedSecret: data.executor.sharedSecret || "",
       });
+      
+      // Store beta information
+      setIsBetaMode(data.betaMode || false);
+      setBetaLimits(data.betaLimits || null);
+      
       setShowCredentials(true);
       setShowModal(false);
-      toast.success("Executor created successfully!");
+      
+      // Show beta mode info if enabled
+      if (data.betaMode) {
+        toast.success("Executor created! Beta mode active with safety limits");
+      } else {
+        toast.success("Executor created successfully!");
+      }
+      
       fetchExecutors();
       setFormData({ name: "", platform: "MT5" });
     } catch (error) {
@@ -555,56 +574,165 @@ function ExecutorsPageContent() {
       {/* Credentials Modal */}
       {showCredentials && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-lg w-full p-6">
+          <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-neutral-900 mb-2">
               Executor Credentials
             </h2>
             <p className="text-sm text-red-600 mb-4">
               ⚠️ Save these credentials securely. They will not be shown again!
             </p>
-            <div className="space-y-4 bg-neutral-50 p-4 rounded-lg">
-              <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  API Key
-                </label>
-                <div className="flex gap-2">
-                  <code className="flex-1 px-3 py-2 bg-white border border-neutral-300 rounded text-sm font-mono break-all">
-                    {credentials.apiKey}
-                  </code>
-                  <button
-                    onClick={() =>
-                      copyToClipboard(credentials.apiKey, "API Key")
-                    }
-                    className="p-2 text-neutral-700 hover:bg-white rounded-lg transition-colors"
-                    title="Copy API Key"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
+            
+            <div className="space-y-4 bg-neutral-50 p-4 rounded-lg mb-4">
+              {/* API Key & Secret - for Windows Executor */}
+              <div className="pb-4 border-b border-neutral-200">
+                <h3 className="text-sm font-semibold text-neutral-900 mb-3">
+                  🖥️ For Windows Executor Setup
+                </h3>
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      API Key
+                    </label>
+                    <div className="flex gap-2">
+                      <code className="flex-1 px-3 py-2 bg-white border border-neutral-300 rounded text-sm font-mono break-all">
+                        {credentials.apiKey}
+                      </code>
+                      <button
+                        onClick={() =>
+                          copyToClipboard(credentials.apiKey, "API Key")
+                        }
+                        className="p-2 text-neutral-700 hover:bg-white rounded-lg transition-colors"
+                        title="Copy API Key"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Secret Key
+                    </label>
+                    <div className="flex gap-2">
+                      <code className="flex-1 px-3 py-2 bg-white border border-neutral-300 rounded text-sm font-mono break-all">
+                        {credentials.secretKey}
+                      </code>
+                      <button
+                        onClick={() =>
+                          copyToClipboard(credentials.secretKey, "Secret Key")
+                        }
+                        className="p-2 text-neutral-700 hover:bg-white rounded-lg transition-colors"
+                        title="Copy Secret Key"
+                      >
+                        <Copy className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
+
+              {/* Shared Secret - for MT5 EA */}
               <div>
-                <label className="block text-sm font-medium text-neutral-700 mb-2">
-                  Secret Key
-                </label>
-                <div className="flex gap-2">
-                  <code className="flex-1 px-3 py-2 bg-white border border-neutral-300 rounded text-sm font-mono break-all">
-                    {credentials.secretKey}
-                  </code>
-                  <button
-                    onClick={() =>
-                      copyToClipboard(credentials.secretKey, "Secret Key")
-                    }
-                    className="p-2 text-neutral-700 hover:bg-white rounded-lg transition-colors"
-                    title="Copy Secret Key"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </button>
+                <h3 className="text-sm font-semibold text-neutral-900 mb-3">
+                  📊 For MT5 EA Configuration
+                </h3>
+                <div>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">
+                    Shared Secret
+                  </label>
+                  <div className="flex gap-2">
+                    <code className="flex-1 px-3 py-2 bg-white border border-neutral-300 rounded text-sm font-mono break-all">
+                      {credentials.sharedSecret}
+                    </code>
+                    <button
+                      onClick={() =>
+                        copyToClipboard(credentials.sharedSecret, "Shared Secret")
+                      }
+                      className="p-2 text-neutral-700 hover:bg-white rounded-lg transition-colors"
+                      title="Copy Shared Secret"
+                    >
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  </div>
+                  <p className="text-xs text-neutral-600 mt-2">
+                    Paste this into <strong>InpSharedSecret</strong> parameter in FX_NusaNexus EA settings
+                  </p>
                 </div>
               </div>
             </div>
+
+            {/* Beta Limits Warning */}
+            {isBetaMode && betaLimits && (
+              <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="text-sm font-bold text-yellow-900 mb-2">
+                      ⚠️ Beta Mode Active - Trading Limits Enforced
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2 text-xs text-yellow-800 mb-2">
+                      <div className="bg-yellow-100 rounded px-2 py-1">
+                        <strong>Max Lot Size:</strong> {betaLimits.maxLotSize}
+                      </div>
+                      <div className="bg-yellow-100 rounded px-2 py-1">
+                        <strong>Max Positions:</strong> {betaLimits.maxPositions}
+                      </div>
+                      <div className="bg-yellow-100 rounded px-2 py-1">
+                        <strong>Daily Trades:</strong> {betaLimits.maxDailyTrades}
+                      </div>
+                      <div className="bg-yellow-100 rounded px-2 py-1">
+                        <strong>Max Loss:</strong> ${betaLimits.maxDailyLoss}
+                      </div>
+                    </div>
+                    <div className="bg-yellow-100 rounded px-2 py-2 mt-2">
+                      <p className="text-xs text-yellow-900 font-medium mb-1">
+                        <strong>Allowed Symbols ({betaLimits.allowedSymbols?.length || 0}):</strong>
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {betaLimits.allowedSymbols?.map((symbol: string) => (
+                          <span 
+                            key={symbol}
+                            className="inline-block bg-yellow-200 text-yellow-900 text-xs px-2 py-0.5 rounded font-mono"
+                          >
+                            {symbol}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <p className="text-xs text-yellow-800 mt-2">
+                      These limits apply to all trading operations during beta testing period.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Setup Instructions */}
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <h4 className="text-sm font-semibold text-blue-900 mb-2">
+                📝 Setup Instructions
+              </h4>
+              <ol className="text-sm text-blue-800 space-y-2 list-decimal list-inside">
+                <li>
+                  Open <strong>Windows Executor</strong> → Settings
+                </li>
+                <li>
+                  Paste <strong>API Key</strong> and <strong>Secret Key</strong>
+                </li>
+                <li>
+                  Open <strong>MT5</strong> → Attach <strong>FX_NusaNexus</strong> EA to chart
+                </li>
+                <li>
+                  In EA settings, paste <strong>Shared Secret</strong> into <strong>InpSharedSecret</strong> parameter
+                </li>
+                <li>
+                  Click OK → EA will authenticate all commands automatically
+                </li>
+              </ol>
+            </div>
+
             <button
               onClick={() => setShowCredentials(false)}
-              className="w-full mt-6 px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
+              className="w-full px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors font-medium"
             >
               I&apos;ve Saved the Credentials
             </button>

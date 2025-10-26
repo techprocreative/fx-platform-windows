@@ -9,6 +9,8 @@ import {
   STRATEGY_LIST_INCLUDE,
   revalidateStrategiesCache,
 } from '@/lib/cache/query-cache';
+import { rateLimit } from '@/lib/middleware/rate-limit';
+import { AuditLogger, AuditAction } from '@/lib/audit/audit-logger';
 
 import type { Prisma } from '@prisma/client';
 
@@ -31,6 +33,10 @@ export async function GET(req: NextRequest) {
     if (!session?.user?.id) {
       throw new AppError(401, 'Unauthorized');
     }
+    
+    // Apply rate limiting
+    const rateLimitResponse = await rateLimit(req, session.user.id);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const url = new URL(req.url);
     const status = url.searchParams.get('status');
@@ -132,6 +138,10 @@ export async function POST(req: NextRequest) {
     if (!session?.user?.id) {
       throw new AppError(401, 'Unauthorized');
     }
+    
+    // Apply rate limiting
+    const rateLimitResponse = await rateLimit(req, session.user.id);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const body = await req.json();
 

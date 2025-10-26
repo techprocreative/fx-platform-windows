@@ -263,7 +263,8 @@ model Executor {
   userId          String
   name            String
   apiKey          String    @unique
-  apiSecretHash   String
+  apiSecretHash   String    // Bcrypt hashed API secret
+  sharedSecret    String?   // Shared secret for EA-Executor communication
   platform        String    // MT5, MT4
   brokerServer    String?
   accountNumber   String?
@@ -367,22 +368,30 @@ model Backtest {
 // Audit Logging
 model AuditLog {
   id              String    @id @default(cuid())
-  userId          String
-  eventType       String
+  userId          String?
+  executorId      String?
+  action          String    // AuditAction enum value
+  eventType       String?   // Legacy field
   resource        String?
-  action          String?
   result          String?
-  metadata        Json?
-  ipAddress       String?
+  details         Json?     // Detailed event data
+  metadata        Json?     // Legacy field
+  ip              String?
+  ipAddress       String?   // Legacy field
   userAgent       String?
+  success         Boolean   @default(true)
+  errorMessage    String?
   hash            String?   // Tamper-proof hash
   timestamp       DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([executorId])
+  @@index([action])
   @@index([eventType])
   @@index([timestamp])
+  @@index([success])
 }
 
 // IP Whitelist Management

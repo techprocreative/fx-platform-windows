@@ -8,6 +8,9 @@ import { authOptions } from '../../../lib/auth';
 import { prisma } from '../../../lib/prisma';
 import { AppError, handleApiError } from '@/lib/errors';
 import { applyRateLimit } from '@/lib/middleware/rate-limit-middleware';
+import { SharedSecretManager } from '@/lib/auth/shared-secret';
+import { AuditLogger, AuditAction } from '@/lib/audit/audit-logger';
+import { BETA_CONFIG } from '@/config/beta.config';
 
 export const dynamic = 'force-dynamic';
 
@@ -148,7 +151,11 @@ export async function POST(req: NextRequest) {
 
     const { name, platform, brokerServer, accountNumber } = validation.data;
 
-    // Check executor limit (max 5 per user for now)
+    // Check executor limit (use beta config if enabled)
+    const maxExecutors = BETA_CONFIG.enabled 
+      ? BETA_CONFIG.accounts.maxActiveExecutors 
+      : 5;
+      
     const executorCount = await prisma.executor.count({
       where: {
         userId: session.user.id,
@@ -156,10 +163,10 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    if (executorCount >= 5) {
+    if (executorCount >= maxExecutors) {
       throw new AppError(
         403,
-        'Executor limit reached (maximum 5 executors per account)',
+        `Executor limit reached (maximum ${maxExecutors} executors${BETA_CONFIG.enabled ? ' during beta' : ''})`,
         'EXECUTOR_LIMIT'
       );
     }
@@ -184,6 +191,12 @@ export async function POST(req: NextRequest) {
     // Generate API credentials
     const { apiKey, secretKey } = generateApiCredentials();
     const secretHash = await bcrypt.hash(secretKey, 10);
+    
+    // Generate shared secret for EA-Executor communication
+    const sharedSecret = SharedSecretManager.generateSharedSecret(
+      apiKey, // Use apiKey as part of seed
+      secretKey
+    );
 
     // Create executor
     const executor = await prisma.executor.create({
@@ -195,22 +208,22 @@ export async function POST(req: NextRequest) {
         accountNumber,
         apiKey,
         apiSecretHash: secretHash,
+        sharedSecret, // Store shared secret for validation
         status: 'offline',
       },
     });
 
-    // Log activity
-    await prisma.activityLog.create({
-      data: {
-        userId: session.user.id,
-        eventType: 'EXECUTOR_CREATED',
-        metadata: {
-          executorId: executor.id,
-          name: executor.name,
-          platform: executor.platform,
-        },
-      },
-    });
+    // Log to audit system
+    await AuditLogger.logExecutor(
+      AuditAction.API_KEY_CREATED,
+      session.user.id,
+      executor.id,
+      {
+        executorName: executor.name,
+        platform: executor.platform,
+        betaMode: BETA_CONFIG.enabled,
+      }
+    );
 
     // Return executor with credentials (only shown once)
     return NextResponse.json(
@@ -218,10 +231,13 @@ export async function POST(req: NextRequest) {
         executor: {
           ...executor,
           secretKey, // Only returned on creation
+          sharedSecret, // Only returned on creation - for EA configuration
           apiSecretHash: undefined, // Don't expose hash
         },
         message:
-          '⚠️ Save these credentials securely. The secret key will not be shown again!',
+          '⚠️ Save these credentials securely. The secret key and shared secret will not be shown again!',
+        betaMode: BETA_CONFIG.enabled,
+        betaLimits: BETA_CONFIG.enabled ? BETA_CONFIG.limits : null,
       },
       { status: 201 }
     );

@@ -7,8 +7,9 @@ interface ConfigState {
   updateConfig: (updates: Partial<AppConfig>) => void;
   resetConfig: () => void;
   isConfigured: () => boolean;
-  getApiCredentials: () => { apiKey: string; apiSecret: string } | null;
-  updateApiCredentials: (apiKey: string, apiSecret: string) => void;
+  getApiCredentials: () => { apiKey: string; apiSecret: string; sharedSecret?: string } | null;
+  updateApiCredentials: (apiKey: string, apiSecret: string, sharedSecret?: string) => void;
+  getSharedSecret: () => string | null;
 
   // New methods for auto-provisioning
   fetchConfigFromPlatform: (
@@ -68,16 +69,22 @@ export const useConfigStore = create<ConfigState>()(
           return {
             apiKey: config.apiKey,
             apiSecret: config.apiSecret,
+            sharedSecret: config.sharedSecret,
           };
         }
         return null;
       },
 
-      updateApiCredentials: (apiKey, apiSecret) =>
+      updateApiCredentials: (apiKey, apiSecret, sharedSecret) =>
         set((state) => ({
-          config: { ...state.config, apiKey, apiSecret },
+          config: { ...state.config, apiKey, apiSecret, sharedSecret },
           error: null,
         })),
+
+      getSharedSecret: () => {
+        const { config } = get();
+        return config.sharedSecret || null;
+      },
 
       /**
        * Auto-provision configuration from platform

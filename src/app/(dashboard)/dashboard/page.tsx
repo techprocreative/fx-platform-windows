@@ -13,6 +13,8 @@ import {
   Plus,
 } from 'lucide-react';
 import { MarketSessionsWidget } from '@/components/market/MarketSessionsWidget';
+import { useBetaMode } from '@/hooks/useBetaMode';
+import { BetaLimitsBadge } from '@/components/beta/BetaLimitsBadge';
 
 interface DashboardStats {
   activeStrategies: number;
@@ -23,6 +25,7 @@ interface DashboardStats {
 
 export default function DashboardPage() {
   const { data: session, status } = useSession();
+  const { isBetaMode, limits } = useBetaMode();
   const [stats, setStats] = useState<DashboardStats>({
     activeStrategies: 0,
     totalTrades: 0,
@@ -67,6 +70,28 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
+      {/* Beta Mode Banner */}
+      {isBetaMode && limits && (
+        <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-300 rounded-lg p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="bg-yellow-500 text-white p-2 rounded-full">
+                <Activity className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-yellow-900">
+                  🧪 Beta Testing Mode Active
+                </h3>
+                <p className="text-sm text-yellow-800">
+                  Trading limits are enforced for safety during beta period
+                </p>
+              </div>
+            </div>
+            <BetaLimitsBadge limits={limits} variant="compact" />
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

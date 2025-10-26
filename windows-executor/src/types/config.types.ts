@@ -2,6 +2,7 @@ export interface AppConfig {
   executorId: string;
   apiKey: string;
   apiSecret: string;
+  sharedSecret?: string; // For EA authentication
   platformUrl: string;
   pusherKey: string;
   pusherCluster: string;
