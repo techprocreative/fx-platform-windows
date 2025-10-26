@@ -9,6 +9,7 @@ import { AppConfig } from "../../types/config.types";
 export function Setup() {
   const {
     config,
+    updateConfig,
     fetchConfigFromPlatform,
     isLoading: configLoading,
     error: configError,
