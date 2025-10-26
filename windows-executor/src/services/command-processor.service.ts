@@ -6,6 +6,7 @@ import { PusherService } from './pusher.service';
 import { StrategyMonitor } from './strategy-monitor.service';
 import { EmergencyStopService } from './emergency-stop.service';
 import { PositionRegistry } from './position-registry.service';
+import { StrategyAdapterService } from './strategy-adapter.service';
 import { logger } from '../utils/logger';
 
 export class CommandProcessor {
