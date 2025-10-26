@@ -14,6 +14,7 @@
     "build:electron": "tsc -p electron/tsconfig.json",
     "type-check": "tsc --noEmit",
     "clean": "node scripts/clean-directories.js",
+    "clear:config": "node scripts/clear-config.js",
     "postinstall": "node scripts/post-install-comprehensive.js",
     "rebuild": "npm run rebuild:native",
     "rebuild:native": "electron-rebuild -f -w zeromq better-sqlite3",
