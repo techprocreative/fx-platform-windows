@@ -80,6 +80,7 @@ export class MainController extends EventEmitter {
   private safetyValidator!: SafetyValidatorService;
   private emergencyStop!: EmergencyStopService;
   private commandProcessor!: CommandProcessor;
+  private positionRegistry: any; // PositionRegistry
   private conditionEvaluator!: ConditionEvaluatorService;
   private filterEvaluator!: FilterEvaluatorService;
   private positionSizing!: PositionSizingService;
@@ -1720,12 +1721,19 @@ export class MainController extends EventEmitter {
       this.multiAccountManager.startPeriodicUpdates();
       this.addLog('info', 'ACCOUNTS', 'Multi-account manager started');
       
+      // Initialize Position Registry (Phase 2 Enhancement)
+      const { PositionRegistry } = require('../services/position-registry.service');
+      this.positionRegistry = new PositionRegistry(this.mt5AccountService);
+      this.positionRegistry.startSync(5000); // Sync every 5 seconds
+      this.addLog('info', 'POSITION', 'Position registry started with 5s sync');
+      
       // Initialize command processor with all services (Phase 1)
       this.commandProcessor.initialize(
         this.zeromqService,
         this.pusherService,
         this.strategyMonitor,
-        this.emergencyStop
+        this.emergencyStop,
+        this.positionRegistry  // Add position registry
       );
       this.addLog('info', 'COMMAND', 'Command processor initialized');
       
@@ -1741,6 +1749,52 @@ export class MainController extends EventEmitter {
         await this.disasterRecovery.recoverFromCrash();
       }
       
+      // Start position update broadcast (Phase 2 Enhancement)
+      setInterval(async () => {
+        if (this.positionRegistry) {
+          try {
+            const summary = this.positionRegistry.getSummary();
+            const positions = this.positionRegistry.getAllPositions();
+            
+            // Broadcast to web platform via Pusher (using Pusher Client SDK)
+            // Note: Pusher server SDK would use pusher.trigger(), but we're using client SDK
+            // This sends via channel.trigger() for client events
+            if (this.pusherService['channel']) {
+              this.pusherService['channel'].trigger('client-position-update', {
+              positions: positions.map((p: any) => ({
+                ticket: p.ticket,
+                strategy: p.strategyId,
+                strategyName: p.strategyName,
+                symbol: p.symbol,
+                type: p.type,
+                volume: p.volume,
+                profit: p.profit,
+                profitPercent: p.profitPercent,
+                duration: p.duration,
+                sl: p.sl,
+                tp: p.tp,
+                openPrice: p.openPrice,
+                openTime: p.openTime
+              })),
+              summary: {
+                total: summary.total,
+                profitable: summary.profitable,
+                losing: summary.losing,
+                totalProfit: summary.totalProfit,
+                totalVolume: summary.totalVolume,
+                byStrategy: Array.from(summary.byStrategy.values()),
+                bySymbol: Array.from(summary.bySymbol.values())
+              },
+                timestamp: new Date().toISOString()
+              });
+            }
+          } catch (error) {
+            logger.error('[MainController] Position update broadcast failed', error);
+          }
+        }
+      }, 5000); // Every 5 seconds
+      
+      this.addLog('info', 'POSITION', 'Position update broadcast started (5s interval)');
       this.addLog('info', 'MAIN', '✅ All live trading services started successfully');
       
     } catch (error) {

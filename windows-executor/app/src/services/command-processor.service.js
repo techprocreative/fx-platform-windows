@@ -10,6 +10,8 @@ class CommandProcessor {
     constructor() {
         this.strategyMonitor = null;
         this.emergencyStop = null;
+        this.positionRegistry = null;
+        this.zeromqService = null;
         this.isProcessing = false;
         // Initialize with default services - these will be set later
         this.commandService = new command_service_1.CommandService(new zeromq_service_1.ZeroMQService(), new pusher_service_1.PusherService(), {
@@ -25,7 +27,7 @@ class CommandProcessor {
     /**
      * Initialize the processor with actual services
      */
-    initialize(zeromqService, pusherService, strategyMonitor, emergencyStop) {
+    initialize(zeromqService, pusherService, strategyMonitor, emergencyStop, positionRegistry) {
         this.commandService = new command_service_1.CommandService(zeromqService, pusherService, {
             maxDailyLoss: 500,
             maxPositions: 10,
@@ -37,7 +39,11 @@ class CommandProcessor {
         });
         this.strategyMonitor = strategyMonitor;
         this.emergencyStop = emergencyStop;
-        logger_1.logger.info('[CommandProcessor] Initialized with all services');
+        this.positionRegistry = positionRegistry || null;
+        this.zeromqService = zeromqService;
+        logger_1.logger.info('[CommandProcessor] Initialized with all services', {
+            hasPositionRegistry: !!this.positionRegistry
+        });
     }
     /**
      * Process command from platform (generic entry point)
@@ -70,6 +76,14 @@ class CommandProcessor {
                         success: true,
                         data: { status: 'operational', strategies: this.strategyMonitor?.getAllActive().length || 0 }
                     };
+                case 'CLOSE_PROFITABLE':
+                    return await this.handleCloseProfitable(command.parameters);
+                case 'CLOSE_LOSING':
+                    return await this.handleCloseLosing(command.parameters);
+                case 'CLOSE_BY_STRATEGY':
+                    return await this.handleCloseByStrategy(command.parameters);
+                case 'CLOSE_BY_SYMBOL':
+                    return await this.handleCloseBySymbol(command.parameters);
                 default:
                     throw new Error(`Unknown command: ${command.command}`);
             }
@@ -255,6 +269,178 @@ class CommandProcessor {
     }
     off(event, handler) {
         this.commandService.off(event, handler);
+    }
+    /**
+     * Handle CLOSE_PROFITABLE command
+     */
+    async handleCloseProfitable(parameters) {
+        if (!this.positionRegistry) {
+            throw new Error('Position registry not available');
+        }
+        if (!this.zeromqService) {
+            throw new Error('ZeroMQ service not available');
+        }
+        const minProfit = parameters?.minProfit || 0;
+        const profitablePositions = this.positionRegistry.getProfitable(minProfit);
+        logger_1.logger.info(`[CommandProcessor] Closing ${profitablePositions.length} profitable positions`, {
+            minProfit,
+            totalProfit: profitablePositions.reduce((sum, p) => sum + p.profit, 0)
+        });
+        const results = [];
+        for (const position of profitablePositions) {
+            try {
+                const result = await this.zeromqService.closePosition(position.ticket);
+                results.push({
+                    ticket: position.ticket,
+                    symbol: position.symbol,
+                    profit: position.profit,
+                    success: result.success
+                });
+            }
+            catch (error) {
+                logger_1.logger.error(`[CommandProcessor] Failed to close position ${position.ticket}`, error);
+                results.push({
+                    ticket: position.ticket,
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+        const successCount = results.filter(r => r.success).length;
+        return {
+            success: true,
+            message: `Closed ${successCount}/${profitablePositions.length} profitable positions`,
+            data: { results, totalClosed: successCount }
+        };
+    }
+    /**
+     * Handle CLOSE_LOSING command
+     */
+    async handleCloseLosing(parameters) {
+        if (!this.positionRegistry) {
+            throw new Error('Position registry not available');
+        }
+        if (!this.zeromqService) {
+            throw new Error('ZeroMQ service not available');
+        }
+        const maxLoss = parameters?.maxLoss || 0;
+        const losingPositions = this.positionRegistry.getLosing(maxLoss);
+        logger_1.logger.warn(`[CommandProcessor] Closing ${losingPositions.length} losing positions`, {
+            maxLoss,
+            totalLoss: losingPositions.reduce((sum, p) => sum + p.profit, 0)
+        });
+        const results = [];
+        for (const position of losingPositions) {
+            try {
+                const result = await this.zeromqService.closePosition(position.ticket);
+                results.push({
+                    ticket: position.ticket,
+                    symbol: position.symbol,
+                    profit: position.profit,
+                    success: result.success
+                });
+            }
+            catch (error) {
+                logger_1.logger.error(`[CommandProcessor] Failed to close position ${position.ticket}`, error);
+                results.push({
+                    ticket: position.ticket,
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+        const successCount = results.filter(r => r.success).length;
+        return {
+            success: true,
+            message: `Closed ${successCount}/${losingPositions.length} losing positions`,
+            data: { results, totalClosed: successCount }
+        };
+    }
+    /**
+     * Handle CLOSE_BY_STRATEGY command
+     */
+    async handleCloseByStrategy(parameters) {
+        if (!this.positionRegistry) {
+            throw new Error('Position registry not available');
+        }
+        if (!this.zeromqService) {
+            throw new Error('ZeroMQ service not available');
+        }
+        const { strategyId } = parameters;
+        if (!strategyId) {
+            throw new Error('Strategy ID is required');
+        }
+        const positions = this.positionRegistry.getByStrategy(strategyId);
+        logger_1.logger.info(`[CommandProcessor] Closing ${positions.length} positions for strategy ${strategyId}`);
+        const results = [];
+        for (const position of positions) {
+            try {
+                const result = await this.zeromqService.closePosition(position.ticket);
+                results.push({
+                    ticket: position.ticket,
+                    symbol: position.symbol,
+                    profit: position.profit,
+                    success: result.success
+                });
+            }
+            catch (error) {
+                logger_1.logger.error(`[CommandProcessor] Failed to close position ${position.ticket}`, error);
+                results.push({
+                    ticket: position.ticket,
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+        const successCount = results.filter(r => r.success).length;
+        return {
+            success: true,
+            message: `Closed ${successCount}/${positions.length} positions for strategy`,
+            data: { results, totalClosed: successCount, strategyId }
+        };
+    }
+    /**
+     * Handle CLOSE_BY_SYMBOL command
+     */
+    async handleCloseBySymbol(parameters) {
+        if (!this.positionRegistry) {
+            throw new Error('Position registry not available');
+        }
+        if (!this.zeromqService) {
+            throw new Error('ZeroMQ service not available');
+        }
+        const { symbol } = parameters;
+        if (!symbol) {
+            throw new Error('Symbol is required');
+        }
+        const positions = this.positionRegistry.getBySymbol(symbol);
+        logger_1.logger.info(`[CommandProcessor] Closing ${positions.length} positions for symbol ${symbol}`);
+        const results = [];
+        for (const position of positions) {
+            try {
+                const result = await this.zeromqService.closePosition(position.ticket);
+                results.push({
+                    ticket: position.ticket,
+                    symbol: position.symbol,
+                    profit: position.profit,
+                    success: result.success
+                });
+            }
+            catch (error) {
+                logger_1.logger.error(`[CommandProcessor] Failed to close position ${position.ticket}`, error);
+                results.push({
+                    ticket: position.ticket,
+                    success: false,
+                    error: error.message
+                });
+            }
+        }
+        const successCount = results.filter(r => r.success).length;
+        return {
+            success: true,
+            message: `Closed ${successCount}/${positions.length} positions for symbol`,
+            data: { results, totalClosed: successCount, symbol }
+        };
     }
 }
 exports.CommandProcessor = CommandProcessor;
