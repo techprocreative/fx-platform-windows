@@ -3,11 +3,12 @@
 import { CheckCircle, TrendingUp, Activity, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/Badge";
 import {
-  Tooltip,
+  Tooltip as CustomTooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/Tooltip";
+import * as RadixTooltip from "@radix-ui/react-tooltip";
 
 interface BacktestBadgeProps {
   verified?: boolean;
@@ -62,10 +63,10 @@ export function BacktestBadge({
         </Badge>
         
         <div className="grid grid-cols-3 gap-2 text-xs">
-          <TooltipProvider>
-            <Tooltip>
+          <TooltipProvider delayDuration={200}>
+            <RadixTooltip.Root>
               <TooltipTrigger asChild>
-                <div className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                <div className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 cursor-help">
                   <TrendingUp className="h-4 w-4 text-green-600 mb-1" />
                   <span className="font-semibold text-green-600">{returnPercentage.toFixed(1)}%</span>
                   <span className="text-gray-500 text-[10px]">3mo Return</span>
@@ -74,13 +75,13 @@ export function BacktestBadge({
               <TooltipContent>
                 <p>Total return over 3-month backtest period</p>
               </TooltipContent>
-            </Tooltip>
+            </RadixTooltip.Root>
           </TooltipProvider>
 
-          <TooltipProvider>
-            <Tooltip>
+          <TooltipProvider delayDuration={200}>
+            <RadixTooltip.Root>
               <TooltipTrigger asChild>
-                <div className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                <div className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 cursor-help">
                   <Activity className="h-4 w-4 text-blue-600 mb-1" />
                   <span className="font-semibold text-blue-600">{winRate.toFixed(1)}%</span>
                   <span className="text-gray-500 text-[10px]">Win Rate</span>
@@ -89,13 +90,13 @@ export function BacktestBadge({
               <TooltipContent>
                 <p>Percentage of winning trades</p>
               </TooltipContent>
-            </Tooltip>
+            </RadixTooltip.Root>
           </TooltipProvider>
 
-          <TooltipProvider>
-            <Tooltip>
+          <TooltipProvider delayDuration={200}>
+            <RadixTooltip.Root>
               <TooltipTrigger asChild>
-                <div className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700">
+                <div className="flex flex-col items-center p-2 bg-gray-50 dark:bg-gray-800 rounded border border-gray-200 dark:border-gray-700 cursor-help">
                   <Shield className="h-4 w-4 text-purple-600 mb-1" />
                   <span className="font-semibold text-purple-600">{profitFactor.toFixed(2)}</span>
                   <span className="text-gray-500 text-[10px]">Profit Factor</span>
@@ -104,7 +105,7 @@ export function BacktestBadge({
               <TooltipContent>
                 <p>Ratio of gross profit to gross loss</p>
               </TooltipContent>
-            </Tooltip>
+            </RadixTooltip.Root>
           </TooltipProvider>
         </div>
 
@@ -118,16 +119,18 @@ export function BacktestBadge({
   }
 
   return (
-    <TooltipProvider>
-      <Tooltip>
+    <TooltipProvider delayDuration={200}>
+      <RadixTooltip.Root>
         <TooltipTrigger asChild>
-          <Badge className={`${getBadgeColor()} ${sizeClasses[size]} flex items-center gap-1.5 cursor-help`}>
-            <CheckCircle className="h-3.5 w-3.5" />
-            <span className="font-semibold">Backtested ✓</span>
-            {returnPercentage && (
-              <span className="ml-1 opacity-90">+{returnPercentage.toFixed(1)}%</span>
-            )}
-          </Badge>
+          <div className="inline-block">
+            <Badge className={`${getBadgeColor()} ${sizeClasses[size]} flex items-center gap-1.5 cursor-help`}>
+              <CheckCircle className="h-3.5 w-3.5" />
+              <span className="font-semibold">Backtested ✓</span>
+              {returnPercentage && (
+                <span className="ml-1 opacity-90">+{returnPercentage.toFixed(1)}%</span>
+              )}
+            </Badge>
+          </div>
         </TooltipTrigger>
         <TooltipContent className="max-w-xs">
           <div className="space-y-1.5">
@@ -149,7 +152,7 @@ export function BacktestBadge({
             </p>
           </div>
         </TooltipContent>
-      </Tooltip>
+      </RadixTooltip.Root>
     </TooltipProvider>
   );
 }
