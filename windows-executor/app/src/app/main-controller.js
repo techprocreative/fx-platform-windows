@@ -91,30 +91,44 @@ class MainController extends events_1.EventEmitter {
      * Initialize all services
      */
     initializeServices() {
-        // Create logger function
-        const logger = (level, message, metadata) => {
+        // Create logger function that logs to both console AND Winston file
+        const loggerFunc = (level, message, metadata) => {
+            // Log to internal array and console
             this.addLog(level, 'MAIN', message, metadata);
+            // ALSO log to Winston logger for file persistence
+            if (level === 'error') {
+                logger_1.logger.error(message, metadata);
+            }
+            else if (level === 'warn') {
+                logger_1.logger.warn(message, metadata);
+            }
+            else if (level === 'info') {
+                logger_1.logger.info(message, metadata);
+            }
+            else {
+                logger_1.logger.debug(message, metadata);
+            }
         };
         // Initialize services with dependency injection
         this.mt5Detector = new mt5_detector_service_1.MT5DetectorService();
         this.mt5Installer = new mt5_auto_installer_service_1.MT5AutoInstaller();
-        this.apiService = new api_service_1.ApiService(logger);
+        this.apiService = new api_service_1.ApiService(loggerFunc);
         this.connectionManager = new connection_manager_service_1.ConnectionManager({
             initialDelay: 1000,
             maxDelay: 60000,
             maxAttempts: 10,
             backoffMultiplier: 2,
-        }, logger);
-        this.pusherService = new pusher_service_1.PusherService(logger);
-        this.zeromqService = new zeromq_service_1.ZeroMQService(logger);
-        this.zeromqServer = new zeromq_server_service_1.ZeroMQServerService(logger);
+        }, loggerFunc);
+        this.pusherService = new pusher_service_1.PusherService(loggerFunc);
+        this.zeromqService = new zeromq_service_1.ZeroMQService(loggerFunc);
+        this.zeromqServer = new zeromq_server_service_1.ZeroMQServerService(loggerFunc);
         this.safetyService = new safety_service_1.SafetyService(this.db);
         this.monitoringService = new monitoring_service_1.MonitoringService(this.db);
         this.securityService = new security_service_1.SecurityService(this.db, 'encryption-key-placeholder');
         // Command service depends on other services
-        this.commandService = new command_service_1.CommandService(this.zeromqService, this.pusherService, this.safetyService.getLimits(), this.getRateLimitConfig(), logger, this.apiService);
+        this.commandService = new command_service_1.CommandService(this.zeromqService, this.pusherService, this.safetyService.getLimits(), this.getRateLimitConfig(), loggerFunc, this.apiService);
         // Heartbeat service
-        this.heartbeatService = new heartbeat_service_1.HeartbeatService(this.zeromqService, this.pusherService, this.commandService, logger, this.apiService);
+        this.heartbeatService = new heartbeat_service_1.HeartbeatService(this.zeromqService, this.pusherService, this.commandService, loggerFunc, this.apiService);
         // Strategy Engine services (NEW)
         this.indicatorService = new indicator_service_1.IndicatorService();
         this.marketDataService = new market_data_service_1.MarketDataService(this.zeromqService);
@@ -767,10 +781,14 @@ class MainController extends events_1.EventEmitter {
             this.addLog('info', 'MAIN', 'Step 9: Initializing Strategy Engine...');
             this.llmService = new llm_service_1.LLMService(config.platformUrl, config.apiKey, this.executorId);
             // Initialize additional services
-            this.mt5AccountService = new mt5_account_service_1.MT5AccountService(this.zeromqServer);
+            this.mt5AccountService = new mt5_account_service_1.MT5AccountService(this.zeromqServer, this.zeromqService);
             this.performanceMonitor = new performance_monitor_service_1.PerformanceMonitorService();
             this.alertService = new alert_service_1.AlertService();
             this.addLog('info', 'MAIN', 'Additional services initialized (MT5Account, PerformanceMonitor, Alert)');
+            // CRITICAL: Setup event handlers BEFORE starting monitoring
+            // This ensures signal emissions are captured
+            this.setupLiveTradingEventHandlers();
+            logger_1.logger.info('[MainController] ✅ Live trading event handlers setup complete (BEFORE monitoring starts)', { category: 'MAIN' });
             // Initialize strategy service with dependencies
             this.initializeStrategyService();
             // Download and load strategies from platform
@@ -784,19 +802,49 @@ class MainController extends events_1.EventEmitter {
                 }
             }
             // Sync active strategies from platform (restore after restart)
-            this.addLog('info', 'MAIN', 'Syncing active strategies from platform...');
+            // MOVED TO AFTER ALL CRITICAL SERVICES ARE INITIALIZED
+            // This ensures ZeroMQ is connected before attempting to monitor strategies
+            // Step 10: Start Live Trading Background Services
+            this.addLog('info', 'MAIN', 'Step 10: Starting live trading services...');
+            await this.startLiveTradingServices();
+            // Step 11: Sync active strategies from platform (after all services are ready)
+            this.addLog('info', 'MAIN', 'Step 11: Syncing active strategies from platform...');
             try {
                 await this.syncActiveStrategiesFromPlatform();
                 this.addLog('info', 'MAIN', 'Active strategies synced successfully');
             }
             catch (error) {
-                this.addLog('warn', 'MAIN', 'Failed to sync active strategies - manual reactivation may be required', { error });
+                this.addLog('warn', 'MAIN', 'Failed to sync active strategies from platform', { error });
+                // Try to load from persisted state as fallback
+                try {
+                    const persistedStrategies = this.persistence.getActiveStrategies();
+                    if (persistedStrategies.length > 0) {
+                        this.addLog('info', 'MAIN', `Loading ${persistedStrategies.length} strategies from local cache`);
+                        for (const strategy of persistedStrategies) {
+                            this.activeStrategies.push({
+                                id: strategy.id,
+                                name: strategy.name,
+                                status: 'active',
+                                symbol: strategy.symbol,
+                                symbols: [strategy.symbol],
+                                timeframe: strategy.timeframe,
+                                lastSignal: null
+                            });
+                            // Start monitoring if ZeroMQ is connected
+                            if (this.connectionStatus.zeromq === 'connected' && this.strategyMonitor) {
+                                await this.strategyMonitor.startMonitoring(strategy);
+                            }
+                        }
+                    }
+                }
+                catch (fallbackError) {
+                    this.addLog('warn', 'MAIN', 'Failed to load persisted strategies', { error: fallbackError });
+                }
             }
-            // Step 10: Start Live Trading Background Services
-            this.addLog('info', 'MAIN', 'Step 10: Starting live trading services...');
-            await this.startLiveTradingServices();
             this.isInitialized = true;
             this.addLog('info', 'MAIN', 'Windows Executor initialized successfully');
+            // Event handlers already setup before monitoring started
+            // this.setupLiveTradingEventHandlers(); // MOVED TO BEFORE START MONITORING
             this.emit('initialized');
             return true;
         }
@@ -903,12 +951,18 @@ class MainController extends events_1.EventEmitter {
                 attempt++;
                 this.addLog('info', 'SYNC', `Syncing active strategies (attempt ${attempt}/${maxRetries})...`);
                 // Fetch active strategies from web platform API
-                const response = await fetch(`${this.config.platformUrl}/api/executor/${this.executorId}/active-strategies`, {
+                // Support both local development and Vercel deployment
+                const platformUrl = this.config.platformUrl || 'https://fx.nusanexus.com';
+                const apiUrl = `${platformUrl}/api/executor/${this.executorId}/active-strategies`;
+                this.addLog('debug', 'SYNC', `Fetching strategies from: ${apiUrl}`);
+                const response = await fetch(apiUrl, {
                     headers: {
                         'Authorization': `Bearer ${this.config.apiKey}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-Executor-Id': this.executorId,
+                        'X-API-Key': this.config.apiKey
                     },
-                    signal: AbortSignal.timeout(10000) // 10 second timeout
+                    signal: AbortSignal.timeout(15000) // 15 second timeout (increased for Vercel)
                 });
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1327,6 +1381,34 @@ class MainController extends events_1.EventEmitter {
         return this.eaAttachmentHandler.getAttachments();
     }
     /**
+     * Reconnect ZeroMQ client (for manual recovery)
+     */
+    async reconnectZeroMQClient() {
+        try {
+            this.addLog('info', 'ZEROMQ', 'Attempting to reconnect ZeroMQ client...');
+            // Disconnect first if connected
+            this.zeromqService.disconnect();
+            // Wait a moment
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Reconnect
+            const connected = await this.zeromqService.connect(this.config);
+            if (connected) {
+                this.addLog('info', 'ZEROMQ', '✅ ZeroMQ client reconnected successfully');
+                this.connectionStatus.zeromq = 'connected';
+                this.monitoringService.updateConnectionStatus('zeromq', { connected: true });
+                return true;
+            }
+            else {
+                this.addLog('error', 'ZEROMQ', 'Failed to reconnect ZeroMQ client');
+                return false;
+            }
+        }
+        catch (error) {
+            this.addLog('error', 'ZEROMQ', `Reconnection error: ${error.message}`, { error });
+            return false;
+        }
+    }
+    /**
      * Get recent activity
      */
     getRecentActivity(limit = 20) {
@@ -1358,6 +1440,11 @@ class MainController extends events_1.EventEmitter {
             // Initialize command processor with all services (Phase 1)
             this.commandProcessor.initialize(this.zeromqService, this.pusherService, this.strategyMonitor, this.emergencyStop);
             this.addLog('info', 'COMMAND', 'Command processor initialized');
+            // Link CommandService with CommandProcessor for strategy commands
+            if (this.commandService && this.commandProcessor) {
+                this.commandService.setCommandProcessor(this.commandProcessor);
+                this.addLog('info', 'COMMAND', 'CommandService linked with CommandProcessor');
+            }
             // Perform crash recovery if needed (Phase 4)
             if (await this.detectPreviousCrash()) {
                 this.addLog('warn', 'RECOVERY', 'Previous crash detected, initiating recovery...');
@@ -1382,10 +1469,21 @@ class MainController extends events_1.EventEmitter {
      * Setup event handlers for live trading services
      */
     setupLiveTradingEventHandlers() {
+        logger_1.logger.info('[MainController] Setting up live trading event handlers...', { category: 'MAIN' });
         // Strategy Monitor events (Phase 1)
         this.strategyMonitor.on('signal:generated', async (data) => {
-            this.addLog('info', 'SIGNAL', `Signal generated for ${data.signal.symbol}`, data.signal);
-            // TODO: Execute trade via ZeroMQ
+            logger_1.logger.info('[MainController] 🔔 SIGNAL EVENT TRIGGERED!', { category: 'SIGNAL', data });
+            const { strategyId, signal } = data;
+            this.addLog('info', 'SIGNAL', `Signal generated for ${signal.symbol}`, signal);
+            // Emit signal to dashboard (MainController extends EventEmitter - will auto-broadcast)
+            this.emit('signal:generated', {
+                strategyId,
+                signal,
+                timestamp: new Date().toISOString(),
+            });
+            // Execute trade via ZeroMQ using existing handler
+            logger_1.logger.info('[MainController] Calling handleSignalGenerated...', { category: 'SIGNAL' });
+            await this.handleSignalGenerated(data);
         });
         this.strategyMonitor.on('monitor:stopped', (data) => {
             this.addLog('info', 'MONITOR', `Strategy monitor stopped: ${data.strategyId}`);
@@ -1409,8 +1507,198 @@ class MainController extends events_1.EventEmitter {
      * Handle signal generated
      */
     async handleSignalGenerated(data) {
-        // TODO: Execute trade via ZeroMQ
-        this.addLog('info', 'SIGNAL', 'Handling signal', data);
+        logger_1.logger.info('[MainController] 🚀 handleSignalGenerated CALLED', { category: 'SIGNAL', data });
+        const { strategyId, signal } = data;
+        try {
+            logger_1.logger.info('[MainController] Processing signal...', { category: 'SIGNAL', strategyId, signal });
+            this.addLog('info', 'SIGNAL', `Signal received for execution: ${signal.action} ${signal.symbol}`, {
+                strategyId,
+                signal: {
+                    symbol: signal.symbol,
+                    type: signal.type,
+                    action: signal.action,
+                    entryPrice: signal.entryPrice,
+                    stopLoss: signal.stopLoss,
+                    takeProfit: signal.takeProfit,
+                    volume: signal.volume,
+                    confidence: signal.confidence,
+                    reasons: signal.reasons
+                }
+            });
+            // Check if emergency stop is active
+            logger_1.logger.info('[MainController] Checking emergency stop...', { category: 'SIGNAL', canTrade: this.emergencyStop?.canTrade() });
+            if (this.emergencyStop && !this.emergencyStop.canTrade()) {
+                logger_1.logger.warn('[MainController] ⛔ Trade rejected: Emergency stop active', { category: 'SIGNAL' });
+                this.addLog('warn', 'SIGNAL', 'Trade rejected: Emergency stop is active');
+                return;
+            }
+            // Validate signal has required fields
+            logger_1.logger.info('[MainController] Validating signal fields...', { category: 'SIGNAL', symbol: signal.symbol, type: signal.type, volume: signal.volume });
+            if (!signal.symbol || !signal.type || !signal.volume) {
+                logger_1.logger.error('[MainController] ❌ Invalid signal: Missing required fields', { category: 'SIGNAL', signal });
+                this.addLog('error', 'SIGNAL', 'Invalid signal: Missing required fields', { signal });
+                return;
+            }
+            logger_1.logger.info('[MainController] ✅ Signal validation passed!', { category: 'SIGNAL' });
+            // Prepare trade parameters
+            logger_1.logger.info('[MainController] Preparing trade parameters...', { category: 'SIGNAL' });
+            // Map platform symbol to MT5 broker symbol (BTCUSD -> BTCUSDm)
+            const mt5Symbol = signal.symbol === 'BTCUSD' ? 'BTCUSDm' : signal.symbol;
+            // Calculate Stop Loss and Take Profit if not provided
+            let stopLoss = signal.stopLoss || 0;
+            let takeProfit = signal.takeProfit || 0;
+            // If no SL provided, calculate based on percentage (2% default for safety)
+            if (stopLoss === 0 && signal.entryPrice) {
+                const slPercentage = 0.02; // 2% stop loss
+                if (signal.type === 'BUY') {
+                    stopLoss = signal.entryPrice * (1 - slPercentage);
+                }
+                else {
+                    stopLoss = signal.entryPrice * (1 + slPercentage);
+                }
+                logger_1.logger.info(`[MainController] 🛡️ Calculated Stop Loss: ${stopLoss.toFixed(2)} (2% from entry)`, { category: 'SIGNAL' });
+            }
+            // If no TP provided, use 2:1 risk-reward ratio
+            if (takeProfit === 0 && signal.entryPrice && stopLoss > 0) {
+                const slDistance = Math.abs(signal.entryPrice - stopLoss);
+                const tpDistance = slDistance * 2; // 2:1 reward:risk
+                if (signal.type === 'BUY') {
+                    takeProfit = signal.entryPrice + tpDistance;
+                }
+                else {
+                    takeProfit = signal.entryPrice - tpDistance;
+                }
+                logger_1.logger.info(`[MainController] 🎯 Calculated Take Profit: ${takeProfit.toFixed(2)} (2:1 R:R)`, { category: 'SIGNAL' });
+            }
+            const tradeParams = {
+                symbol: mt5Symbol, // Use broker symbol
+                type: signal.type, // 'BUY' or 'SELL'
+                volume: signal.volume,
+                price: signal.entryPrice || 0, // 0 means market price
+                stopLoss: stopLoss,
+                takeProfit: takeProfit,
+                comment: `Strategy: ${strategyId}`,
+                magic: this.generateMagicNumber(strategyId),
+                slippage: 10, // 10 points slippage
+            };
+            logger_1.logger.info('[MainController] 🎯 Executing trade via ZeroMQ...', { category: 'SIGNAL', tradeParams });
+            this.addLog('info', 'SIGNAL', 'Executing trade via ZeroMQ...', { tradeParams });
+            // Execute trade via ZeroMQ
+            logger_1.logger.info('[MainController] Calling zeromqService.openPosition...', { category: 'SIGNAL' });
+            const result = await this.zeromqService.openPosition(tradeParams);
+            logger_1.logger.info('[MainController] 📥 Received result from openPosition', { category: 'SIGNAL', result });
+            if (result.success) {
+                logger_1.logger.info(`[MainController] 🎉 Trade executed successfully!`, {
+                    category: 'SIGNAL',
+                    ticket: result.ticket,
+                    symbol: result.symbol,
+                    type: result.type,
+                    volume: result.volume,
+                    openPrice: result.openPrice,
+                    stopLoss: result.stopLoss,
+                    takeProfit: result.takeProfit
+                });
+                this.addLog('info', 'SIGNAL', `✅ Trade executed successfully: Ticket #${result.ticket}`, {
+                    ticket: result.ticket,
+                    symbol: result.symbol,
+                    type: result.type,
+                    volume: result.volume,
+                    openPrice: result.openPrice,
+                    stopLoss: result.stopLoss,
+                    takeProfit: result.takeProfit,
+                    profit: result.profit,
+                    commission: result.commission,
+                });
+                // Broadcast to dashboard via Pusher
+                try {
+                    await this.pusherService.sendCommandResult('trade-opened', {
+                        strategyId,
+                        signal,
+                        ticket: result.ticket,
+                        openPrice: result.openPrice,
+                        timestamp: new Date().toISOString(),
+                    });
+                    logger_1.logger.info('[MainController] 📡 Trade broadcasted to dashboard', { category: 'SIGNAL' });
+                }
+                catch (broadcastError) {
+                    logger_1.logger.error('[MainController] Failed to broadcast trade:', broadcastError);
+                }
+                // Notify platform about trade execution
+                await this.reportTradeExecution(strategyId, signal, result);
+                // Emit event for monitoring
+                this.emit('trade:opened', {
+                    strategyId,
+                    signal,
+                    result,
+                });
+            }
+            else {
+                this.addLog('error', 'SIGNAL', `❌ Trade execution failed: ${result.error}`, {
+                    signal,
+                    error: result.error,
+                });
+                // Emit event for error handling
+                this.emit('trade:failed', {
+                    strategyId,
+                    signal,
+                    error: result.error,
+                });
+            }
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.addLog('error', 'SIGNAL', `Error executing signal: ${errorMessage}`, {
+                error,
+                signal,
+                strategyId,
+            });
+            this.emit('trade:error', {
+                strategyId,
+                signal,
+                error: errorMessage,
+            });
+        }
+    }
+    /**
+     * Generate magic number from strategy ID
+     */
+    generateMagicNumber(strategyId) {
+        // Generate a consistent magic number from strategy ID
+        let hash = 0;
+        for (let i = 0; i < strategyId.length; i++) {
+            const char = strategyId.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        // Ensure positive number between 100000 and 999999
+        return Math.abs(hash % 900000) + 100000;
+    }
+    /**
+     * Report trade execution to platform
+     */
+    async reportTradeExecution(strategyId, signal, result) {
+        try {
+            if (!this.apiService) {
+                this.addLog('warn', 'SIGNAL', 'API service not available for trade reporting');
+                return;
+            }
+            await this.apiService.reportTrade({
+                ticket: result.ticket?.toString() || 'unknown',
+                symbol: signal.symbol,
+                type: signal.type,
+                volume: signal.volume,
+                openPrice: result.openPrice || signal.entryPrice,
+                openTime: result.timestamp || new Date().toISOString(),
+                stopLoss: result.stopLoss || signal.stopLoss,
+                takeProfit: result.takeProfit || signal.takeProfit,
+                comment: `Strategy: ${strategyId}`,
+            });
+            this.addLog('info', 'SIGNAL', 'Trade execution reported to platform');
+        }
+        catch (error) {
+            this.addLog('warn', 'SIGNAL', 'Failed to report trade to platform', { error });
+            // Don't throw - this is non-critical
+        }
     }
     /**
      * Execute partial close

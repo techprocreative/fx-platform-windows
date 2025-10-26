@@ -21,6 +21,7 @@ export class CommandService {
   private apiService: ApiService | null = null;
   private zeroMQService: ZeroMQService;
   private pusherService: PusherService;
+  private commandProcessor: any | null = null; // CommandProcessor for strategy commands
   private safetyLimits: SafetyLimits;
   private rateLimitConfig: RateLimitConfig;
   private commandHistory: Map<string, { timestamp: Date; result: CommandResult }> = new Map();
@@ -57,6 +58,10 @@ export class CommandService {
   
   setApiService(apiService: ApiService): void {
     this.apiService = apiService;
+  }
+  
+  setCommandProcessor(commandProcessor: any): void {
+    this.commandProcessor = commandProcessor;
   }
 
   private log(level: string, message: string, metadata?: any): void {
@@ -319,6 +324,17 @@ export class CommandService {
           
         case 'GET_SYMBOL_INFO':
           result = await this.executeGetSymbolInfo(command, context);
+          break;
+        
+        case 'START_STRATEGY':
+        case 'STOP_STRATEGY':
+        case 'GET_STATUS':
+          // Delegate strategy commands to CommandProcessor
+          if (this.commandProcessor) {
+            result = await this.commandProcessor.processCommand(command);
+          } else {
+            throw new Error('CommandProcessor not available for strategy commands');
+          }
           break;
           
         default:

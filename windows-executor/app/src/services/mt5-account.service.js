@@ -7,13 +7,14 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.MT5AccountService = void 0;
 const logger_1 = require("../utils/logger");
 class MT5AccountService {
-    constructor(zeromqServer) {
+    constructor(zeromqServer, zeromqClient) {
         this.cachedAccountInfo = null;
         this.cacheExpiry = 0;
         this.cacheLifetime = 5000; // 5 seconds
         this.cachedPositions = [];
         this.positionsCacheExpiry = 0;
         this.zeromqServer = zeromqServer;
+        this.zeromqClient = zeromqClient;
     }
     /**
      * Get current account information from MT5
@@ -202,11 +203,53 @@ class MT5AccountService {
      * Fetch account info from MT5 (to be implemented with ZMQ/bridge)
      */
     async fetchAccountInfoFromMT5() {
-        // Get account info from ZeroMQ Server (which receives it from EA)
+        // Request account info from EA via ZeroMQ client
+        if (this.zeromqClient && this.zeromqClient.isConnected()) {
+            try {
+                logger_1.logger.debug('[MT5AccountService] Requesting account info from EA...');
+                const response = await this.zeromqClient.sendRequest({
+                    command: 'GET_ACCOUNT',
+                    requestId: `account_${Date.now()}`
+                }, 3000);
+                if (response && response.status === 'OK' && response.data) {
+                    const data = response.data;
+                    return {
+                        balance: data.balance || 0,
+                        equity: data.equity || 0,
+                        margin: data.margin || 0,
+                        freeMargin: data.freeMargin || 0,
+                        marginLevel: data.freeMargin > 0 ? (data.equity / data.margin) * 100 : 0,
+                        profit: data.profit || 0,
+                        currency: 'USD', // MT5 doesn't provide this in response
+                        leverage: 100, // MT5 doesn't provide this in response
+                        accountNumber: 'MT5', // MT5 doesn't provide this in response
+                        server: 'Unknown',
+                        company: 'Unknown'
+                    };
+                }
+            }
+            catch (error) {
+                logger_1.logger.warn('[MT5AccountService] Failed to request account info:', error);
+            }
+        }
+        // Fallback: Try to get from ZeroMQ Server (old method)
         const accountData = this.zeromqServer.getAccountInfo();
         if (!accountData) {
-            logger_1.logger.debug('[MT5AccountService] No account info available from MT5 EA yet');
-            return null;
+            logger_1.logger.debug('[MT5AccountService] No account info available, returning zeros');
+            // Return zeros instead of crashing
+            return {
+                balance: 0,
+                equity: 0,
+                margin: 0,
+                freeMargin: 0,
+                marginLevel: 0,
+                profit: 0,
+                currency: 'USD',
+                leverage: 100,
+                accountNumber: 'N/A',
+                server: 'N/A',
+                company: 'N/A'
+            };
         }
         // Transform ZeroMQ data to MT5AccountInfo format
         const accountInfo = {

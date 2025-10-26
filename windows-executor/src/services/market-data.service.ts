@@ -4,6 +4,7 @@
  */
 
 import { logger } from '../utils/logger';
+import { SymbolMapper } from '../utils/symbol-mapper';
 import { Timeframe } from '../types/strategy.types';
 import { Bar, MarketData } from './indicator.service';
 
@@ -23,7 +24,14 @@ export class MarketDataService {
   ): Promise<MarketData> {
     
     try {
-      logger.debug(`[MarketDataService] Fetching ${bars} bars for ${symbol} ${timeframe}`);
+      // Map platform symbol to MT5 broker symbol
+      const mt5Symbol = SymbolMapper.toMT5Symbol(symbol);
+      
+      if (mt5Symbol !== symbol) {
+        logger.debug(`[MarketDataService] Symbol mapped: ${symbol} -> ${mt5Symbol}`);
+      }
+      
+      logger.debug(`[MarketDataService] Fetching ${bars} bars for ${mt5Symbol} ${timeframe}`);
       
       // Request from MT5 via ZeroMQ
       const request = {
@@ -31,7 +39,7 @@ export class MarketDataService {
         requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         timestamp: new Date().toISOString(),
         parameters: {
-          symbol,
+          symbol: mt5Symbol,  // Use mapped symbol for MT5
           timeframe,
           bars
         }

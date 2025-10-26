@@ -159,7 +159,27 @@ class HeartbeatService {
                         this.log('info', 'Received pending commands', {
                             count: response.pendingCommands.length,
                         });
-                        // TODO: Pass to command service
+                        // Process each command via CommandService
+                        if (this.commandService) {
+                            for (const command of response.pendingCommands) {
+                                try {
+                                    this.log('info', 'Processing pending command', {
+                                        commandId: command.id,
+                                        command: command.command
+                                    });
+                                    await this.commandService.addCommand(command);
+                                }
+                                catch (error) {
+                                    this.log('error', 'Failed to process pending command', {
+                                        commandId: command.id,
+                                        error: error.message
+                                    });
+                                }
+                            }
+                        }
+                        else {
+                            this.log('warn', 'Command service not available, commands not processed');
+                        }
                     }
                 }
                 catch (apiError) {

@@ -35,8 +35,10 @@ class StrategyMonitor extends events_1.EventEmitter {
             isActive: true,
             interval: null,
             lastCheck: new Date(),
+            lastSignalTime: null,
             signalCount: 0,
             errorCount: 0,
+            hasOpenPosition: false,
         };
         this.activeMonitors.set(strategy.id, monitor);
         // Start the monitoring loop
@@ -84,6 +86,17 @@ class StrategyMonitor extends events_1.EventEmitter {
         return Array.from(this.activeMonitors.values());
     }
     /**
+     * Mark position as closed for a strategy
+     * Call this when a position is closed to allow new signals
+     */
+    markPositionClosed(strategyId) {
+        const monitor = this.activeMonitors.get(strategyId);
+        if (monitor) {
+            monitor.hasOpenPosition = false;
+            logger_1.logger.info(`[StrategyMonitor] Position closed for ${monitor.strategy.name}, ready for new signals`);
+        }
+    }
+    /**
      * Main monitoring loop - THIS IS THE CRITICAL CONTINUOUS MONITORING
      */
     async runMonitoringLoop(monitor) {
@@ -114,25 +127,44 @@ class StrategyMonitor extends events_1.EventEmitter {
                     this.scheduleNext(monitor, interval);
                     return;
                 }
-                // 3. Evaluate entry conditions
+                // 3. Check signal cooldown (prevent rapid-fire trading)
+                const SIGNAL_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes minimum between signals
+                const timeSinceLastSignal = monitor.lastSignalTime
+                    ? Date.now() - monitor.lastSignalTime.getTime()
+                    : SIGNAL_COOLDOWN_MS + 1;
+                if (timeSinceLastSignal < SIGNAL_COOLDOWN_MS) {
+                    const remainingCooldown = Math.ceil((SIGNAL_COOLDOWN_MS - timeSinceLastSignal) / 1000 / 60);
+                    logger_1.logger.debug(`[StrategyMonitor] Signal cooldown active for ${strategy.name} (${remainingCooldown} minutes remaining)`);
+                    this.scheduleNext(monitor, interval);
+                    return;
+                }
+                // 4. Check if already has open position (prevent duplicates)
+                if (monitor.hasOpenPosition) {
+                    logger_1.logger.debug(`[StrategyMonitor] Position already open for ${strategy.name}, skipping entry signal`);
+                    this.scheduleNext(monitor, interval);
+                    return;
+                }
+                // 5. Evaluate entry conditions
                 const entrySignal = await this.evaluateEntryConditions(strategy, marketData);
                 if (entrySignal) {
-                    // 4. Validate safety before generating signal
+                    // 6. Validate safety before generating signal
                     const safetyCheck = await this.safetyValidator.validateBeforeTrade(entrySignal);
                     if (safetyCheck.canTrade) {
-                        // 5. Calculate position size
+                        // 7. Calculate position size
                         const lotSize = await this.calculatePositionSize(strategy, entrySignal);
                         entrySignal.volume = lotSize;
-                        // 6. Emit signal for execution
+                        // 8. Emit signal for execution
                         monitor.signalCount++;
+                        monitor.lastSignalTime = new Date(); // Update last signal time
+                        monitor.hasOpenPosition = true; // Mark as having open position
                         this.emit('signal:generated', {
                             strategyId: strategy.id,
                             signal: entrySignal,
                         });
-                        logger_1.logger.info(`[StrategyMonitor] Signal generated for ${strategy.name}: ${entrySignal.action} ${entrySignal.symbol}`);
+                        logger_1.logger.info(`[StrategyMonitor] ✅ Signal generated for ${strategy.name}: ${entrySignal.action} ${entrySignal.symbol} @ ${lotSize} lots`);
                     }
                     else {
-                        logger_1.logger.warn(`[StrategyMonitor] Safety check failed: ${safetyCheck.failedChecks.map(c => c.reason).join(', ')}`);
+                        logger_1.logger.warn(`[StrategyMonitor] ⚠️ Safety check failed: ${safetyCheck.failedChecks.map(c => c.reason).join(', ')}`);
                     }
                 }
                 // 7. Check exit conditions for open positions

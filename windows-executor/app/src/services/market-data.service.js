@@ -6,6 +6,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.MarketDataService = void 0;
 const logger_1 = require("../utils/logger");
+const symbol_mapper_1 = require("../utils/symbol-mapper");
 class MarketDataService {
     constructor(zeromqService) {
         this.zeromqService = zeromqService;
@@ -16,14 +17,19 @@ class MarketDataService {
      */
     async getMarketData(symbol, timeframe, bars = 100) {
         try {
-            logger_1.logger.debug(`[MarketDataService] Fetching ${bars} bars for ${symbol} ${timeframe}`);
+            // Map platform symbol to MT5 broker symbol
+            const mt5Symbol = symbol_mapper_1.SymbolMapper.toMT5Symbol(symbol);
+            if (mt5Symbol !== symbol) {
+                logger_1.logger.debug(`[MarketDataService] Symbol mapped: ${symbol} -> ${mt5Symbol}`);
+            }
+            logger_1.logger.debug(`[MarketDataService] Fetching ${bars} bars for ${mt5Symbol} ${timeframe}`);
             // Request from MT5 via ZeroMQ
             const request = {
                 command: 'GET_BARS',
                 requestId: `req_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
                 timestamp: new Date().toISOString(),
                 parameters: {
-                    symbol,
+                    symbol: mt5Symbol, // Use mapped symbol for MT5
                     timeframe,
                     bars
                 }

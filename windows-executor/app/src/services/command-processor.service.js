@@ -40,6 +40,46 @@ class CommandProcessor {
         logger_1.logger.info('[CommandProcessor] Initialized with all services');
     }
     /**
+     * Process command from platform (generic entry point)
+     */
+    async processCommand(command) {
+        logger_1.logger.info(`[CommandProcessor] Processing command: ${command.command}`, {
+            commandId: command.id,
+            strategyId: command.parameters?.strategyId
+        });
+        try {
+            // Route based on command type
+            switch (command.command) {
+                case 'START_STRATEGY':
+                    await this.handleStartStrategy({
+                        type: 'START_STRATEGY',
+                        strategyId: command.parameters?.strategyId,
+                        strategy: command.parameters?.strategy,
+                        timestamp: new Date()
+                    });
+                    return { success: true, message: 'Strategy started' };
+                case 'STOP_STRATEGY':
+                    await this.handleStopStrategy({
+                        type: 'STOP_STRATEGY',
+                        strategyId: command.parameters?.strategyId,
+                        timestamp: new Date()
+                    });
+                    return { success: true, message: 'Strategy stopped' };
+                case 'GET_STATUS':
+                    return {
+                        success: true,
+                        data: { status: 'operational', strategies: this.strategyMonitor?.getAllActive().length || 0 }
+                    };
+                default:
+                    throw new Error(`Unknown command: ${command.command}`);
+            }
+        }
+        catch (error) {
+            logger_1.logger.error(`[CommandProcessor] Command execution error:`, error);
+            throw error;
+        }
+    }
+    /**
      * Handle strategy commands (START, STOP, PAUSE, RESUME, UPDATE)
      */
     async handleStrategyCommand(command) {

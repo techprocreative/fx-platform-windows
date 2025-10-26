@@ -117,9 +117,9 @@ void OnTick()
 //+------------------------------------------------------------------+
 void OnTimer()
 {
-   SendMarketData();
-   SendAccountInfo();
-   CheckForCommands();
+   // DISABLED: SendMarketData();  // Executor will REQUEST when needed via GET_BARS
+   // DISABLED: SendAccountInfo();  // Executor will REQUEST when needed 
+   CheckForCommands();  // Only listen for commands
 }
 
 //+------------------------------------------------------------------+
@@ -317,7 +317,14 @@ void CheckForCommands()
 string ProcessCommand(string request)
 {
    // Route to appropriate handler
-   if(StringFind(request, "\"command\":\"GET_BARS\"") >= 0)
+   if(StringFind(request, "\"command\":\"PING\"") >= 0)
+   {
+      // Handle PING command for connection test
+      ulong startTime = GetTickCount64();
+      ulong executionTime = GetTickCount64() - startTime;
+      return "{\"status\":\"OK\",\"message\":\"PONG\",\"executionTime\":" + IntegerToString((long)executionTime) + "}";
+   }
+   else if(StringFind(request, "\"command\":\"GET_BARS\"") >= 0)
    {
       return GetHistoricalBars(request);
    }

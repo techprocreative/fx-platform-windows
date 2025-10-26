@@ -8,8 +8,15 @@ import { Strategy } from '../types/strategy.types';
 /**
  * Get primary symbol from strategy
  * Strategy has symbols array, this gets the first one
+ * Also handles when strategy comes with single 'symbol' property from web platform
  */
-export function getPrimarySymbol(strategy: Strategy): string {
+export function getPrimarySymbol(strategy: Strategy | any): string {
+  // Handle single symbol property from web platform
+  if ((strategy as any).symbol && typeof (strategy as any).symbol === 'string') {
+    return (strategy as any).symbol;
+  }
+  
+  // Handle symbols array
   if (!strategy.symbols || strategy.symbols.length === 0) {
     return 'EURUSD'; // Default fallback
   }
@@ -19,14 +26,24 @@ export function getPrimarySymbol(strategy: Strategy): string {
 /**
  * Get all symbols from strategy
  */
-export function getAllSymbols(strategy: Strategy): string[] {
+export function getAllSymbols(strategy: Strategy | any): string[] {
+  // Handle single symbol property from web platform
+  if ((strategy as any).symbol && typeof (strategy as any).symbol === 'string') {
+    return [(strategy as any).symbol];
+  }
+  
   return strategy.symbols || ['EURUSD'];
 }
 
 /**
  * Check if strategy has specific symbol
  */
-export function hasSymbol(strategy: Strategy, symbol: string): boolean {
+export function hasSymbol(strategy: Strategy | any, symbol: string): boolean {
+  // Handle single symbol property from web platform
+  if ((strategy as any).symbol && typeof (strategy as any).symbol === 'string') {
+    return (strategy as any).symbol === symbol;
+  }
+  
   return strategy.symbols?.includes(symbol) || false;
 }
 

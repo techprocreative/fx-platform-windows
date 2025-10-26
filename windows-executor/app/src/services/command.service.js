@@ -6,6 +6,7 @@ class CommandService {
     constructor(zeroMQService, pusherService, safetyLimits, rateLimitConfig, logger, apiService) {
         this.processing = false;
         this.apiService = null;
+        this.commandProcessor = null; // CommandProcessor for strategy commands
         this.commandHistory = new Map();
         this.activeCommands = new Set();
         this.retryDelays = new Map([
@@ -28,6 +29,9 @@ class CommandService {
     }
     setApiService(apiService) {
         this.apiService = apiService;
+    }
+    setCommandProcessor(commandProcessor) {
+        this.commandProcessor = commandProcessor;
     }
     log(level, message, metadata) {
         this.logger(level, message, metadata);
@@ -244,6 +248,17 @@ class CommandService {
                     break;
                 case 'GET_SYMBOL_INFO':
                     result = await this.executeGetSymbolInfo(command, context);
+                    break;
+                case 'START_STRATEGY':
+                case 'STOP_STRATEGY':
+                case 'GET_STATUS':
+                    // Delegate strategy commands to CommandProcessor
+                    if (this.commandProcessor) {
+                        result = await this.commandProcessor.processCommand(command);
+                    }
+                    else {
+                        throw new Error('CommandProcessor not available for strategy commands');
+                    }
                     break;
                 default:
                     throw new Error(`Unknown command: ${command.command}`);

@@ -13,8 +13,9 @@ export class ZeroMQService {
   private connectionStatus: ConnectionStatus["zeromq"] = "disconnected";
   private config: AppConfig | null = null;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
+  private maxReconnectAttempts = Infinity; // UNLIMITED retries for live trading
   private reconnectTimeout: any = null;
+  private autoRetryInterval: any = null; // Background retry loop
   private requestTimeouts: Map<string, any> = new Map();
   private pendingRequests: Map<
     string,
@@ -28,6 +29,7 @@ export class ZeroMQService {
   private connectionPool: zmq.Request[] = [];
   private maxPoolSize = 3;
   private currentPoolIndex = 0;
+  private isRetrying = false; // Flag to prevent multiple retry loops
 
   constructor(
     logger?: (level: string, message: string, metadata?: any) => void,
@@ -68,13 +70,26 @@ export class ZeroMQService {
       }
 
       const poolResults = await Promise.allSettled(poolPromises);
-      const successfulConnections = poolResults.filter(
-        (result) => result.status === "fulfilled",
-      ).length;
+      
+      // Add successful connections to pool
+      this.connectionPool = [];
+      for (const result of poolResults) {
+        if (result.status === "fulfilled") {
+          this.connectionPool.push(result.value);
+        }
+      }
+      
+      const successfulConnections = this.connectionPool.length;
+      this.log("info", `Created ${successfulConnections} ZeroMQ connections in pool`, { category: "ZEROMQ" });
 
       if (successfulConnections > 0) {
         // Set up main socket for backwards compatibility
         this.socket = this.connectionPool[0];
+
+        // CRITICAL: Wait additional time for all connections to stabilize
+        // This ensures EA (if already running) has time to process connection
+        this.log("info", "Waiting for connections to stabilize...");
+        await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second wait
 
         // Test connection
         const isConnected = await this.ping();
@@ -83,16 +98,20 @@ export class ZeroMQService {
         if (isConnected) {
           this.log(
             "info",
-            `ZeroMQ connected successfully with ${successfulConnections} connections in pool`,
+            `✅ ZeroMQ connected successfully with ${successfulConnections} connections in pool`,
           );
+          this.reconnectAttempts = 0; // Reset counter on success
+          this.stopAutoRetry(); // Stop background retry loop
           return true;
         } else {
-          this.log("error", "ZeroMQ connection test failed");
-          return false;
+          this.log("warn", "⚠️ ZeroMQ PING test failed, starting auto-retry...");
+          this.startAutoRetry(); // Start background retry loop
+          return false; // Return false but don't block initialization
         }
       } else {
         this.log("error", "Failed to create any ZeroMQ connections");
         this.connectionStatus = "error";
+        this.startAutoRetry(); // Keep trying in background
         return false;
       }
     } catch (error) {
@@ -100,7 +119,7 @@ export class ZeroMQService {
         error: (error as Error).message,
       });
       this.connectionStatus = "error";
-      this.scheduleReconnect();
+      this.startAutoRetry(); // Start auto-retry instead of single schedule
       return false;
     }
   }
@@ -172,16 +191,37 @@ export class ZeroMQService {
    */
   async ping(): Promise<boolean> {
     try {
+      this.log("info", "[ZeroMQService] Sending PING to MT5...", { category: "ZEROMQ" });
+      
       const response = await this.sendRequest(
         {
           command: "PING",
           requestId: this.generateRequestId(),
           timestamp: new Date().toISOString(),
         },
-        3000,
+        5000, // Increased timeout to 5 seconds
+        true, // Skip connection check for PING test
       );
-      return response.status === "OK";
-    } catch (error) {
+
+      this.log("info", "[ZeroMQService] Received PING response", { 
+        category: "ZEROMQ", 
+        response: JSON.stringify(response) 
+      });
+
+      const isOK = response.status === "OK";
+      if (!isOK) {
+        this.log("warn", "[ZeroMQService] PING test failed - response status not OK", { 
+          category: "ZEROMQ", 
+          response: JSON.stringify(response) 
+        });
+      }
+      
+      return isOK;
+    } catch (error: any) {
+      this.log("error", "[ZeroMQService] PING test error", { 
+        category: "ZEROMQ", 
+        error: error.message 
+      });
       return false;
     }
   }
@@ -190,11 +230,20 @@ export class ZeroMQService {
    * Open a trading position
    */
   async openPosition(params: TradeParams): Promise<TradeResult> {
+    // Transform parameters to match EA expectations
+    // EA expects: action, lotSize
+    // We send: type, volume
+    const eaParams = {
+      ...params,
+      action: params.type, // EA uses 'action' instead of 'type'
+      lotSize: params.volume, // EA uses 'lotSize' instead of 'volume'
+    };
+    
     const request: ZeroMQRequest = {
       command: "OPEN_POSITION",
       requestId: this.generateRequestId(),
       timestamp: new Date().toISOString(),
-      parameters: params,
+      parameters: eaParams,
     };
 
     const response = await this.sendRequest(request);
@@ -404,8 +453,10 @@ export class ZeroMQService {
   private async sendRequest(
     request: ZeroMQRequest,
     timeout: number = 5000,
+    skipConnectionCheck: boolean = false,
   ): Promise<ZeroMQResponse> {
-    if (!this.isConnected()) {
+    // Skip connection check for PING test during connection initialization
+    if (!skipConnectionCheck && !this.isConnected()) {
       throw new Error("ZeroMQ not connected");
     }
 
@@ -518,6 +569,83 @@ export class ZeroMQService {
   }
 
   /**
+   * Start aggressive auto-retry loop for live trading
+   * Keeps trying to reconnect every 10 seconds until successful
+   */
+  private startAutoRetry(): void {
+    if (this.isRetrying) {
+      return; // Already running
+    }
+
+    this.isRetrying = true;
+    const retryInterval = 10000; // 10 seconds
+
+    this.log("info", "🔄 Starting auto-retry loop (every 10 seconds)...");
+
+    this.autoRetryInterval = setInterval(async () => {
+      if (this.connectionStatus === "connected") {
+        this.stopAutoRetry();
+        return;
+      }
+
+      this.reconnectAttempts++;
+      this.log("info", `🔄 Auto-retry attempt #${this.reconnectAttempts} - Attempting to reconnect...`);
+
+      try {
+        // Try to create new connection pool
+        const poolPromises = [];
+        for (let i = 0; i < this.maxPoolSize; i++) {
+          poolPromises.push(this.createPoolConnection());
+        }
+
+        const poolResults = await Promise.allSettled(poolPromises);
+        
+        // Clear old pool and add new successful connections
+        this.connectionPool = [];
+        for (const result of poolResults) {
+          if (result.status === "fulfilled") {
+            this.connectionPool.push(result.value);
+          }
+        }
+
+        if (this.connectionPool.length > 0) {
+          this.socket = this.connectionPool[0];
+          
+          // Test connection with PING
+          const pingSuccess = await this.ping();
+          
+          if (pingSuccess) {
+            this.connectionStatus = "connected";
+            this.reconnectAttempts = 0;
+            this.log("info", `✅ Auto-retry SUCCESS! Connected with ${this.connectionPool.length} connections`);
+            this.stopAutoRetry();
+          } else {
+            this.log("warn", `⚠️ Auto-retry #${this.reconnectAttempts}: PING test failed, will retry...`);
+          }
+        } else {
+          this.log("warn", `⚠️ Auto-retry #${this.reconnectAttempts}: No connections established, will retry...`);
+        }
+      } catch (error) {
+        this.log("warn", `⚠️ Auto-retry #${this.reconnectAttempts} failed: ${(error as Error).message}`);
+      }
+    }, retryInterval);
+
+    this.log("info", "🔄 Auto-retry loop started (will keep trying every 10 seconds)");
+  }
+
+  /**
+   * Stop auto-retry loop
+   */
+  private stopAutoRetry(): void {
+    if (this.autoRetryInterval) {
+      clearInterval(this.autoRetryInterval);
+      this.autoRetryInterval = null;
+      this.isRetrying = false;
+      this.log("info", "✅ Auto-retry loop stopped - Connection established");
+    }
+  }
+
+  /**
    * Generate unique request ID
    */
   private generateRequestId(): string {
@@ -559,6 +687,9 @@ export class ZeroMQService {
    */
   disconnect(): void {
     this.log("info", "Disconnecting from ZeroMQ...");
+
+    // Stop auto-retry loop
+    this.stopAutoRetry();
 
     // Clear timeouts
     if (this.reconnectTimeout) {

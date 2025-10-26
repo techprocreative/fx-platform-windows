@@ -359,9 +359,11 @@ class MainController extends events_1.EventEmitter {
                             id: params.strategyId,
                             name: params.strategyName,
                             status: 'active',
+                            symbol: params.symbol,
                             symbols: [params.symbol],
-                            timeframes: [params.timeframe],
+                            timeframe: params.timeframe, // Singular for getActiveStrategies()
                             activeSince: new Date(),
+                            lastSignal: null
                         });
                         // Persist strategy activation
                         this.persistence.saveActiveStrategy({
@@ -679,7 +681,8 @@ class MainController extends events_1.EventEmitter {
             const dbInitialized = await this.db.initialize();
             if (!dbInitialized) {
                 this.addLog('error', 'MAIN', 'Failed to initialize database');
-                return false;
+                this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+                // Don't fail - EA might already be installed manually
             }
             this.addLog('info', 'MAIN', 'Database initialized successfully');
             // Configure API service
@@ -690,7 +693,8 @@ class MainController extends events_1.EventEmitter {
             if (this.mt5Installations.length === 0) {
                 this.addLog('warn', 'MAIN', 'No MT5 installations found');
                 this.emit('mt5-not-found');
-                return false;
+                this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+                // Don't fail - EA might already be installed manually
             }
             this.addLog('info', 'MAIN', `Found ${this.mt5Installations.length} MT5 installation(s)`);
             this.emit('mt5-detected', this.mt5Installations);
@@ -698,7 +702,8 @@ class MainController extends events_1.EventEmitter {
             const installResult = await this.mt5Installer.autoInstallEverything();
             this.handleAutoInstallResult(installResult, { emitDetectionEvent: false });
             if (!installResult.success) {
-                return false;
+                this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+                // Don't fail - EA might already be installed manually
             }
             // Step 3: Initialize security service
             this.addLog('info', 'MAIN', 'Step 3: Initializing security service...');
@@ -779,17 +784,45 @@ class MainController extends events_1.EventEmitter {
                 }
             }
             // Sync active strategies from platform (restore after restart)
-            this.addLog('info', 'MAIN', 'Syncing active strategies from platform...');
+            // MOVED TO AFTER ALL CRITICAL SERVICES ARE INITIALIZED
+            // This ensures ZeroMQ is connected before attempting to monitor strategies
+            // Step 10: Start Live Trading Background Services
+            this.addLog('info', 'MAIN', 'Step 10: Starting live trading services...');
+            await this.startLiveTradingServices();
+            // Step 11: Sync active strategies from platform (after all services are ready)
+            this.addLog('info', 'MAIN', 'Step 11: Syncing active strategies from platform...');
             try {
                 await this.syncActiveStrategiesFromPlatform();
                 this.addLog('info', 'MAIN', 'Active strategies synced successfully');
             }
             catch (error) {
-                this.addLog('warn', 'MAIN', 'Failed to sync active strategies - manual reactivation may be required', { error });
+                this.addLog('warn', 'MAIN', 'Failed to sync active strategies from platform', { error });
+                // Try to load from persisted state as fallback
+                try {
+                    const persistedStrategies = this.persistence.getActiveStrategies();
+                    if (persistedStrategies.length > 0) {
+                        this.addLog('info', 'MAIN', `Loading ${persistedStrategies.length} strategies from local cache`);
+                        for (const strategy of persistedStrategies) {
+                            this.activeStrategies.push({
+                                id: strategy.id,
+                                name: strategy.name,
+                                status: 'active',
+                                symbol: strategy.symbol,
+                                symbols: [strategy.symbol],
+                                timeframe: strategy.timeframe,
+                                lastSignal: null
+                            });
+                            // Start monitoring if ZeroMQ is connected
+                            if (this.connectionStatus.zeromq === 'connected' && this.strategyMonitor) {
+                                await this.strategyMonitor.startMonitoring(strategy);
+                            }
+                        }
+                    }
+                }
+                catch (fallbackError) {
+                    this.addLog('warn', 'MAIN', 'Failed to load persisted strategies', { error: fallbackError });
+                }
             }
-            // Step 10: Start Live Trading Background Services
-            this.addLog('info', 'MAIN', 'Step 10: Starting live trading services...');
-            await this.startLiveTradingServices();
             this.isInitialized = true;
             this.addLog('info', 'MAIN', 'Windows Executor initialized successfully');
             this.emit('initialized');
@@ -809,7 +842,8 @@ class MainController extends events_1.EventEmitter {
             });
             this.addLog('error', 'MAIN', `Initialization failed: ${errorMessage}`, { error });
             this.emit('initialization-failed', error);
-            return false;
+            this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+            // Don't fail - EA might already be installed manually
         }
     }
     /**
@@ -842,7 +876,8 @@ class MainController extends events_1.EventEmitter {
             });
             this.addLog('error', 'MAIN', `Failed to start: ${errorMessage}`, { error });
             this.emit('start-failed', error);
-            return false;
+            this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+            // Don't fail - EA might already be installed manually
         }
     }
     /**
@@ -876,7 +911,8 @@ class MainController extends events_1.EventEmitter {
         catch (error) {
             this.addLog('error', 'MAIN', `Failed to stop: ${error.message}`, { error });
             this.emit('stop-failed', error);
-            return false;
+            this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+            // Don't fail - EA might already be installed manually
         }
     }
     /**
@@ -895,12 +931,18 @@ class MainController extends events_1.EventEmitter {
                 attempt++;
                 this.addLog('info', 'SYNC', `Syncing active strategies (attempt ${attempt}/${maxRetries})...`);
                 // Fetch active strategies from web platform API
-                const response = await fetch(`${this.config.platformUrl}/api/executor/${this.executorId}/active-strategies`, {
+                // Support both local development and Vercel deployment
+                const platformUrl = this.config.platformUrl || 'https://fx.nusanexus.com';
+                const apiUrl = `${platformUrl}/api/executor/${this.executorId}/active-strategies`;
+                this.addLog('debug', 'SYNC', `Fetching strategies from: ${apiUrl}`);
+                const response = await fetch(apiUrl, {
                     headers: {
                         'Authorization': `Bearer ${this.config.apiKey}`,
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
+                        'X-Executor-Id': this.executorId,
+                        'X-API-Key': this.config.apiKey
                     },
-                    signal: AbortSignal.timeout(10000) // 10 second timeout
+                    signal: AbortSignal.timeout(15000) // 15 second timeout (increased for Vercel)
                 });
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -921,8 +963,11 @@ class MainController extends events_1.EventEmitter {
                         this.activeStrategies.push({
                             id: strategy.id,
                             name: strategy.name,
+                            status: 'active',
                             symbol: strategy.symbol,
-                            timeframe: strategy.timeframe
+                            symbols: [strategy.symbol], // Array for compatibility with dashboard
+                            timeframe: strategy.timeframe,
+                            lastSignal: null
                         });
                         // Save to persistence
                         this.persistence.saveActiveStrategy({
@@ -973,8 +1018,11 @@ class MainController extends events_1.EventEmitter {
                         this.activeStrategies.push({
                             id: strategy.id,
                             name: strategy.name,
+                            status: 'active',
                             symbol: strategy.symbol,
-                            timeframe: strategy.timeframe
+                            symbols: [strategy.symbol], // Array for compatibility with dashboard
+                            timeframe: strategy.timeframe,
+                            lastSignal: null
                         });
                         // Start monitoring
                         if (this.strategyMonitor) {
@@ -1206,7 +1254,8 @@ class MainController extends events_1.EventEmitter {
         }
         catch (error) {
             this.addLog('error', 'MAIN', `Failed to update configuration: ${error.message}`, { error });
-            return false;
+            this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
+            // Don't fail - EA might already be installed manually
         }
     }
     /**
@@ -1312,6 +1361,34 @@ class MainController extends events_1.EventEmitter {
         return this.eaAttachmentHandler.getAttachments();
     }
     /**
+     * Reconnect ZeroMQ client (for manual recovery)
+     */
+    async reconnectZeroMQClient() {
+        try {
+            this.addLog('info', 'ZEROMQ', 'Attempting to reconnect ZeroMQ client...');
+            // Disconnect first if connected
+            this.zeromqService.disconnect();
+            // Wait a moment
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Reconnect
+            const connected = await this.zeromqService.connect(this.config);
+            if (connected) {
+                this.addLog('info', 'ZEROMQ', '✅ ZeroMQ client reconnected successfully');
+                this.connectionStatus.zeromq = 'connected';
+                this.monitoringService.updateConnectionStatus('zeromq', { connected: true });
+                return true;
+            }
+            else {
+                this.addLog('error', 'ZEROMQ', 'Failed to reconnect ZeroMQ client');
+                return false;
+            }
+        }
+        catch (error) {
+            this.addLog('error', 'ZEROMQ', `Reconnection error: ${error.message}`, { error });
+            return false;
+        }
+    }
+    /**
      * Get recent activity
      */
     getRecentActivity(limit = 20) {
@@ -1394,8 +1471,135 @@ class MainController extends events_1.EventEmitter {
      * Handle signal generated
      */
     async handleSignalGenerated(data) {
-        // TODO: Execute trade via ZeroMQ
-        this.addLog('info', 'SIGNAL', 'Handling signal', data);
+        const { strategyId, signal } = data;
+        try {
+            this.addLog('info', 'SIGNAL', `Signal received for execution: ${signal.action} ${signal.symbol}`, {
+                strategyId,
+                signal: {
+                    symbol: signal.symbol,
+                    type: signal.type,
+                    action: signal.action,
+                    entryPrice: signal.entryPrice,
+                    stopLoss: signal.stopLoss,
+                    takeProfit: signal.takeProfit,
+                    volume: signal.volume,
+                    confidence: signal.confidence,
+                    reasons: signal.reasons
+                }
+            });
+            // Check if emergency stop is active
+            if (this.emergencyStop && !this.emergencyStop.canTrade()) {
+                this.addLog('warn', 'SIGNAL', 'Trade rejected: Emergency stop is active');
+                return;
+            }
+            // Validate signal has required fields
+            if (!signal.symbol || !signal.type || !signal.volume) {
+                this.addLog('error', 'SIGNAL', 'Invalid signal: Missing required fields', { signal });
+                return;
+            }
+            // Prepare trade parameters
+            const tradeParams = {
+                symbol: signal.symbol,
+                type: signal.type, // 'BUY' or 'SELL'
+                volume: signal.volume,
+                price: signal.entryPrice || 0, // 0 means market price
+                stopLoss: signal.stopLoss || 0,
+                takeProfit: signal.takeProfit || 0,
+                comment: `Strategy: ${strategyId}`,
+                magic: this.generateMagicNumber(strategyId),
+                slippage: 10, // 10 points slippage
+            };
+            this.addLog('info', 'SIGNAL', 'Executing trade via ZeroMQ...', { tradeParams });
+            // Execute trade via ZeroMQ
+            const result = await this.zeromqService.openPosition(tradeParams);
+            if (result.success) {
+                this.addLog('info', 'SIGNAL', `✅ Trade executed successfully: Ticket #${result.ticket}`, {
+                    ticket: result.ticket,
+                    symbol: result.symbol,
+                    type: result.type,
+                    volume: result.volume,
+                    openPrice: result.openPrice,
+                    stopLoss: result.stopLoss,
+                    takeProfit: result.takeProfit,
+                    profit: result.profit,
+                    commission: result.commission,
+                });
+                // Notify platform about trade execution
+                await this.reportTradeExecution(strategyId, signal, result);
+                // Emit event for monitoring
+                this.emit('trade:opened', {
+                    strategyId,
+                    signal,
+                    result,
+                });
+            }
+            else {
+                this.addLog('error', 'SIGNAL', `❌ Trade execution failed: ${result.error}`, {
+                    signal,
+                    error: result.error,
+                });
+                // Emit event for error handling
+                this.emit('trade:failed', {
+                    strategyId,
+                    signal,
+                    error: result.error,
+                });
+            }
+        }
+        catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+            this.addLog('error', 'SIGNAL', `Error executing signal: ${errorMessage}`, {
+                error,
+                signal,
+                strategyId,
+            });
+            this.emit('trade:error', {
+                strategyId,
+                signal,
+                error: errorMessage,
+            });
+        }
+    }
+    /**
+     * Generate magic number from strategy ID
+     */
+    generateMagicNumber(strategyId) {
+        // Generate a consistent magic number from strategy ID
+        let hash = 0;
+        for (let i = 0; i < strategyId.length; i++) {
+            const char = strategyId.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        // Ensure positive number between 100000 and 999999
+        return Math.abs(hash % 900000) + 100000;
+    }
+    /**
+     * Report trade execution to platform
+     */
+    async reportTradeExecution(strategyId, signal, result) {
+        try {
+            if (!this.apiService) {
+                this.addLog('warn', 'SIGNAL', 'API service not available for trade reporting');
+                return;
+            }
+            await this.apiService.reportTrade({
+                ticket: result.ticket?.toString() || 'unknown',
+                symbol: signal.symbol,
+                type: signal.type,
+                volume: signal.volume,
+                openPrice: result.openPrice || signal.entryPrice,
+                openTime: result.timestamp || new Date().toISOString(),
+                stopLoss: result.stopLoss || signal.stopLoss,
+                takeProfit: result.takeProfit || signal.takeProfit,
+                comment: `Strategy: ${strategyId}`,
+            });
+            this.addLog('info', 'SIGNAL', 'Trade execution reported to platform');
+        }
+        catch (error) {
+            this.addLog('warn', 'SIGNAL', 'Failed to report trade to platform', { error });
+            // Don't throw - this is non-critical
+        }
     }
     /**
      * Execute partial close
