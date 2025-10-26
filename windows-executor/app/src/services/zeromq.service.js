@@ -50,7 +50,17 @@ class ZeroMQService {
         this.maxPoolSize = 3;
         this.currentPoolIndex = 0;
         this.isRetrying = false; // Flag to prevent multiple retry loops
+        this.sharedSecret = null; // For EA authentication
         this.logger = logger || this.defaultLogger;
+    }
+    /**
+     * Set shared secret for EA authentication
+     */
+    setSharedSecret(secret) {
+        this.sharedSecret = secret;
+        this.log("info", secret ? "Shared secret configured for EA authentication" : "Shared secret cleared", {
+            category: "ZEROMQ"
+        });
     }
     log(level, message, metadata) {
         this.logger(level, message, metadata);
@@ -425,6 +435,10 @@ class ZeroMQService {
         }
         const requestId = request.requestId || this.generateRequestId();
         request.requestId = requestId;
+        // Add authentication token if shared secret is configured
+        if (this.sharedSecret) {
+            request.token = this.sharedSecret;
+        }
         return new Promise((resolve, reject) => {
             // Store the promise handlers
             this.pendingRequests.set(requestId, {

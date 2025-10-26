@@ -192,6 +192,10 @@ model Strategy {
   version         Int       @default(1)
   aiPrompt        String?   @db.Text
   isPublic        Boolean   @default(false)
+  isSystemDefault Boolean   @default(false) // Cannot be deleted if true
+  systemDefaultType String? // SCALP_WEEKDAY, SWING_WEEKDAY, SCALP_WEEKEND, SWING_WEEKEND
+  backtestResults Json?     // Official backtest results for system defaults
+  backtestVerified Boolean  @default(false) // Has official backtest
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?

@@ -303,6 +303,22 @@ interface GlossaryTooltipProps {
   className?: string;
 }
 
+// Radix UI compatible exports for BacktestBadge
+export const TooltipProvider = ({ children }: { children: React.ReactNode }) => <>{children}</>;
+export const TooltipTrigger = React.forwardRef<HTMLDivElement, { children: React.ReactNode; asChild?: boolean } & React.HTMLAttributes<HTMLDivElement>>(
+  ({ children, asChild, ...props }, ref) => <div ref={ref} {...props}>{children}</div>
+);
+TooltipTrigger.displayName = 'TooltipTrigger';
+
+export const TooltipContent = React.forwardRef<HTMLDivElement, { children: React.ReactNode; className?: string } & React.HTMLAttributes<HTMLDivElement>>(
+  ({ children, className = "", ...props }, ref) => (
+    <div ref={ref} className={`z-50 overflow-hidden rounded-md bg-gray-900 px-3 py-1.5 text-xs text-white shadow-md animate-in fade-in-0 zoom-in-95 ${className}`} {...props}>
+      {children}
+    </div>
+  )
+);
+TooltipContent.displayName = 'TooltipContent';
+
 export function GlossaryTooltip({
   termId,
   term,

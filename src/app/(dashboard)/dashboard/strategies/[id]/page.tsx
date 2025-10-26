@@ -25,6 +25,8 @@ import { LoadingSpinner } from "@/components/ui/LoadingSpinner";
 import { useApiRequest } from "@/hooks/useApiRequest";
 import { ActivateStrategyDialog } from "@/components/strategies/ActivateStrategyDialog";
 import { OptimizationSuggestionModal } from "@/components/supervisor/OptimizationSuggestionModal";
+import { BacktestResults } from "@/components/strategies/BacktestResults";
+import { BacktestBadge } from "@/components/strategies/BacktestBadge";
 
 interface Strategy {
   id: string;
@@ -36,6 +38,8 @@ interface Strategy {
   rules: any;
   version: number;
   createdAt: string;
+  backtestVerified?: boolean;
+  backtestResults?: any;
   _count: {
     trades: number;
     backtests: number;
@@ -499,6 +503,20 @@ export default function StrategyDetailPage({
         <div className="p-6">
           {activeTab === "overview" && (
             <div className="space-y-6">
+              {/* Backtest Badge (if verified) */}
+              {strategy.backtestVerified && strategy.backtestResults && (
+                <div className="p-4 bg-blue-50 dark:bg-blue-950 rounded-lg border border-blue-200 dark:border-blue-800">
+                  <BacktestBadge
+                    verified={true}
+                    returnPercentage={strategy.backtestResults.performance.returnPercentage}
+                    winRate={strategy.backtestResults.statistics.winRate}
+                    profitFactor={strategy.backtestResults.statistics.profitFactor}
+                    size="md"
+                    showDetails={true}
+                  />
+                </div>
+              )}
+              
               <h3 className="text-xl font-bold text-neutral-900">
                 Strategy Overview
               </h3>
@@ -1021,9 +1039,24 @@ export default function StrategyDetailPage({
           )}
 
           {activeTab === "backtests" && (
-            <div className="space-y-4">
+            <div className="space-y-6">
+              {/* Official Backtest Results (if verified) */}
+              {strategy.backtestVerified && strategy.backtestResults && (
+                <div>
+                  <BacktestResults results={strategy.backtestResults} />
+                  <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <p className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                      📊 These are official backtest results for this system default strategy
+                    </p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400">
+                      You can run additional custom backtests below to test different parameters or time periods.
+                    </p>
+                  </div>
+                </div>
+              )}
+              
               <div className="flex items-center justify-between">
-                <h3 className="font-bold text-neutral-900">Backtest History</h3>
+                <h3 className="font-bold text-neutral-900">Custom Backtest History</h3>
                 <Link
                   href={`/dashboard/backtest?strategyId=${strategy.id}`}
                   className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"

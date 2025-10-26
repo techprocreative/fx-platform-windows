@@ -21,6 +21,7 @@ import { useConfirmDialog, confirmDelete } from '@/components/ui/ConfirmDialog';
 import { StrategyStatus } from '@/components/ui/StatusIndicator';
 import { Button } from '@/components/ui/Button';
 import { ActivateStrategyDialog } from '@/components/strategies/ActivateStrategyDialog';
+import { BacktestBadge } from '@/components/strategies/BacktestBadge';
 
 interface Strategy {
   id: string;
@@ -31,6 +32,16 @@ interface Strategy {
   type: 'manual' | 'ai_generated' | 'imported';
   version: number;
   createdAt: string;
+  backtestVerified?: boolean;
+  backtestResults?: {
+    performance: {
+      returnPercentage: number;
+    };
+    statistics: {
+      winRate: number;
+      profitFactor: number;
+    };
+  };
 }
 
 export default function StrategiesPage() {
@@ -253,12 +264,23 @@ export default function StrategiesPage() {
               {filteredStrategies.map((strategy) => (
                 <tr key={strategy.id} className="hover:bg-neutral-50 transition-colors">
                   <td className="px-6 py-4">
-                    <Link
-                      href={`/dashboard/strategies/${strategy.id}`}
-                      className="font-medium text-primary-600 hover:text-primary-700"
-                    >
-                      {strategy.name}
-                    </Link>
+                    <div className="flex flex-col gap-2">
+                      <Link
+                        href={`/dashboard/strategies/${strategy.id}`}
+                        className="font-medium text-primary-600 hover:text-primary-700"
+                      >
+                        {strategy.name}
+                      </Link>
+                      {strategy.backtestVerified && strategy.backtestResults && (
+                        <BacktestBadge
+                          verified={true}
+                          returnPercentage={strategy.backtestResults.performance.returnPercentage}
+                          winRate={strategy.backtestResults.statistics.winRate}
+                          profitFactor={strategy.backtestResults.statistics.profitFactor}
+                          size="sm"
+                        />
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-neutral-600">
                     {strategy.symbol}

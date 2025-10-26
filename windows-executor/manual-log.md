@@ -1,15 +1,14 @@
-audit secara berurutan dan berikan reportnya
-1. Strategy Page (manual & AI generate)
-1.1. Backend
-1.2. UI
-2. Backtest Page
-2.1. Backend
-2.2. UI
-3. Executor Page
-3.1. Backend
-3.2. UI
-4. Supervisor
-5. Windows Executor
-5.1 Backend
-5.2 UI
-6. EA
+EMA 9 ↗ crosses above ema_21
+
+9-period Exponential Moving Average
+
+2
+RSI < 30
+
+Relative Strength Index - measures momentum
+
+3
+STOCHASTIC K < 20
+
+4
+PRICE ≥ 111445.41406

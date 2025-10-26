@@ -308,6 +308,19 @@ export async function DELETE(
     // Enhanced ownership validation
     const { strategy } = await validateStrategyOwnership(params.id, session.user.id, 'delete');
 
+    // CRITICAL: Prevent deletion of system default strategies
+    if (strategy.isSystemDefault === true) {
+      throw new AppError(
+        403,
+        'System default strategies cannot be deleted. Please clone this strategy if you want to customize it.',
+        'SYSTEM_DEFAULT_PROTECTED',
+        { 
+          strategyType: strategy.systemDefaultType,
+          canClone: true 
+        }
+      );
+    }
+
     // Additional validation: prevent deletion of active strategies with open trades
     const activeTrades = await prisma.trade.count({
       where: {

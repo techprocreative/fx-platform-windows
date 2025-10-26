@@ -690,6 +690,14 @@ class MainController extends events_1.EventEmitter {
             this.addLog('info', 'MAIN', 'Initializing Windows Executor...');
             this.config = config;
             this.executorId = config.executorId;
+            // Configure shared secret for MT5 EA authentication
+            if (config.sharedSecret) {
+                this.zeromqService.setSharedSecret(config.sharedSecret);
+                this.addLog('info', 'MAIN', '🔐 Shared secret configured for MT5 EA authentication');
+            }
+            else {
+                this.addLog('warn', 'MAIN', '⚠️ No shared secret configured - MT5 EA authentication disabled');
+            }
             // Step 0: Initialize database FIRST
             this.addLog('info', 'MAIN', 'Initializing database...');
             const dbInitialized = await this.db.initialize();
@@ -864,6 +872,7 @@ class MainController extends events_1.EventEmitter {
             this.emit('initialization-failed', error);
             this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
             // Don't fail - EA might already be installed manually
+            return false;
         }
     }
     /**
@@ -898,6 +907,7 @@ class MainController extends events_1.EventEmitter {
             this.emit('start-failed', error);
             this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
             // Don't fail - EA might already be installed manually
+            return false;
         }
     }
     /**
@@ -933,6 +943,7 @@ class MainController extends events_1.EventEmitter {
             this.emit('stop-failed', error);
             this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
             // Don't fail - EA might already be installed manually
+            return false;
         }
     }
     /**
@@ -1265,6 +1276,11 @@ class MainController extends events_1.EventEmitter {
                 throw new Error('No configuration loaded');
             }
             this.config = { ...this.config, ...newConfig };
+            // Update shared secret if changed
+            if ('sharedSecret' in newConfig) {
+                this.zeromqService.setSharedSecret(newConfig.sharedSecret || null);
+                this.addLog('info', 'MAIN', newConfig.sharedSecret ? '🔐 Shared secret updated' : '⚠️ Shared secret removed');
+            }
             // Update services with new configuration
             await this.pusherService.forceReconnect();
             await this.zeromqService.forceReconnect();
@@ -1276,6 +1292,7 @@ class MainController extends events_1.EventEmitter {
             this.addLog('error', 'MAIN', `Failed to update configuration: ${error.message}`, { error });
             this.addLog('warn', 'MAIN', 'Auto-installation failed, but continuing initialization...');
             // Don't fail - EA might already be installed manually
+            return false;
         }
     }
     /**
