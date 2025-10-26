@@ -32,6 +32,8 @@ interface Strategy {
   type: 'manual' | 'ai_generated' | 'imported';
   version: number;
   createdAt: string;
+  isSystemDefault?: boolean;
+  systemDefaultType?: string;
   backtestVerified?: boolean;
   backtestResults?: {
     performance: {
@@ -265,12 +267,19 @@ export default function StrategiesPage() {
                 <tr key={strategy.id} className="hover:bg-neutral-50 transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex flex-col gap-2">
-                      <Link
-                        href={`/dashboard/strategies/${strategy.id}`}
-                        className="font-medium text-primary-600 hover:text-primary-700"
-                      >
-                        {strategy.name}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/dashboard/strategies/${strategy.id}`}
+                          className="font-medium text-primary-600 hover:text-primary-700"
+                        >
+                          {strategy.name}
+                        </Link>
+                        {strategy.isSystemDefault && (
+                          <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                            System Default
+                          </span>
+                        )}
+                      </div>
                       {strategy.backtestVerified && strategy.backtestResults && (
                         <BacktestBadge
                           verified={true}
@@ -324,18 +333,25 @@ export default function StrategiesPage() {
                         <Edit2 className="h-4 w-4" />
                       </Link>
 
-                      <button
-                        onClick={() => handleDelete(strategy.id)}
-                        disabled={deletingId === strategy.id}
-                        className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        title="Delete strategy"
-                      >
-                        {deletingId === strategy.id ? (
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </button>
+                      {!strategy.isSystemDefault && (
+                        <button
+                          onClick={() => handleDelete(strategy.id)}
+                          disabled={deletingId === strategy.id}
+                          className="p-2 text-red-600 hover:bg-red-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Delete strategy"
+                        >
+                          {deletingId === strategy.id ? (
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </button>
+                      )}
+                      {strategy.isSystemDefault && (
+                        <span className="p-2 text-gray-400 cursor-not-allowed" title="System default strategies cannot be deleted">
+                          <Trash2 className="h-4 w-4 opacity-30" />
+                        </span>
+                      )}
                     </div>
                   </td>
                 </tr>

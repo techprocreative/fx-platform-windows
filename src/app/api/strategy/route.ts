@@ -49,8 +49,12 @@ export async function GET(req: NextRequest) {
     const skip = (page - 1) * limit;
 
     // Build where clause with optimized queries
+    // Include both user's strategies AND system default strategies
     const where: Prisma.StrategyWhereInput = {
-      userId: session.user.id,
+      OR: [
+        { userId: session.user.id }, // User's own strategies
+        { isSystemDefault: true, isPublic: true }, // System default strategies (visible to all)
+      ],
       deletedAt: null,
       ...(status && status !== 'all' ? { status } : {}),
       ...(symbol ? { symbol: symbol.toUpperCase() } : {}),
@@ -91,7 +95,10 @@ export async function GET(req: NextRequest) {
     const statsPromise = prisma.strategy.groupBy({
       by: ['status'],
       where: {
-        userId: session.user.id,
+        OR: [
+          { userId: session.user.id },
+          { isSystemDefault: true, isPublic: true },
+        ],
         deletedAt: null,
       },
       _count: {
