@@ -366,10 +366,50 @@ string GetHistoricalBars(string request)
    // Convert timeframe string to ENUM_TIMEFRAMES
    ENUM_TIMEFRAMES timeframe = StringToTimeframe(timeframeStr);
    
-   Print("📊 GET_BARS: ", symbol, " ", EnumToString(timeframe), " Bars=", barsCount);
+   Print("📊 GET_BARS Request: ", symbol, " ", EnumToString(timeframe), " Bars=", barsCount);
+   
+   // ===== NEW: Add symbol to Market Watch and validate =====
+   if(!SymbolSelect(symbol, true))
+   {
+      Print("⚠️ Symbol not in Market Watch, attempting to add: ", symbol);
+      if(!SymbolSelect(symbol, true))
+      {
+         string errorMsg = "Failed to add symbol to Market Watch: " + symbol;
+         Print("❌ ", errorMsg);
+         return "{\"status\":\"ERROR\",\"message\":\"" + errorMsg + "\",\"error\":4301}";
+      }
+      Print("✅ Symbol added to Market Watch: ", symbol);
+   }
+   
+   // Wait for symbol to be ready (especially for newly added symbols)
+   int attempts = 0;
+   while(attempts < 5)
+   {
+      // Check if symbol info is available
+      double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
+      if(bid > 0)
+         break;
+         
+      Print("⏳ Waiting for symbol data... attempt ", (attempts + 1));
+      Sleep(500);
+      attempts++;
+   }
+   
+   // Check if symbol has data
+   double symbolBid = SymbolInfoDouble(symbol, SYMBOL_BID);
+   if(symbolBid == 0)
+   {
+      string errorMsg = "Symbol has no price data: " + symbol + ". Symbol might be disabled or market is closed.";
+      Print("❌ ", errorMsg);
+      return "{\"status\":\"ERROR\",\"message\":\"" + errorMsg + "\",\"error\":4301}";
+   }
+   
+   Print("✅ Symbol validated: ", symbol, " Bid=", symbolBid);
+   // ===== END NEW CODE =====
    
    // Get bars from MT5
    MqlRates rates[];
+   ArraySetAsSeries(rates, true);
    int copied = CopyRates(symbol, timeframe, 0, barsCount, rates);
    
    if(copied <= 0)
@@ -377,7 +417,19 @@ string GetHistoricalBars(string request)
       int error = GetLastError();
       string errorMsg = "Failed to copy rates: Error " + IntegerToString(error);
       Print("❌ ", errorMsg);
-      return "{\"status\":\"ERROR\",\"message\":\"" + errorMsg + "\"}";
+      Print("   Symbol: ", symbol);
+      Print("   Timeframe: ", EnumToString(timeframe));
+      Print("   Bars requested: ", barsCount);
+      
+      // Try to get available bars
+      int availableBars = Bars(symbol, timeframe);
+      Print("   Available bars: ", availableBars);
+      
+      // Additional diagnostics
+      Print("   Symbol exists: ", SymbolInfoInteger(symbol, SYMBOL_SELECT) ? "Yes" : "No");
+      Print("   Symbol visible: ", SymbolInfoInteger(symbol, SYMBOL_VISIBLE) ? "Yes" : "No");
+      
+      return "{\"status\":\"ERROR\",\"message\":\"" + errorMsg + "\",\"error\":" + IntegerToString(error) + ",\"availableBars\":" + IntegerToString(availableBars) + "}";
    }
    
    // Build JSON response

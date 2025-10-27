@@ -1,0 +1,114 @@
+{
+  "name": "windows-executor-v2",
+  "version": "1.0.0",
+  "description": "Windows Executor V2 - Hybrid Trading Platform",
+  "author": "NusaNexus",
+  "private": true,
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build && tsc electron/main.ts --outDir dist-electron && tsc electron/preload.ts --outDir dist-electron",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "electron": "cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .",
+    "electron:build": "npm run build && electron-builder",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "^5.90.5",
+    "axios": "^1.6.0",
+    "lucide-react": "^0.548.0",
+    "pusher-js": "^8.4.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "recharts": "^3.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.10",
+    "@types/react": "^18.2.21",
+    "@types/react-dom": "^18.2.7",
+    "@vitejs/plugin-react": "^4.1.1",
+    "cross-env": "^7.0.3",
+    "electron": "^27.1.1",
+    "electron-builder": "^24.6.0",
+    "typescript": "^5.2.2",
+    "vite": "^4.5.0"
+  },
+  "build": {
+    "appId": "com.nusanexus.windows-executor-v2",
+    "productName": "Windows Executor V2",
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "directories": {
+      "output": "../dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraFiles": [
+      {
+        "from": "../.env.example",
+        "to": ".env.example"
+      },
+      {
+        "from": "../SETUP_GUIDE.md",
+        "to": "SETUP_GUIDE.md"
+      },
+      {
+        "from": "../USER_INSTALLATION_GUIDE.md",
+        "to": "USER_INSTALLATION_GUIDE.md"
+      }
+    ],
+    "extraResources": [
+      {
+        "from": "../backend-dist",
+        "to": "backend",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Windows Executor V2",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "installerHeaderIcon": "build/icon.ico",
+      "license": "../LICENSE.txt",
+      "warningsAsErrors": false
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "build/icon.icns",
+      "category": "public.app-category.finance"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "build/icon.png",
+      "category": "Finance"
+    }
+  }
+}

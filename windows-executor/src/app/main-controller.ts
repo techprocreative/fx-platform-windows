@@ -1574,18 +1574,63 @@ export class MainController extends EventEmitter {
    */
   async getMT5AccountInfo() {
     try {
-      // Get account info from ZeroMQ server (received from MT5 EA)
-      const accountInfo = this.zeromqServer.getAccountInfo();
-      
-      if (accountInfo) {
-        return accountInfo;
+      // Try getting from MT5AccountService first (most reliable)
+      try {
+        const accountInfo = await this.mt5AccountService.getAccountInfo();
+        if (accountInfo && (accountInfo.balance > 0 || accountInfo.equity > 0)) {
+          logger.debug('[MainController] Account info from MT5AccountService:', { 
+            balance: accountInfo.balance, 
+            equity: accountInfo.equity 
+          });
+          return accountInfo;
+        }
+      } catch (serviceError) {
+        logger.warn('[MainController] MT5AccountService failed:', serviceError);
       }
       
-      // Fallback to old method if no data from ZMQ yet
-      return await this.mt5AccountService.getAccountInfo();
+      // Fallback to ZeroMQ server data
+      const zmqAccountInfo = this.zeromqServer.getAccountInfo();
+      if (zmqAccountInfo && (zmqAccountInfo.balance > 0 || zmqAccountInfo.equity > 0)) {
+        logger.debug('[MainController] Account info from ZeroMQ:', { 
+          balance: zmqAccountInfo.balance, 
+          equity: zmqAccountInfo.equity 
+        });
+        return zmqAccountInfo;
+      }
+      
+      // If both failed, return default structure instead of null
+      logger.warn('[MainController] No account info available, returning defaults');
+      return {
+        balance: 0,
+        equity: 0,
+        margin: 0,
+        freeMargin: 0,
+        marginLevel: 0,
+        profit: 0,
+        currency: 'USD',
+        leverage: 100,
+        accountNumber: 'N/A',
+        server: 'N/A',
+        company: 'N/A',
+        openPositions: 0
+      };
     } catch (error) {
       this.addLog('error', 'MT5', `Failed to get account info: ${(error as Error).message}`);
-      return null;
+      // Return default structure instead of null to prevent UI errors
+      return {
+        balance: 0,
+        equity: 0,
+        margin: 0,
+        freeMargin: 0,
+        marginLevel: 0,
+        profit: 0,
+        currency: 'USD',
+        leverage: 100,
+        accountNumber: 'N/A',
+        server: 'N/A',
+        company: 'N/A',
+        openPositions: 0
+      };
     }
   }
 

@@ -1,0 +1,71 @@
+========================================
+CARA HAPUS DATABASE LAMA
+Windows Executor V2
+========================================
+
+MASALAH:
+- Ada strategi aktif yang bukan dari platform
+- Ada position EURUSD palsu
+- Data dari testing lama
+
+PENYEBAB:
+- Database lama di komputer tidak terhapus saat install
+
+SOLUSI: Hapus database manual
+
+========================================
+LANGKAH-LANGKAH:
+========================================
+
+1. TUTUP APLIKASI
+   - Close Windows Executor V2 sepenuhnya
+   - Pastikan tidak ada di system tray
+
+2. BUKA FOLDER DATABASE
+   - Tekan: Win + R
+   - Ketik: %LOCALAPPDATA%\WindowsExecutorV2
+   - Tekan: Enter
+
+3. HAPUS FILE DATABASE
+   - Cari file: windows_executor_v2.db
+   - Klik kanan → Delete
+   - Confirm deletion
+
+4. RESTART APLIKASI
+   - Start Windows Executor V2
+   - Database baru akan dibuat (KOSONG)
+   - Tidak ada lagi data palsu!
+
+========================================
+HASIL SETELAH CLEANUP:
+========================================
+
+✓ Running Strategies: KOSONG
+✓ Available Strategies: HANYA DARI PLATFORM
+✓ Positions: NONE (sampai trading real)
+✓ Dashboard: 0 positions, 0 trades
+
+========================================
+ALTERNATIVE: PowerShell Script
+========================================
+
+Run script ini untuk auto-cleanup:
+
+  SOLUSI_HAPUS_DATA_PALSU.ps1
+
+Script akan:
+- Check if app running
+- Find database location
+- Delete old database
+- Clear logs (optional)
+
+========================================
+JIKA MASIH ADA MASALAH:
+========================================
+
+Check locations ini juga:
+1. %APPDATA%\WindowsExecutorV2\
+2. %LOCALAPPDATA%\WindowsExecutorV2\
+3. Installation folder\.env (for config)
+
+========================================

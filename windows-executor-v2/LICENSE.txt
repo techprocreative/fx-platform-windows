@@ -1,0 +1,51 @@
+Windows Executor V2 - End User License Agreement
+
+Copyright (c) 2025 NusaNexus
+
+This software is provided "as is", without warranty of any kind, express or implied, 
+including but not limited to the warranties of merchantability, fitness for a 
+particular purpose and noninfringement.
+
+TERMS AND CONDITIONS
+
+1. GRANT OF LICENSE
+   NusaNexus grants you a non-exclusive, non-transferable license to use the 
+   Windows Executor V2 software for trading purposes.
+
+2. RESTRICTIONS
+   You may not:
+   - Modify, reverse engineer, or decompile the software
+   - Remove or alter any copyright notices
+   - Distribute or sublicense the software
+   - Use the software for illegal purposes
+
+3. DISCLAIMER
+   Trading involves substantial risk of loss. The software is provided as a tool 
+   to execute trading strategies, but does not guarantee profits or prevent losses.
+   
+   You are solely responsible for:
+   - Your trading decisions
+   - Risk management
+   - Compliance with local regulations
+   - Account security
+
+4. LIABILITY
+   In no event shall NusaNexus be liable for any direct, indirect, incidental,
+   special, or consequential damages arising out of the use or inability to use
+   this software, including but not limited to trading losses.
+
+5. TERMINATION
+   This license is effective until terminated. Your rights under this license 
+   will terminate automatically without notice if you fail to comply with any term.
+
+6. UPDATES
+   NusaNexus may provide updates and improvements to the software. Continued use
+   of the software after updates constitutes acceptance of the updated terms.
+
+7. SUPPORT
+   Support is provided through the platform at https://fx.nusanexus.com
+
+By installing or using this software, you acknowledge that you have read this 
+agreement, understand it, and agree to be bound by its terms and conditions.
+
+For questions, contact: support@nusanexus.com

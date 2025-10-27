@@ -1,0 +1,267 @@
+=========================================================
+WINDOWS EXECUTOR V2 - SIAP DISTRIBUSI
+=========================================================
+
+STATUS: READY FOR BETA ✅
+Tanggal Build: 27 Oktober 2025
+Versi: 1.0.0 Beta
+
+=========================================================
+FILE INSTALLER
+=========================================================
+
+Lokasi: D:\fx-platform-windows-fresh\windows-executor-v2\dist\
+
+File Utama:
+- Windows Executor V2-Setup-1.0.0.exe (239 MB)
+
+File ini SIAP untuk didistribusikan!
+
+=========================================================
+CARA DISTRIBUSI
+=========================================================
+
+OPSI 1: Google Drive (RECOMMENDED)
+----------------------------------
+1. Upload file installer ke Google Drive
+2. Set permission: "Anyone with link can download"
+3. Copy link dan share ke users
+4. File size: 239 MB (4-5 menit upload)
+
+OPSI 2: Direct Download Server
+----------------------------------
+1. Upload ke web server / hosting
+2. Provide direct download link
+3. Users download langsung
+
+OPSI 3: USB / External Drive
+----------------------------------
+1. Copy installer ke USB drive
+2. Distribute secara manual
+3. Users install dari USB
+
+=========================================================
+INSTRUKSI UNTUK USER
+=========================================================
+
+STEP 1: Download & Install
+---------------------------
+1. Download Windows Executor V2-Setup-1.0.0.exe
+2. Double-click installer
+3. Pilih lokasi install (default: C:\Program Files\Windows Executor V2)
+4. Klik Install
+5. Tunggu sampai selesai (~2-3 menit)
+
+STEP 2: Konfigurasi Awal
+---------------------------
+1. Buka aplikasi (dari Desktop shortcut atau Start Menu)
+2. Aplikasi akan create file .env otomatis
+3. WAJIB isi 3 field ini di file .env:
+   
+   WE_V2_API_KEY=your_api_key_here
+   WE_V2_API_SECRET=your_api_secret_here
+   WE_V2_EXECUTOR_ID=executor_001
+
+4. Restart aplikasi
+
+STEP 3: Connect MT5
+---------------------------
+1. Pastikan MetaTrader 5 sudah terinstall
+2. Login ke MT5 account
+3. Aplikasi akan auto-detect MT5
+4. Backend start otomatis (tunggu 10-15 detik)
+
+STEP 4: Mulai Trading
+---------------------------
+1. Buka tab "Strategies"
+2. Lihat strategi dari platform di "Available Strategies"
+3. Klik "Start Strategy" untuk mulai
+4. Monitor di tab "Positions" dan "Dashboard"
+
+=========================================================
+FITUR UTAMA YANG SUDAH INCLUDE
+=========================================================
+
+✅ CRITICAL FIXES:
+- CORS Security (hanya allow fx.nusanexus.com)
+- Debug mode OFF di production
+- Rate limiting (100 request/menit)
+- Retry mechanism untuk network error
+- DELETE strategy permanent (fix database)
+
+✅ ADVANCED FEATURES:
+- Advanced Risk Management:
+  * Daily trade limits
+  * Daily loss limits
+  * Max drawdown protection
+  * Per-symbol position limits
+  * Correlation checks
+
+- Enhanced Partial Exits:
+  * 6 trigger types (profit, trailing, ATR, time, regime, price)
+  * Multi-level configuration
+  * Automatic execution
+
+✅ TRADING FEATURES:
+- MT5 auto-detection
+- Real-time updates (WebSocket)
+- Strategy management (start/stop/delete)
+- Position monitoring
+- Trade history
+- Performance metrics
+- Multi-timeframe analysis
+- 10+ indicators (ATR, EMA, RSI, MACD, CCI, dll)
+
+=========================================================
+SYSTEM REQUIREMENTS
+=========================================================
+
+Minimum:
+- Windows 10 64-bit (atau Windows 11)
+- RAM: 4 GB
+- Disk Space: 500 MB free
+- MetaTrader 5 installed
+- Internet connection
+
+Recommended:
+- Windows 11 64-bit
+- RAM: 8 GB
+- SSD storage
+- Fast internet connection
+
+=========================================================
+TESTING CHECKLIST (UNTUK BETA TESTERS)
+=========================================================
+
+Sebelum distribusi ke user lain, test dulu:
+
+[ ] Install di Windows 10
+[ ] Install di Windows 11  
+[ ] Config .env file
+[ ] MT5 auto-detection works
+[ ] Backend starts successfully
+[ ] Frontend loads properly
+[ ] Strategy start/stop works
+[ ] DELETE strategy works
+[ ] Rate limiting tested (100+ requests)
+[ ] Positions monitoring works
+[ ] Real-time updates works
+
+=========================================================
+TROUBLESHOOTING UMUM
+=========================================================
+
+ISSUE: Backend tidak start
+SOLUSI:
+- Check port 8081 tidak dipakai aplikasi lain
+- Check .env file ada dan configured
+- Check logs di: %LOCALAPPDATA%\WindowsExecutorV2\logs\
+
+ISSUE: MT5 tidak terdetect
+SOLUSI:
+- Pastikan MT5 terinstall
+- Coba set WE_V2_MT5_PATH manual di .env
+- Restart aplikasi
+
+ISSUE: Strategy tidak bisa start
+SOLUSI:
+- Pastikan MT5 sudah login
+- Check API credentials benar
+- Check internet connection
+- Check logs untuk detail error
+
+ISSUE: Rate limit error (429)
+SOLUSI:
+- Tunggu 1 menit
+- Limit: 100 requests per 60 detik
+- Normal untuk production security
+
+=========================================================
+SUPPORT & DOKUMENTASI
+=========================================================
+
+Logs Location:
+%LOCALAPPDATA%\WindowsExecutorV2\logs\
+
+Database Location:
+%LOCALAPPDATA%\WindowsExecutorV2\windows_executor_v2.db
+
+Config File:
+C:\Program Files\Windows Executor V2\.env
+
+Untuk hapus database (reset):
+1. Close aplikasi
+2. Delete: %LOCALAPPDATA%\WindowsExecutorV2\windows_executor_v2.db
+3. Restart aplikasi
+
+=========================================================
+RELEASE NOTES V1.0.0
+=========================================================
+
+NEW FEATURES:
+- Complete rewrite dengan Python + Electron
+- Advanced risk management
+- Enhanced partial exits system
+- Real-time WebSocket updates
+- Auto MT5 detection
+- Professional UI dengan charts
+
+SECURITY IMPROVEMENTS:
+- CORS restricted to platform only
+- Rate limiting active
+- Retry mechanisms for resilience
+- Debug mode disabled
+
+BUG FIXES:
+- Strategy DELETE now works properly
+- Database cleanup fixed
+- Import issues resolved
+- Mock data removed
+
+=========================================================
+DISTRIBUSI BETA
+=========================================================
+
+Recommended Beta Users: 10-20 orang
+Monitoring: Daily
+Duration: 1-2 minggu
+
+Setelah beta testing sukses:
+- Fix bugs yang ditemukan
+- Update documentation
+- Release ke production (unlimited users)
+
+=========================================================
+FILE BUILD INFO
+=========================================================
+
+Build Tool: PyInstaller 6.16.0 + electron-builder 24.13.3
+Python: 3.13.5
+Node: 11.5.1
+Electron: 27.3.11
+React: 18.2.0
+
+Build Time: ~90 seconds
+Installer Size: 239 MB
+Architecture: Windows x64
+
+=========================================================
+KESIMPULAN
+=========================================================
+
+✅ Build COMPLETE
+✅ Installer READY
+✅ All critical fixes INCLUDED
+✅ Advanced features IMPLEMENTED
+✅ READY FOR DISTRIBUTION
+
+File installer ada di:
+D:\fx-platform-windows-fresh\windows-executor-v2\dist\Windows Executor V2-Setup-1.0.0.exe
+
+SIAP UNTUK DIBAGIKAN KE BETA TESTERS!
+
+=========================================================
+Build by: Factory AI
+Date: October 27, 2025
+Status: BETA READY ✅
+=========================================================
