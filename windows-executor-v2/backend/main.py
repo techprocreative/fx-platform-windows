@@ -64,9 +64,9 @@ async def lifespan(app: FastAPI):  # noqa: D401
     pusher_client.register_loop(loop)
     pusher_client.attach_queue(command_queue)
     
-    # Sync active strategies from platform on startup
-    await _sync_active_strategies()
-
+    # NOTE: Strategies are started via Pusher commands from web platform
+    # No auto-sync on startup - following command-based architecture
+    
     tasks = [
         asyncio.create_task(_monitor_loop(stop_event)),
         asyncio.create_task(_command_loop(stop_event, command_queue)),
@@ -158,70 +158,13 @@ def _default_channel(executor_id: Optional[str]) -> str:
     return f"private-executor-{suffix}"
 
 
-async def _sync_active_strategies() -> None:
-    """Sync active strategies from platform on startup."""
-    logger = logging.getLogger(__name__)
-    logger.info("🔄 Syncing active strategies from platform...")
-    
-    try:
-        platform_api = WebPlatformAPI()
-        
-        # Fetch strategies assigned to this executor
-        strategies = await platform_api.fetch_active_strategies()
-        
-        if not strategies:
-            logger.info("📋 No active strategies assigned to this executor")
-            return
-        
-        logger.info(f"✅ Found {len(strategies)} active strategies assigned to executor")
-        
-        # Start each assigned strategy
-        started_count = 0
-        failed_count = 0
-        
-        for strategy_data in strategies:
-            try:
-                # Convert platform format to executor format
-                strategy_config = StrategyConfig(
-                    id=strategy_data.get("id"),
-                    name=strategy_data.get("name"),
-                    symbol=strategy_data.get("symbol"),
-                    timeframe=strategy_data.get("timeframe"),
-                    positionSize=strategy_data.get("positionSize", 0.01),
-                    entryConditions=strategy_data.get("entryConditions", []),
-                    entryLogic=strategy_data.get("entryLogic", "AND"),
-                    stopLoss=strategy_data.get("stopLoss", {"type": "pips", "value": 50}),
-                    takeProfit=strategy_data.get("takeProfit", {"type": "pips", "value": 100}),
-                    trailingStop=strategy_data.get("trailingStop"),
-                    riskManagement=strategy_data.get("riskManagement", {
-                        "maxRiskPerTrade": 1,
-                        "maxOpenPositions": 1,
-                        "maxDailyLoss": 5
-                    }),
-                    filters=strategy_data.get("filters", {}),
-                )
-                
-                # Start the strategy
-                status = await strategy_executor.start_strategy(strategy_config)
-                if status:
-                    started_count += 1
-                    logger.info(f"✅ Started strategy: {strategy_config.name} ({strategy_config.id})")
-                else:
-                    failed_count += 1
-                    logger.warning(f"⚠️ Failed to start strategy: {strategy_config.name}")
-                    
-            except Exception as exc:
-                failed_count += 1
-                logger.error(f"❌ Error starting strategy {strategy_data.get('name')}: {exc}")
-        
-        # Summary
-        if started_count > 0:
-            logger.info(f"🎯 Successfully started {started_count} strategies")
-        if failed_count > 0:
-            logger.warning(f"⚠️ Failed to start {failed_count} strategies")
-            
-    except Exception as exc:
-        logger.error(f"❌ Failed to sync strategies from platform: {exc}")
+# NOTE: Removed _sync_active_strategies function
+# Strategies are now started exclusively via Pusher commands from the web platform
+# This follows the command-based architecture and prevents duplicate executions
+# When a user clicks "Start Strategy" in the web platform:
+# 1. Web platform sends START_STRATEGY command via Pusher
+# 2. Windows Executor receives command and starts the strategy
+# 3. No auto-sync or database-based activation needed
 
 
 __all__ = ["app"]

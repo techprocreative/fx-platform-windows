@@ -26,11 +26,14 @@ async def get_available_strategies() -> List[Dict[str, Any]]:
     return strategies
 
 
-@router.get("/assigned", summary="Get active strategies assigned to this executor")
+@router.get("/assigned", summary="(Deprecated) Get active strategies assigned to this executor")
 async def get_assigned_strategies() -> List[Dict[str, Any]]:
-    """Fetch active strategies assigned to this executor from web platform."""
-    strategies = await platform_api.fetch_active_strategies()
-    return strategies
+    """DEPRECATED: Strategies are now started via Pusher commands only.
+    
+    This endpoint returns empty list to maintain backward compatibility.
+    Use Pusher commands (START_STRATEGY) from web platform instead.
+    """
+    return []  # No auto-sync - strategies start via commands only
 
 
 @router.get("/{strategy_id}", summary="Get strategy details from platform")

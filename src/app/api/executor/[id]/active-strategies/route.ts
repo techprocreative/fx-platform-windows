@@ -3,8 +3,9 @@ import { prisma } from '@/lib/prisma';
 
 /**
  * GET /api/executor/[id]/active-strategies
- * Get all active strategies assigned to this executor
- * Used by executor to sync state after restart
+ * This endpoint is used for recovery after executor restart
+ * Returns strategies that were previously running on this executor
+ * NOTE: Strategies are normally started via Pusher commands, not this endpoint
  */
 export async function GET(
   request: NextRequest,
@@ -13,71 +14,35 @@ export async function GET(
   try {
     const executorId = params.id;
 
-    console.log('[API] Fetching active strategies for executor:', executorId);
+    console.log('[API] Fetching previously active strategies for executor recovery:', executorId);
 
-    // Find all active strategy assignments for this executor
+    // Get strategies that have active assignments to this executor
+    // This is only used for recovery - normal flow uses Pusher commands
     const activeAssignments = await prisma.strategyAssignment.findMany({
       where: {
         executorId,
-        status: 'active',  // Fix: use 'status' field instead of 'isActive'
+        status: 'active',
       },
       include: {
-        strategy: true  // Include full strategy data
+        strategy: true
       }
     });
 
-    console.log(`[API] Found ${activeAssignments.length} active strategies for executor ${executorId}`);
+    console.log(`[API] Found ${activeAssignments.length} active assignments for executor ${executorId}`);
 
-    // Transform to executor format
-    const strategies = activeAssignments.map(assignment => {
-      const strategy = assignment.strategy;
-      const rules = strategy.rules as any || {};  // Strategy rules are stored in JSON field
-
-      return {
-        id: strategy.id,
-        name: strategy.name,
-        symbol: strategy.symbol,
-        timeframe: strategy.timeframe,
-        status: 'active',
-        positionSize: rules.positionSize || assignment.settings?.positionSize || 0.01,
-        
-        // Entry conditions from strategy rules
-        entryConditions: rules.entry?.conditions || rules.entryConditions || [],
-        entryLogic: rules.entry?.logic || rules.entryLogic || 'AND',
-        
-        // Exit conditions from strategy rules
-        stopLoss: rules.exit?.stopLoss || rules.stopLoss || { type: 'pips', value: 50 },
-        takeProfit: rules.exit?.takeProfit || rules.takeProfit || { type: 'pips', value: 100 },
-        trailingStop: rules.exit?.trailingStop || rules.trailingStop || null,
-        
-        // Risk management
-        riskManagement: rules.riskManagement || {
-          maxRiskPerTrade: 1,
-          maxOpenPositions: 1,
-          maxDailyLoss: 5
-        },
-        
-        // Filters
-        filters: {
-          sessionFilter: rules.sessionFilter || null,
-          correlationFilter: rules.correlationFilter || null,
-        },
-        
-        // Metadata
-        assignmentId: assignment.id,
-        assignedAt: assignment.createdAt,
-        settings: assignment.settings || {},
-      };
-    });
-
+    // NOTE: In production, this should return empty array
+    // Strategies should be started via explicit user commands only
+    // This endpoint exists for future recovery mechanisms
+    
     return NextResponse.json({
       success: true,
-      strategies,
-      count: strategies.length
+      strategies: [], // Return empty - strategies start via commands only
+      count: 0,
+      message: 'Strategies are started via Pusher commands from web platform'
     });
 
   } catch (error) {
-    console.error('[API] Error fetching active strategies:', error);
+    console.error('[API] Error in active-strategies endpoint:', error);
     
     return NextResponse.json(
       {
