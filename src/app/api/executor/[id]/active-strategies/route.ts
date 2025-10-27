@@ -19,14 +19,10 @@ export async function GET(
     const activeAssignments = await prisma.strategyAssignment.findMany({
       where: {
         executorId,
-        isActive: true,
+        status: 'active',  // Fix: use 'status' field instead of 'isActive'
       },
       include: {
-        strategy: {
-          include: {
-            rules: true,
-          }
-        }
+        strategy: true  // Include full strategy data
       }
     });
 
@@ -35,7 +31,7 @@ export async function GET(
     // Transform to executor format
     const strategies = activeAssignments.map(assignment => {
       const strategy = assignment.strategy;
-      const rules = strategy.rules;
+      const rules = strategy.rules as any || {};  // Strategy rules are stored in JSON field
 
       return {
         id: strategy.id,
@@ -43,27 +39,34 @@ export async function GET(
         symbol: strategy.symbol,
         timeframe: strategy.timeframe,
         status: 'active',
-        positionSize: strategy.lotSize || 0.01,
+        positionSize: rules.positionSize || assignment.settings?.positionSize || 0.01,
         
-        // Entry conditions
-        entryConditions: rules?.entry ? 
-          (typeof rules.entry === 'string' ? JSON.parse(rules.entry) : rules.entry) 
-          : [],
-        entryLogic: rules?.entryLogic || 'AND',
+        // Entry conditions from strategy rules
+        entryConditions: rules.entry?.conditions || rules.entryConditions || [],
+        entryLogic: rules.entry?.logic || rules.entryLogic || 'AND',
         
-        // Exit conditions  
-        stopLoss: rules?.exit?.stopLoss || { type: 'pips', value: 50 },
-        takeProfit: rules?.exit?.takeProfit || { type: 'pips', value: 100 },
+        // Exit conditions from strategy rules
+        stopLoss: rules.exit?.stopLoss || rules.stopLoss || { type: 'pips', value: 50 },
+        takeProfit: rules.exit?.takeProfit || rules.takeProfit || { type: 'pips', value: 100 },
+        trailingStop: rules.exit?.trailingStop || rules.trailingStop || null,
+        
+        // Risk management
+        riskManagement: rules.riskManagement || {
+          maxRiskPerTrade: 1,
+          maxOpenPositions: 1,
+          maxDailyLoss: 5
+        },
         
         // Filters
         filters: {
-          sessionFilter: rules?.sessionFilter || null,
-          correlationFilter: rules?.correlationFilter || null,
+          sessionFilter: rules.sessionFilter || null,
+          correlationFilter: rules.correlationFilter || null,
         },
         
         // Metadata
         assignmentId: assignment.id,
-        assignedAt: assignment.assignedAt,
+        assignedAt: assignment.createdAt,
+        settings: assignment.settings || {},
       };
     });
 
