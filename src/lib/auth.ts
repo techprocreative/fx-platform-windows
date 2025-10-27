@@ -67,6 +67,7 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: `${user.firstName} ${user.lastName}`.trim() || user.email,
           image: user.avatarUrl,
+          role: user.role || 'user',
         };
       },
     }),
@@ -76,6 +77,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.email = user.email;
+        token.role = user.role || 'user';
       }
 
       if (account?.provider === 'credentials') {
@@ -89,6 +91,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.email = token.email as string;
+        session.user.role = token.role as string;
       }
 
       return session;

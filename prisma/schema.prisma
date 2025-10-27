@@ -20,6 +20,7 @@ model User {
   lastName               String?
   phoneNumber            String?
   avatarUrl              String?
+  role                   String    @default("user") // "user" or "admin"
   twoFactorEnabled       Boolean   @default(false)
   twoFactorSecret        String?
   locked                 Boolean   @default(false)

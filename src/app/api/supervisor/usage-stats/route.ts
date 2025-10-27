@@ -20,6 +20,14 @@ export async function GET(request: NextRequest) {
       );
     }
     
+    // Check if user is admin
+    if (session.user.role !== 'admin') {
+      return NextResponse.json(
+        { error: 'Forbidden: Admin access required' },
+        { status: 403 }
+      );
+    }
+    
     const { searchParams } = new URL(request.url);
     const period = searchParams.get('period') || '30d';  // 24h, 7d, 30d, all
     
