@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { AppError, handleApiError } from '@/lib/errors';
 
 /**
  * GET /api/executor/[id]/active-strategies
@@ -12,6 +14,33 @@ export async function GET(
 ) {
   try {
     const executorId = params.id;
+
+    // Authenticate executor via API key/secret (hardening)
+    const apiKey = request.headers.get('x-api-key');
+    const apiSecret = request.headers.get('x-api-secret');
+
+    if (!apiKey || !apiSecret) {
+      throw new AppError(401, 'API credentials required', 'MISSING_CREDENTIALS');
+    }
+
+    // Ensure API credentials belong to the executor in path (binding)
+    const executor = await prisma.executor.findFirst({
+      where: {
+        id: executorId,
+        apiKey,
+        deletedAt: null,
+      },
+      select: { id: true, apiSecretHash: true },
+    });
+
+    if (!executor) {
+      throw new AppError(404, 'Executor not found', 'EXECUTOR_NOT_FOUND');
+    }
+
+    const isValidSecret = await bcrypt.compare(apiSecret, executor.apiSecretHash);
+    if (!isValidSecret) {
+      throw new AppError(401, 'Invalid API credentials', 'INVALID_CREDENTIALS');
+    }
 
     console.log('[API] Fetching active strategies for executor:', executorId);
 
@@ -74,15 +103,6 @@ export async function GET(
     });
 
   } catch (error) {
-    console.error('[API] Error fetching active strategies:', error);
-    
-    return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to fetch active strategies',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+    return handleApiError(error);
   }
 }

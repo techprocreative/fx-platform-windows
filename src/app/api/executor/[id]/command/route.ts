@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import bcrypt from 'bcryptjs';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 
@@ -218,6 +219,33 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
+    // Authenticate executor via API key/secret (hardening)
+    const apiKey = req.headers.get('x-api-key');
+    const apiSecret = req.headers.get('x-api-secret');
+
+    if (!apiKey || !apiSecret) {
+      throw new AppError(401, 'API credentials required', 'MISSING_CREDENTIALS');
+    }
+
+    // Ensure API credentials belong to the executor in path (binding)
+    const executor = await prisma.executor.findFirst({
+      where: {
+        id: params.id,
+        apiKey,
+        deletedAt: null,
+      },
+      select: { id: true, apiSecretHash: true },
+    });
+
+    if (!executor) {
+      throw new AppError(404, 'Executor not found', 'EXECUTOR_NOT_FOUND');
+    }
+
+    const isValidSecret = await bcrypt.compare(apiSecret, executor.apiSecretHash);
+    if (!isValidSecret) {
+      throw new AppError(401, 'Invalid API credentials', 'INVALID_CREDENTIALS');
+    }
+
     const body = await req.json();
     const { commandId, status, result } = body;
 
@@ -252,6 +280,12 @@ export async function PATCH(
       },
     });
 
+    if (status === 'executed' && result) {
+      await syncTradeFromResult(updatedCommand, params.id, result).catch((error) => {
+        console.error('Trade sync failed:', error);
+      });
+    }
+
     // Notify user about execution result via Pusher
     await notifyUserExecution(updatedCommand.userId, {
       commandId: commandId,
@@ -269,4 +303,78 @@ export async function PATCH(
   } catch (error) {
     return handleApiError(error);
   }
+}
+
+async function syncTradeFromResult(
+  command: { userId: string; executorId: string; parameters?: any },
+  executorId: string,
+  result: any
+) {
+  const tradePayload = result?.trade ?? null;
+  if (!tradePayload || !tradePayload.ticket || !tradePayload.symbol) {
+    return;
+  }
+
+  const ticket = String(tradePayload.ticket);
+  const strategyId: string | undefined = tradePayload.strategyId || command.parameters?.strategyId;
+  if (!strategyId) {
+    return;
+  }
+  const lots = tradePayload.lots !== undefined ? Number(tradePayload.lots) : undefined;
+  const data: any = {
+    userId: command.userId,
+    executorId,
+    strategyId,
+    ticket,
+    symbol: tradePayload.symbol,
+    type: tradePayload.type || 'BUY',
+    lots: lots ?? 0,
+    openPrice: tradePayload.openPrice !== undefined ? Number(tradePayload.openPrice) : 0,
+    openTime: tradePayload.openTime ? new Date(tradePayload.openTime) : new Date(),
+    stopLoss: tradePayload.stopLoss !== undefined ? Number(tradePayload.stopLoss) : null,
+    takeProfit: tradePayload.takeProfit !== undefined ? Number(tradePayload.takeProfit) : null,
+    comment: tradePayload.comment || null,
+  };
+
+  const existing = await prisma.trade.findFirst({
+    where: {
+      ticket,
+      executorId,
+    },
+  });
+
+  const updateData: any = {};
+  if (tradePayload.closePrice !== undefined) {
+    updateData.closePrice = Number(tradePayload.closePrice);
+  }
+  if (tradePayload.closeTime) {
+    updateData.closeTime = new Date(tradePayload.closeTime);
+  }
+  if (tradePayload.profit !== undefined) {
+    updateData.profit = Number(tradePayload.profit);
+  }
+  if (tradePayload.netProfit !== undefined) {
+    updateData.netProfit = Number(tradePayload.netProfit);
+  }
+  if (tradePayload.swap !== undefined) {
+    updateData.swap = Number(tradePayload.swap);
+  }
+  if (tradePayload.commission !== undefined) {
+    updateData.commission = Number(tradePayload.commission);
+  }
+
+  if (existing) {
+    if (Object.keys(updateData).length === 0) {
+      return;
+    }
+    await prisma.trade.update({
+      where: { id: existing.id },
+      data: updateData,
+    });
+    return;
+  }
+
+  await prisma.trade.create({
+    data,
+  });
 }

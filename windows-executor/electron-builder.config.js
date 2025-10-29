@@ -51,6 +51,11 @@ module.exports = {
       from: "resources/icons",
       to: "resources/icons",
       filter: ["*.ico", "*.png"]  // Copy icons
+    },
+    {
+      from: "resources/backend",
+      to: "backend",
+      filter: ["*.exe"]
     }
   ],
 

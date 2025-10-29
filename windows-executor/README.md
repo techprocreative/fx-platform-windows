@@ -268,6 +268,26 @@ When reporting issues, please include:
 - **Disclaimer**: Trading involves risk. Past performance is not indicative of future results.
 - **Privacy**: We don't store or share your trading data. All data remains on your local machine.
 
+## 🔧 Packaging Backend (Executor V2)
+
+When building the next-generation Windows Executor V2 bundle:
+
+```
+cd ../windows-executor-v2/backend
+pip install -r requirements.txt
+pip install pyinstaller
+./build-backend.ps1
+
+# Copy the executable into Electron resources
+copy dist-backend\backend-service.exe ..\windows-executor\resources\backend\backend-service.exe
+
+# Then package Electron as usual
+cd ..\windows-executor
+npm run build
+```
+
+Electron will include the backend executable and launch it automatically for packaged builds.
+
 ## 🚀 Version History
 
 ### v1.0.0 (Current)

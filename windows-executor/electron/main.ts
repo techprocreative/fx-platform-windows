@@ -1,4 +1,5 @@
 import { app, BrowserWindow, ipcMain, dialog, Tray, Menu, nativeImage } from 'electron';
+import { spawn, ChildProcess } from 'child_process';
 import * as path from 'path';
 import * as url from 'url';
 import { autoUpdater } from 'electron-updater';
@@ -21,6 +22,7 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let mainController: MainController | null = null;
 let isQuitting = false;
+let backendProcess: ChildProcess | null = null;
 
 // Function to create the main window
 function createWindow(): void {
@@ -115,6 +117,9 @@ function createWindow(): void {
 
   // Create system tray
   createTray();
+
+  // Start backend service (packaged builds auto-start service)
+  startBackendService();
 }
 
 // Function to create system tray
@@ -169,6 +174,58 @@ function createTray(): void {
       }
     }
   });
+}
+
+function getBackendExecutablePath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'backend', 'backend-service.exe');
+  }
+  return '';
+}
+
+function startBackendService(): void {
+  if (!app.isPackaged) {
+    console.log('[Backend] Skipping auto-start (development mode).');
+    return;
+  }
+
+  if (backendProcess) {
+    console.log('[Backend] Process already running.');
+    return;
+  }
+
+  const executable = getBackendExecutablePath();
+  if (!executable || !existsSync(executable)) {
+    console.warn('[Backend] Executable not found:', executable);
+    return;
+  }
+  console.log('[Backend] Launching backend executable:', executable);
+
+  backendProcess = spawn(executable, [], {
+    windowsHide: true,
+    stdio: 'ignore',
+  });
+
+  backendProcess.on('exit', (code, signal) => {
+    console.log(`[Backend] exited with code ${code} signal ${signal}`);
+    backendProcess = null;
+    if (!isQuitting) {
+      console.warn('[Backend] Restarting backend service in 3s...');
+      setTimeout(() => startBackendService(), 3000);
+    }
+  });
+
+  backendProcess.on('error', (error) => {
+    console.error('[Backend] Failed to start backend service:', error);
+    backendProcess = null;
+  });
+}
+
+function stopBackendService(): void {
+  if (backendProcess) {
+    backendProcess.kill();
+    backendProcess = null;
+  }
 }
 
 // Function to initialize the main controller
@@ -597,6 +654,7 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+  stopBackendService();
 });
 
 app.on('activate', () => {
@@ -609,7 +667,8 @@ app.on('activate', () => {
 // Before quitting
 app.on('before-quit', () => {
   isQuitting = true;
-  
+  stopBackendService();
+
   // Cleanup services
   try {
     if (mainController) {
@@ -681,4 +740,3 @@ function setupAutoUpdater(): void {
     console.error('Auto-updater error:', error);
   });
 }
-
